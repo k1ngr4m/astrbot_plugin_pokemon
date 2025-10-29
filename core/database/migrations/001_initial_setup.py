@@ -89,6 +89,21 @@ def up(cursor: sqlite3.Cursor):
         );
     """)
 
+    # --- 6. 宝可梦技能定义 ---
+    cursor.execute("""
+        CREATE TABLE pokemon_moves (
+            id INT PRIMARY KEY AUTO_INCREMENT COMMENT '技能ID',
+            name VARCHAR(50) NOT NULL COMMENT '技能名称',
+            type_id INT COMMENT '技能属性类型ID',
+            category ENUM('Physical','Special','Status') NOT NULL COMMENT '技能类别：物理/特殊/变化',
+            power INT COMMENT '威力',
+            accuracy INT COMMENT '命中率',
+            pp INT COMMENT '可使用次数PP',
+            description TEXT COMMENT '技能描述',
+            FOREIGN KEY (type_id) REFERENCES pokemon_types(id)
+        )
+    """)
+
     # --- 7. 玩家宝可梦进化关系 ---
     cursor.execute("""
         CREATE TABLE pokemon_evolution (
