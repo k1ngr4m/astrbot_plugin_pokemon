@@ -5,6 +5,7 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from .core.database.migration import run_migrations
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
+from .core.services.data_setup_service import DataSetupService
 from .handlers import common_handlers
 
 from .core.services.user_service import UserService
@@ -60,6 +61,12 @@ class PokemonPlugin(Star):
             user_repo=self.user_repo,
             config=self.game_config
         )
+
+        # --- 4. 启动后台任务 ---
+
+        # --- 5. 初始化核心游戏数据 ---
+        data_setup_service = DataSetupService()
+        data_setup_service.setup_initial_data()
 
         # 管理员扮演功能
         self.impersonation_map = {}
