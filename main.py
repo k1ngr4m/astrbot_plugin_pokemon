@@ -45,6 +45,7 @@ class PokemonPlugin(Star):
         # 初始化数据库模式
         plugin_root_dir = os.path.dirname(__file__)
         migrations_path = os.path.join(plugin_root_dir, "core", "database", "migrations")
+        print(migrations_path)
         run_migrations(db_path, migrations_path)
 
         # --- 2. 组合根：实例化所有仓储层 ---
@@ -75,7 +76,7 @@ class PokemonPlugin(Star):
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
 
-    @filter.command("注册")
+    @filter.command("宝可梦注册")
     async def register(self, event: AstrMessageEvent):
         """注册成为宝可梦游戏玩家，开始你的宝可梦之旅"""
         async for r in common_handlers.register_user(self, event):

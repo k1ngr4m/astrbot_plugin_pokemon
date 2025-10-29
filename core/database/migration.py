@@ -53,7 +53,7 @@ def run_migrations(db_path: str, migrations_dir: str):
         if version > current_version:
             logger.info(f"正在应用迁移脚本: {filename}...")
             try:
-                module_name = f"data.plugins.astrbot_plugin_fishing.core.database.migrations.{filename[:-3]}"
+                module_name = f"data.plugins.astrbot_plugin_pokemon.core.database.migrations.{filename[:-3]}"
                 migration_module = importlib.import_module(module_name)
 
                 with sqlite3.connect(db_path) as conn:

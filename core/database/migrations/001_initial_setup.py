@@ -25,7 +25,7 @@ def up(cursor: sqlite3.Cursor):
     # --- 2. 宝可梦种族定义（图鉴） ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_species (
-            id INTEGER PRIMARY KEY AUTOINCREMENT, -- 种族ID
+            id INTEGER PRIMARY KEY,               -- 种族ID
             name_en TEXT NOT NULL,                -- 英文名
             name_cn TEXT,                         -- 中文名
             generation INTEGER,                   -- 世代编号
@@ -166,3 +166,49 @@ def up(cursor: sqlite3.Cursor):
     """)
 
     logger.info("✅ 数据库初始结构创建完成 (SQLite)")
+    # --- 插入宝可梦数据 ---
+    cursor.execute("""
+        INSERT INTO pokemon_types (name)
+            VALUES ('Normal'), ('Fire'), ('Water'), ('Grass'), ('Electric'),
+            ('Ice'), ('Fighting'), ('Poison'), ('Ground'), ('Flying'), ('Psychic'),
+            ('Bug'), ('Rock'), ('Ghost'), ('Dragon'), ('Dark'), ('Steel'), ('Fairy');
+    """)
+
+    cursor.execute("""
+        INSERT INTO pokemon_species
+           (id, name_en, name_cn, generation, base_hp, base_attack, base_defense, base_sp_attack,
+            base_sp_defense, base_speed, height, weight, description)
+           VALUES
+               -- 妙蛙种子进化线
+               (1,  'Bulbasaur',  '妙蛙种子',   1, 45, 49, 49, 65, 65, 45, 0.7, 6.9, '可以从背上的种子吸收营养成长。喜欢阳光的地方。'),
+               (2,  'Ivysaur',    '妙蛙草',     1, 60, 62, 63, 80, 80, 60, 1.0, 13.0, '随着花苞的成长，身体变得更加强壮。'),
+               (3,  'Venusaur',   '妙蛙花',     1, 80, 82, 83, 100, 100, 80, 2.0, 100.0, '背上的花在阳光下绽放，香气能安抚心灵。'),
+        
+               -- 小火龙进化线
+               (4,  'Charmander', '小火龙',     1, 39, 52, 43, 60, 50, 65, 0.6, 8.5, '尾巴燃烧的火焰表示它的心情。火焰若熄灭，它就会死去。'),
+               (5,  'Charmeleon', '火恐龙',     1, 58, 64, 58, 80, 65, 80, 1.1, 19.0, '性格暴躁，战斗时会用尾巴的火焰猛烈攻击。'),
+               (6,  'Charizard',  '喷火龙',     1, 78, 84, 78, 109, 85, 100, 1.7, 90.5, '飞翔在天空中吐出炽热的火焰，能融化一切。'),
+        
+               -- 杰尼龟进化线
+               (7,  'Squirtle',   '杰尼龟',     1, 44, 48, 65, 50, 64, 43, 0.5, 9.0, '用壳保护自己。受到攻击时会往壳里缩。'),
+               (8,  'Wartortle',  '卡咪龟',     1, 59, 63, 80, 65, 80, 58, 1.0, 22.5, '尾巴上长有毛绒绒的毛，是长寿的象征。'),
+               (9,  'Blastoise',  '水箭龟',     1, 79, 83, 100, 85, 105, 78, 1.6, 85.5, '背上的水炮能以超高压发射强力水流。')
+       """)
+
+    cursor.execute("""
+        INSERT INTO pokemon_species_types (species_id, type_id)
+            VALUES  (1, 4), (1, 8), (2, 4), (2, 8), (3, 4), (3, 8),
+                    (4, 2), (5, 2), (6, 2),
+                    (7, 3), (8, 3), (9, 3);
+                   """)
+
+    cursor.execute("""
+       INSERT INTO pokemon_evolution (from_species_id, to_species_id, method, condition_value)
+            VALUES
+               (1, 2, 'LevelUp', '16'),
+               (2, 3, 'LevelUp', '32'),
+               (4, 5, 'LevelUp', '16'),
+               (5, 6, 'LevelUp', '36'),
+               (7, 8, 'LevelUp', '16'),
+               (8, 9, 'LevelUp', '36');
+           """)
