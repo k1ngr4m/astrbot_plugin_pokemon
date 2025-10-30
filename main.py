@@ -4,6 +4,7 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from .core.database.migration import run_migrations
+from .core.repositories.sqlite_item_template_repo import SqliteItemTemplateRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
 from .core.services.data_setup_service import DataSetupService
 from .handlers import common_handlers
@@ -51,6 +52,7 @@ class PokemonPlugin(Star):
 
         # --- 2. 组合根：实例化所有仓储层 ---
         self.user_repo = SqliteUserRepository(db_path)
+        self.item_template_repo = SqliteItemTemplateRepository(db_path)
 
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
@@ -65,7 +67,7 @@ class PokemonPlugin(Star):
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
-        data_setup_service = DataSetupService()
+        data_setup_service = DataSetupService(self.item_template_repo)
         data_setup_service.setup_initial_data()
 
         # 管理员扮演功能

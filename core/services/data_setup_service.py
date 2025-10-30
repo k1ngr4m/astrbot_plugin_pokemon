@@ -21,8 +21,8 @@ class DataSetupService:
         这是一个幂等操作（idempotent），可以安全地多次调用而不会重复插入数据。
         """
         try:
-            existing_fish = self.item_template_repo.get_all_pokemon()
-            if existing_fish:
+            existing_pokemon = self.item_template_repo.get_all_pokemon()
+            if existing_pokemon:
                 logger.info("数据库核心数据已存在，跳过初始化。")
                 return
         except Exception as e:
