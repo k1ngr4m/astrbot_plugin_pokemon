@@ -29,3 +29,6 @@ class User:
 
     # --- 有默认值的字段放后面 ---
     coins: int = 0
+    level: int = 1
+    exp: int = 0
+    init_select: Optional[int] = 0

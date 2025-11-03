@@ -61,6 +61,7 @@ class PokemonPlugin(Star):
         # 3.3 实例化其他核心服务
         self.user_service = UserService(
             user_repo=self.user_repo,
+            item_template_repo=self.item_template_repo,
             config=self.game_config
         )
 
@@ -89,6 +90,12 @@ class PokemonPlugin(Star):
     async def register(self, event: AstrMessageEvent):
         """注册成为宝可梦游戏玩家，开始你的宝可梦之旅"""
         async for r in common_handlers.register_user(self, event):
+            yield r
+
+    @filter.command("初始选择")
+    async def init_select(self, event: AstrMessageEvent):
+        """初始化选择宝可梦。用法：初始选择 <宝可梦ID>"""
+        async for r in common_handlers.init_select(self, event):
             yield r
 
     async def terminate(self):

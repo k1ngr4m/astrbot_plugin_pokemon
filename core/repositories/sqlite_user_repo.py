@@ -55,6 +55,10 @@ class SqliteUserRepository(AbstractUserRepository):
             user_id=row["user_id"],
             nickname=row["nickname"],
             coins=row["coins"],
+            level=row["level"],
+            exp=row["exp"],
+            init_select = row["init_select"],
+            created_at=parse_datetime(row["created_at"]),
         )
 
     def get_by_id(self, user_id: str) -> Optional[User]:
