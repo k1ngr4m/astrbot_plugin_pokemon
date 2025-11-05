@@ -54,3 +54,63 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
                         :description)
             """, {**data})
             conn.commit()
+
+    def add_pokemon_type_template(self, data: Dict[str, Any]) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO pokemon_types
+                (name)
+                VALUES (:name)
+            """, {**data})
+            conn.commit()
+
+    def add_pokemon_species_type_template(self, data: Dict[str, Any]) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO pokemon_species_types
+                (species_id, type_id)
+                VALUES (:species_id, :type_id)
+            """, {**data})
+            conn.commit()
+
+    def add_pokemon_evolution_template(self, data: Dict[str, Any]) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO pokemon_evolutions
+                (from_species_id, to_species_id, method, condition_value)
+                VALUES (:from_species_id, :to_species_id, :method, :condition_value)
+            """, {**data})
+            conn.commit()
+
+    def add_item_template(self, data: Dict[str, Any]) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO items
+                (id, name, rarity, price, type, description)
+                VALUES (:id, :name, :rarity, :price, :type, :description)
+            """, {**data})
+            conn.commit()
+
+    def add_pokemon_move_template(self, data: Dict[str, Any]) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO pokemon_moves
+                (id, name, type_id, category, power, accuracy, pp, description)
+                VALUES (:id, :name, :type_id, :category, :power, :accuracy, :pp, :description)
+            """, {**data})
+            conn.commit()
+
+    def add_pokemon_species_move_template(self, data: Dict[str, Any]) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT OR IGNORE INTO pokemon_species_moves
+                (species_id, move_id, learn_method, learn_value)
+                VALUES (:species_id, :move_id, :learn_method, :learn_value)
+            """, {**data})
+            conn.commit()

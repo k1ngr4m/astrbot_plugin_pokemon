@@ -109,7 +109,7 @@ def up(cursor: sqlite3.Cursor):
 
     # --- 7. 宝可梦进化关系 ---
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pokemon_evolution (
+        CREATE TABLE IF NOT EXISTS pokemon_evolutions (
             from_species_id INTEGER NOT NULL,     -- 进化前种族
             to_species_id INTEGER NOT NULL,       -- 进化后种族
             method TEXT CHECK(method IN ('LevelUp','Item','Trade','Happiness','Other')) NOT NULL,
@@ -165,6 +165,21 @@ def up(cursor: sqlite3.Cursor):
             end_time TEXT,                        -- 结束时间
             FOREIGN KEY (user1_id) REFERENCES users(user_id),
             FOREIGN KEY (user2_id) REFERENCES users(user_id)
+        );
+    """)
+
+    # ==========================================================================
+    # 新增：11. 宝可梦种族-技能学习关系表（核心新增表）
+    # ==========================================================================
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pokemon_species_moves (
+            species_id INTEGER NOT NULL,          -- 宝可梦种族ID
+            move_id INTEGER NOT NULL,             -- 技能ID
+            learn_method TEXT CHECK(learn_method IN ('LevelUp','EggMove','TM','HM','Tutor','Initial')) NOT NULL,
+            learn_value TEXT NOT NULL,            -- 学习条件（等级/道具编号/无）
+            PRIMARY KEY (species_id, move_id, learn_method), -- 复合唯一键
+            FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
+            FOREIGN KEY (move_id) REFERENCES pokemon_moves(id) ON DELETE CASCADE
         );
     """)
 

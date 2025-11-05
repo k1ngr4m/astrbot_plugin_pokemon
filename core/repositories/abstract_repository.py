@@ -52,3 +52,21 @@ class AbstractItemTemplateRepository(ABC):
 
     @abstractmethod
     def add_pokemon_template(self, pokemon_data: Dict[str, Any]) -> None: pass
+
+    @abstractmethod
+    def add_pokemon_type_template(self, type_data: Dict[str, Any]) -> None: pass
+
+    @abstractmethod
+    def add_pokemon_species_type_template(self, species_type_data: Dict[str, Any]) -> None: pass
+
+    @abstractmethod
+    def add_pokemon_evolution_template(self, evolution_data: Dict[str, Any]) -> None: pass
+
+    @abstractmethod
+    def add_item_template(self, item_data: Dict[str, Any]) -> None: pass
+
+    @abstractmethod
+    def add_pokemon_move_template(self, move_data: Dict[str, Any]) -> None: pass
+
+    @abstractmethod
+    def add_pokemon_species_move_template(self, species_move_data: Dict[str, Any]) -> None: pass
