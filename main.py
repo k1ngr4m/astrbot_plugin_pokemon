@@ -7,7 +7,7 @@ from .core.database.migration import run_migrations
 from .core.repositories.sqlite_item_template_repo import SqliteItemTemplateRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
 from .core.services.data_setup_service import DataSetupService
-from .handlers import common_handlers
+from .handlers.common_handlers import CommonHandlers
 
 from .core.services.user_service import UserService
 
@@ -65,6 +65,8 @@ class PokemonPlugin(Star):
             config=self.game_config
         )
 
+
+        self.common_handlers = CommonHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -89,13 +91,31 @@ class PokemonPlugin(Star):
     @filter.command("宝可梦注册")
     async def register(self, event: AstrMessageEvent):
         """注册成为宝可梦游戏玩家，开始你的宝可梦之旅"""
-        async for r in common_handlers.register_user(self, event):
+        async for r in self.common_handlers.register_user(event):
             yield r
 
     @filter.command("初始选择")
     async def init_select(self, event: AstrMessageEvent):
         """初始化选择宝可梦。用法：初始选择 <宝可梦ID>"""
-        async for r in common_handlers.init_select(self, event):
+        async for r in self.common_handlers.init_select(event):
+            yield r
+
+    @filter.command("我的宝可梦")
+    async def my_pokemon(self, event: AstrMessageEvent):
+        """查看我的宝可梦列表"""
+        async for r in self.common_handlers.my_pokemon(event):
+            yield r
+
+    @filter.command("队伍设置")
+    async def set_team(self, event: AstrMessageEvent):
+        """设置队伍中的宝可梦"""
+        async for r in self.common_handlers.set_team(event):
+            yield r
+
+    @filter.command("查看队伍")
+    async def view_team(self, event: AstrMessageEvent):
+        """查看当前队伍配置"""
+        async for r in self.common_handlers.view_team(event):
             yield r
 
     async def terminate(self):

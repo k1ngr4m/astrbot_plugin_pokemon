@@ -44,13 +44,13 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO pokemon_species 
-                (id, name_en, name_cn, generation, base_hp, base_attack, 
-                 base_defense, base_sp_attack, base_sp_defense, base_speed, 
+                INSERT OR IGNORE INTO pokemon_species
+                (id, name_en, name_cn, generation, base_hp, base_attack,
+                 base_defense, base_sp_attack, base_sp_defense, base_speed,
                 height, weight, description)
-                VALUES (:id, :name_en, :name_cn, :generation, :base_hp, 
-                        :base_attack, :base_defense, :base_sp_attack, 
-                        :base_sp_defense, :base_speed, :height, :weight, 
+                VALUES (:id, :name_en, :name_cn, :generation, :base_hp,
+                        :base_attack, :base_defense, :base_sp_attack,
+                        :base_sp_defense, :base_speed, :height, :weight,
                         :description)
             """, {**data})
             conn.commit()

@@ -20,6 +20,26 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def add(self, user: User) -> None: pass
 
+    # 创建用户宝可梦记录
+    @abstractmethod
+    def create_user_pokemon(self, user_id: str, species_id: int, nickname: Optional[str] = None) -> int: pass
+
+    # 更新用户的初始选择状态
+    @abstractmethod
+    def update_init_select(self, user_id: str, pokemon_id: int) -> None: pass
+
+    # 获取用户的所有宝可梦
+    @abstractmethod
+    def get_user_pokemon(self, user_id: str) -> List[Dict[str, Any]]: pass
+
+    # 获取用户的队伍配置
+    @abstractmethod
+    def get_user_team(self, user_id: str) -> Optional[str]: pass
+
+    # 更新用户的队伍配置
+    @abstractmethod
+    def update_user_team(self, user_id: str, team_data: str) -> None: pass
+
 
 class AbstractItemTemplateRepository(ABC):
     """物品模板数据仓储接口"""
@@ -31,4 +51,4 @@ class AbstractItemTemplateRepository(ABC):
     def get_all_pokemon(self) -> List[Pokemon]: pass
 
     @abstractmethod
-    def add_pokemon_template(self, pokemon_data: Dict[str, Any]) -> Pokemon: pass
+    def add_pokemon_template(self, pokemon_data: Dict[str, Any]) -> None: pass
