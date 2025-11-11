@@ -42,7 +42,7 @@ class UserService:
 
         return {
             "success": True,
-            "message": f"注册成功！欢迎 {nickname} 🎉 你获得了 {initial_coins} 金币作为起始资金。请从妙蛙种子1、小火龙4、杰尼龟7中选择作为初始宝可梦。输入 /初始选择 <宝可梦ID> 来选择。"
+            "message": f"注册成功！欢迎 {nickname} 🎉 你获得了 {initial_coins} 金币作为起始资金。\n\n请从妙蛙种子1、小火龙4、杰尼龟7中选择作为初始宝可梦。\n\n输入 /初始选择 <宝可梦ID> 来选择。"
         }
 
     def init_select_pokemon(self, user_id: str, pokemon_id: int) -> Dict[str, Any]:
@@ -65,15 +65,19 @@ class UserService:
         if not pokemon_template:
             return {"success": False, "message": "宝可梦不存在"}
 
-        # 创建用户宝可梦记录
-        self.user_repo.create_user_pokemon(user_id, pokemon_id, pokemon_template.name_cn)
+        # 创建用户宝可梦记录，使用模板数据完善实例
+        new_pokemon_id = self.user_repo.create_user_pokemon(
+            user_id,
+            pokemon_id,
+            pokemon_template.name_cn
+        )
 
         # 更新用户的初始选择状态
         self.user_repo.update_init_select(user_id, pokemon_id)
 
         return {
             "success": True,
-            "message": f"成功将 {pokemon_template.name_cn} 初始选择为宝可梦！"
+            "message": f"成功将 {pokemon_template.name_cn} 初始选择为宝可梦！它已根据种族模板完善了个体值、努力值等特性。"
         }
 
     def get_user_pokemon(self, user_id: str) -> Dict[str, Any]:
@@ -97,7 +101,7 @@ class UserService:
         formatted_pokemon = []
         for pokemon in user_pokemon_list:
             formatted_pokemon.append({
-                "id": pokemon["id"],
+                "shortcode": pokemon.get("shortcode", f"P{pokemon['id']:04d}"),  # 使用短码，如果不存在则生成
                 "species_id": pokemon["species_id"],
                 "species_name": pokemon["species_name"],
                 "species_en_name": pokemon["species_en_name"],

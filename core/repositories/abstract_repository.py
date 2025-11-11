@@ -35,6 +35,12 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def get_user_pokemon_by_id(self, pokemon_id: str) -> Optional[Dict[str, Any]]: pass
 
+    @abstractmethod
+    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[Dict[str, Any]]: pass
+
 class AbstractItemTemplateRepository(ABC):
     """物品模板数据仓储接口"""
     # 获取Pokemon模板

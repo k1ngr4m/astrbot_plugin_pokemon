@@ -117,9 +117,9 @@ class PokemonPlugin(Star):
         async for r in self.common_handlers.my_pokemon(event):
             yield r
 
-    @filter.command("队伍设置")
+    @filter.command("设置队伍")
     async def set_team(self, event: AstrMessageEvent):
-        """设置队伍中的宝可梦"""
+        """设置队伍中的宝可梦，最多6只宝可梦，第一个为出战宝可梦"""
         async for r in self.team_handlers.set_team(event):
             yield r
 

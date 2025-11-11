@@ -21,16 +21,27 @@ class TeamHandlers:
 
         args = event.message_str.split(" ")
         if len(args) < 2:
-            yield event.plain_result("❌ 请输入宝可梦实例ID。用法：队伍设置 <宝可梦ID>\n\n💡 提示：使用 我的宝可梦 指令查看您的宝可梦列表和对应的ID")
+            yield event.plain_result("❌ 请输入宝可梦短码列表。用法：设置队伍 <宝可梦短码1> <宝可梦短码2> ...\n\n💡 提示：最多可设置6只宝可梦，第一个为出战宝可梦。使用 我的宝可梦 指令查看您的宝可梦列表和对应的短码。")
             return
 
-        try:
-            pokemon_id = int(args[1])
-        except ValueError:
-            yield event.plain_result("❌ 请输入正确的宝可梦实例ID。\n💡 提示：使用 我的宝可梦 指令查看您的宝可梦列表和对应的ID")
+        # 获取用户输入的宝可梦短码列表（跳过命令本身）
+        pokemon_shortcodes = args[1:]
+
+        if len(pokemon_shortcodes) > 6:
+            yield event.plain_result("❌ 队伍最多只能包含6只宝可梦。")
             return
 
-        result = self.team_service.set_team_pokemon(user_id, pokemon_id)
+        if len(pokemon_shortcodes) == 0:
+            yield event.plain_result("❌ 请至少选择1只宝可梦加入队伍。")
+            return
+
+        # 验证每个短码格式（支持数字ID或P开头的短码）
+        for shortcode in pokemon_shortcodes:
+            if not (shortcode.isdigit() or (shortcode.startswith('P') and shortcode[1:].isdigit())):
+                yield event.plain_result(f"❌ 宝可梦短码 {shortcode} 格式不正确（支持数字ID或P开头的短码如P001）。")
+                return
+
+        result = self.team_service.set_team_pokemon(user_id, pokemon_shortcodes)
 
         if result["success"]:
             yield event.plain_result(f"✅ {result['message']}")
@@ -63,16 +74,28 @@ class TeamHandlers:
         message = "🏆 当前队伍配置：\n\n"
         if "active_pokemon_info" in team:
             pokemon = team["active_pokemon_info"]
-            message += f"⚔️ 出战宝可梦：{pokemon['nickname']}\n"
-            message += f"   实例ID: {pokemon['id']} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']}\n"
+            shortcode = pokemon.get("shortcode", f"P{pokemon['id']:04d}")
+            message += f"⚔️ 出战宝可梦：{pokemon['species_name']}\n"
+            message += f"   短码: {shortcode} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']}\n"
         else:
             message += "⚔️ 出战宝可梦：暂无\n"
 
-        # 显示队伍列表（当前只支持一只，但可以扩展）
-        if "team_list" in team:
+        # 显示队伍列表
+        if "team_list" in team and team["team_list"]:
             message += f"\n队伍成员 ({len(team['team_list'])}/6)：\n"
-            for i, pokemon in enumerate(team["team_list"], 1):
-                # 这里可以进一步优化，显示更多宝可梦信息
-                message += f"  {i}. 实例ID: {pokemon['id']} | 昵称: {pokemon['pokemon_data']['nickname']}\n"
+            for i, pokemon_data_entry in enumerate(team["team_list"], 1):
+                # 从pokemon_data_entry中提取信息
+                pokemon = pokemon_data_entry.get('pokemon_data', {})
+                shortcode = pokemon.get('shortcode', f"P{pokemon.get('id', 0):04d}")
+                species_name = pokemon.get('species_name', '未知')
+                level = pokemon.get('level', 1)
+                current_hp = pokemon.get('current_hp', 0)
+
+                # 标记出战宝可梦（第一个是出战的）
+                marker = " ⭐" if i == 1 else ""
+                message += f"  {i}. {species_name}{marker}\n"
+                message += f"     短码: {shortcode} | 等级: {level} | HP: {current_hp}\n"
+        else:
+            message += "\n队伍成员 (0/6)：暂无\n"
 
         yield event.plain_result(message)

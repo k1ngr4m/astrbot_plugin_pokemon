@@ -87,10 +87,16 @@ def up(cursor: sqlite3.Cursor):
             is_shiny INTEGER DEFAULT 0,           -- 是否异色（0/1）
             moves TEXT,                           -- 技能列表（JSON字符串）
             caught_time TEXT DEFAULT CURRENT_TIMESTAMP,
+            shortcode TEXT,                       -- 短码ID（格式为P+4位数字）
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (species_id) REFERENCES pokemon_species(id)
         );
     """)
+
+    # 为user_pokemon表创建索引
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_shortcode ON user_pokemon(shortcode)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_user_id ON user_pokemon(user_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_species_id ON user_pokemon(species_id)")
 
     # --- 6. 宝可梦技能定义 ---
     cursor.execute("""
@@ -182,5 +188,54 @@ def up(cursor: sqlite3.Cursor):
             FOREIGN KEY (move_id) REFERENCES pokemon_moves(id) ON DELETE CASCADE
         );
     """)
+
+    # 为其他表创建必要索引
+    try:
+        # users表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_nickname ON users(nickname)")
+
+        # pokemon_species表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_name ON pokemon_species(name_cn, name_en)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_generation ON pokemon_species(generation)")
+
+        # pokemon_moves表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_name ON pokemon_moves(name)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(type_id)")
+
+        # user_items表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_items_user_id ON user_items(user_id)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_items_item_id ON user_items(item_id)")
+
+        # pokemon_species_moves表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_moves_species_id ON pokemon_species_moves(species_id)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_moves_move_id ON pokemon_species_moves(move_id)")
+
+        # battle_records表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_battle_records_user1_id ON battle_records(user1_id)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_battle_records_user2_id ON battle_records(user2_id)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_battle_records_winner_id ON battle_records(winner_id)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_battle_records_battle_type ON battle_records(battle_type)")
+
+        # pokemon_species_types表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_types_species_id ON pokemon_species_types(species_id)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_types_type_id ON pokemon_species_types(type_id)")
+
+        # pokemon_evolutions表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_evolutions_from_species_id ON pokemon_evolutions(from_species_id)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_evolutions_to_species_id ON pokemon_evolutions(to_species_id)")
+
+        # items表索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(type)")
+
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_rarity ON items(rarity)")
+    except sqlite3.Error as e:
+        logger.error(f"❌ 创建其他索引时出错: {e}")
 
     logger.info("✅ 数据库初始结构创建完成 (SQLite)")

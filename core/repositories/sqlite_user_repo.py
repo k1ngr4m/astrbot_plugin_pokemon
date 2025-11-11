@@ -91,7 +91,7 @@ class SqliteUserRepository(AbstractUserRepository):
 
     def create_user_pokemon(self, user_id: str, species_id: int, nickname: Optional[str] = None) -> int:
         """
-        创建用户宝可梦记录
+        创建用户宝可梦记录，使用模板数据完善实例
         Args:
             user_id: 用户ID
             species_id: 宝可梦种族ID
@@ -99,38 +99,90 @@ class SqliteUserRepository(AbstractUserRepository):
         Returns:
             新创建的宝可梦实例ID
         """
-        # 获取宝可梦基础数据
+        # 获取宝可梦完整基础数据
         base_sql = """
         SELECT base_hp, base_attack, base_defense, base_sp_attack, base_sp_defense, base_speed
         FROM pokemon_species WHERE id = ?
         """
+
         # 性别从 M/F/N 随机选择
         gender = random.choice(['M', 'F', 'N'])
+
+        # 为初始宝可梦生成随机个体值(IV)，范围0-31
+        hp_iv = random.randint(0, 31)
+        attack_iv = random.randint(0, 31)
+        defense_iv = random.randint(0, 31)
+        sp_attack_iv = random.randint(0, 31)
+        sp_defense_iv = random.randint(0, 31)
+        speed_iv = random.randint(0, 31)
+
+        # 初始努力值为0
+        hp_ev = 0
+        attack_ev = 0
+        defense_ev = 0
+        sp_attack_ev = 0
+        sp_defense_ev = 0
+        speed_ev = 0
+
+        # 初始等级为1
+        level = 1
+        exp = 0
+
+        # 初始技能为空数组
+        moves = '[]'
+
+        # 是否异色（1/4096概率）
+        is_shiny = 1 if random.randint(1, 4096) == 1 else 0
+
         sql = """
         INSERT INTO user_pokemon (
             user_id, species_id, nickname, level, exp, gender,
             hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
             hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-            current_hp, is_shiny, moves, caught_time
+            current_hp, is_shiny, moves, caught_time, shortcode
         )
-        VALUES (?, ?, ?, 1, 0, ?,
-            0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0,
-            ?, 0, '[]', CURRENT_TIMESTAMP
+        VALUES (?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?, CURRENT_TIMESTAMP, ?
         )
         """
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            # 先获取基础HP值
+            # 先获取基础数据
             cursor.execute(base_sql, (species_id,))
             base_row = cursor.fetchone()
-            base_hp = base_row[0] if base_row else 0
 
-            # 创建宝可梦记录
-            cursor.execute(sql, (user_id, species_id, nickname, gender, base_hp))
+            if base_row:
+                base_hp, base_attack, base_defense, base_sp_attack, base_sp_defense, base_speed = base_row
+                # 计算初始HP值，等级为1
+                # 宝可梦的HP计算公式：int((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 等级 + 10
+                # 对于1级宝可梦：int((39*2 + IV + 0) * 1/100) + 1 + 10 = int((78 + IV) * 0.01) + 11
+                # 这会导致HP值偏低，所以使用基础公式但对1级做特殊处理
+                # 根据宝可梦官方机制，1级宝可梦HP更接近种族HP值加上修正
+                current_hp = max(base_hp, int((base_hp * 2 + hp_iv + hp_ev // 4) * level / 100) + level + 10)
+            else:
+                base_hp = 0
+                current_hp = 0
+
+            # 获取新记录的ID（先插入然后获取ID用于生成短码）
+            cursor.execute(sql, (
+                user_id, species_id, nickname, level, exp, gender,
+                hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
+                hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
+                current_hp, is_shiny, moves, f"P{0:04d}"
+            ))
+            new_id = cursor.lastrowid
             conn.commit()
-            return cursor.lastrowid
+
+            # 更新记录的shortcode字段
+            shortcode = f"P{new_id:04d}"
+            update_shortcode_sql = "UPDATE user_pokemon SET shortcode = ? WHERE id = ?"
+            cursor.execute(update_shortcode_sql, (shortcode, new_id))
+            conn.commit()
+
+            return new_id
 
     def update_init_select(self, user_id: str, pokemon_id: int) -> None:
         """
@@ -166,13 +218,38 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor = conn.cursor()
             cursor.execute(sql, (user_id,))
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            result = []
+            for row in rows:
+                row_dict = dict(row)
+                # 添加短码ID，如果数据库中没有则生成默认值
+                if not row_dict.get('shortcode'):
+                    row_dict['shortcode'] = f"P{row_dict['id']:04d}"
+                result.append(row_dict)
+            return result
 
-    def get_user_pokemon_by_id(self, pokemon_id: int) -> Optional[Dict[str, Any]]:
+    def get_user_pokemon_by_id(self, pokemon_id: str) -> Optional[Dict[str, Any]]:
         """
-        获取用户的宝可梦实例
+        通过ID获取用户的宝可梦实例（支持短码ID和数字ID）
         Args:
-            pokemon_id: 宝可梦实例ID
+            pokemon_id: 宝可梦实例ID（可以是P开头的短码或数字）
+        Returns:
+            宝可梦实例信息（如果存在）
+        """
+        # 如果ID以P开头，使用短码查询
+        if pokemon_id.startswith('P') and pokemon_id[1:].isdigit():
+            return self.get_user_pokemon_by_shortcode(pokemon_id)
+        # 否则尝试作为数字ID查询
+        elif pokemon_id.isdigit():
+            pokemon_numeric_id = int(pokemon_id)
+            return self.get_user_pokemon_by_numeric_id(pokemon_numeric_id)
+        else:
+            return None
+
+    def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[Dict[str, Any]]:
+        """
+        通过数字ID获取用户的宝可梦实例
+        Args:
+            pokemon_numeric_id: 宝可梦实例数字ID
         Returns:
             宝可梦实例信息（如果存在）
         """
@@ -185,6 +262,27 @@ class SqliteUserRepository(AbstractUserRepository):
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (pokemon_id,))
+            cursor.execute(sql, (pokemon_numeric_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[Dict[str, Any]]:
+        """
+        通过短码获取用户的宝可梦实例
+        Args:
+            shortcode: 宝可梦短码ID（格式如P001）
+        Returns:
+            宝可梦实例信息（如果存在）
+        """
+        sql = """
+        SELECT up.*, ps.name_cn as species_name, ps.name_en as species_en_name
+        FROM user_pokemon up
+        JOIN pokemon_species ps ON up.species_id = ps.id
+        WHERE up.shortcode = ?
+        """
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, (shortcode,))
             row = cursor.fetchone()
             return dict(row) if row else None

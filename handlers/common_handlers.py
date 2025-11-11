@@ -81,7 +81,7 @@ class CommonHandlers:
             }.get(pokemon["gender"], "")
 
             message += f"{i}. {shiny_str}{pokemon['nickname']} {gender_str}\n"
-            message += f"   ID: {pokemon['id']} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']}\n"
+            message += f"   短码: {pokemon['shortcode']} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']}\n"
             # message += f"   种族ID: {pokemon['species_id']} | 捕获时间: {pokemon['caught_time']}\n\n"
 
         yield event.plain_result(message.strip())
