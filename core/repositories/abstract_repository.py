@@ -32,14 +32,8 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def get_user_pokemon(self, user_id: str) -> List[Dict[str, Any]]: pass
 
-    # 获取用户的队伍配置
     @abstractmethod
-    def get_user_team(self, user_id: str) -> Optional[str]: pass
-
-    # 更新用户的队伍配置
-    @abstractmethod
-    def update_user_team(self, user_id: str, team_data: str) -> None: pass
-
+    def get_user_pokemon_by_id(self, pokemon_id: str) -> Optional[Dict[str, Any]]: pass
 
 class AbstractItemTemplateRepository(ABC):
     """物品模板数据仓储接口"""
@@ -70,3 +64,13 @@ class AbstractItemTemplateRepository(ABC):
 
     @abstractmethod
     def add_pokemon_species_move_template(self, species_move_data: Dict[str, Any]) -> None: pass
+
+class AbstractTeamRepository(ABC):
+    """队伍数据仓储接口"""
+    # 获取用户的队伍配置
+    @abstractmethod
+    def get_user_team(self, user_id: str) -> Optional[str]: pass
+
+    # 更新用户的队伍配置
+    @abstractmethod
+    def update_user_team(self, user_id: str, team_data: str) -> None: pass

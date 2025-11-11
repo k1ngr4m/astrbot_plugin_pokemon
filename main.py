@@ -5,9 +5,12 @@ from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from .core.database.migration import run_migrations
 from .core.repositories.sqlite_item_template_repo import SqliteItemTemplateRepository
+from .core.repositories.sqlite_team_repo import SqliteTeamRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
 from .core.services.data_setup_service import DataSetupService
+from .core.services.team_service import TeamService
 from .handlers.common_handlers import CommonHandlers
+from .handlers.team_handlers import TeamHandlers
 
 from .core.services.user_service import UserService
 
@@ -53,6 +56,7 @@ class PokemonPlugin(Star):
         # --- 2. 组合根：实例化所有仓储层 ---
         self.user_repo = SqliteUserRepository(db_path)
         self.item_template_repo = SqliteItemTemplateRepository(db_path)
+        self.team_repo = SqliteTeamRepository(db_path)
 
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
@@ -65,8 +69,15 @@ class PokemonPlugin(Star):
             config=self.game_config
         )
 
+        self.team_service = TeamService(
+            user_repo=self.user_repo,
+            item_template_repo=self.item_template_repo,
+            team_repo=self.team_repo,
+            config=self.game_config
+        )
 
         self.common_handlers = CommonHandlers(self)
+        self.team_handlers = TeamHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -109,13 +120,13 @@ class PokemonPlugin(Star):
     @filter.command("队伍设置")
     async def set_team(self, event: AstrMessageEvent):
         """设置队伍中的宝可梦"""
-        async for r in self.common_handlers.set_team(event):
+        async for r in self.team_handlers.set_team(event):
             yield r
 
     @filter.command("查看队伍")
     async def view_team(self, event: AstrMessageEvent):
         """查看当前队伍配置"""
-        async for r in self.common_handlers.view_team(event):
+        async for r in self.team_handlers.view_team(event):
             yield r
 
     async def terminate(self):

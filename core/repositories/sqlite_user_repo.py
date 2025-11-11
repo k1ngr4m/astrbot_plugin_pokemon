@@ -1,3 +1,4 @@
+import random
 import sqlite3
 import threading
 import dataclasses
@@ -103,7 +104,8 @@ class SqliteUserRepository(AbstractUserRepository):
         SELECT base_hp, base_attack, base_defense, base_sp_attack, base_sp_defense, base_speed
         FROM pokemon_species WHERE id = ?
         """
-
+        # 性别从 M/F/N 随机选择
+        gender = random.choice(['M', 'F', 'N'])
         sql = """
         INSERT INTO user_pokemon (
             user_id, species_id, nickname, level, exp, gender,
@@ -111,7 +113,7 @@ class SqliteUserRepository(AbstractUserRepository):
             hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
             current_hp, is_shiny, moves, caught_time
         )
-        VALUES (?, ?, ?, 1, 0, 'N',
+        VALUES (?, ?, ?, 1, 0, ?,
             0, 0, 0, 0, 0, 0,
             0, 0, 0, 0, 0, 0,
             ?, 0, '[]', CURRENT_TIMESTAMP
@@ -126,7 +128,7 @@ class SqliteUserRepository(AbstractUserRepository):
             base_hp = base_row[0] if base_row else 0
 
             # 创建宝可梦记录
-            cursor.execute(sql, (user_id, species_id, nickname, base_hp))
+            cursor.execute(sql, (user_id, species_id, nickname, gender, base_hp))
             conn.commit()
             return cursor.lastrowid
 
@@ -166,35 +168,23 @@ class SqliteUserRepository(AbstractUserRepository):
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
-    def get_user_team(self, user_id: str) -> Optional[str]:
+    def get_user_pokemon_by_id(self, pokemon_id: int) -> Optional[Dict[str, Any]]:
         """
-        获取用户的队伍配置
+        获取用户的宝可梦实例
         Args:
-            user_id: 用户ID
+            pokemon_id: 宝可梦实例ID
         Returns:
-            队伍配置的JSON字符串，如果不存在则返回None
-        """
-        sql = "SELECT team FROM user_team WHERE user_id = ?"
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (user_id,))
-            row = cursor.fetchone()
-            return row["team"] if row else None
-
-    def update_user_team(self, user_id: str, team_data: str) -> None:
-        """
-        更新用户的队伍配置
-        Args:
-            user_id: 用户ID
-            team_data: 队伍配置的JSON字符串
+            宝可梦实例信息（如果存在）
         """
         sql = """
-        INSERT OR REPLACE INTO user_team (user_id, team)
-        VALUES (?, ?)
+        SELECT up.*, ps.name_cn as species_name, ps.name_en as species_en_name
+        FROM user_pokemon up
+        JOIN pokemon_species ps ON up.species_id = ps.id
+        WHERE up.id = ?
         """
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (user_id, team_data))
-            conn.commit()
+            cursor.execute(sql, (pokemon_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
