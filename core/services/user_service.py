@@ -77,7 +77,7 @@ class UserService:
 
         return {
             "success": True,
-            "message": f"成功将 {pokemon_template.name_cn} 初始选择为宝可梦！它已根据种族模板完善了个体值、努力值等特性。"
+            "message": f"成功将 {pokemon_template.name_cn} 初始选择为宝可梦！它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
         }
 
     def get_user_pokemon(self, user_id: str) -> Dict[str, Any]:
@@ -110,6 +110,11 @@ class UserService:
                 "exp": pokemon["exp"],
                 "gender": pokemon["gender"],
                 "current_hp": pokemon["current_hp"],
+                "attack": pokemon.get("attack", 0),
+                "defense": pokemon.get("defense", 0),
+                "sp_attack": pokemon.get("sp_attack", 0),
+                "sp_defense": pokemon.get("sp_defense", 0),
+                "speed": pokemon.get("speed", 0),
                 "is_shiny": bool(pokemon["is_shiny"]),
                 "caught_time": pokemon["caught_time"]
             })

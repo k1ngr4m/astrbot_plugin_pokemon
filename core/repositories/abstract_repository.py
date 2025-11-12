@@ -3,6 +3,7 @@ from typing import Optional, List, Dict, Any
 from ..domain.models import (
     User, Pokemon,
 )
+from ..domain.area import AdventureArea, AreaPokemon
 
 
 
@@ -80,3 +81,23 @@ class AbstractTeamRepository(ABC):
     # 更新用户的队伍配置
     @abstractmethod
     def update_user_team(self, user_id: str, team_data: str) -> None: pass
+
+class AbstractAreaRepository(ABC):
+    """冒险区域数据仓储接口"""
+    @abstractmethod
+    def get_all_areas(self) -> List[AdventureArea]: pass
+
+    @abstractmethod
+    def get_area_by_code(self, area_code: str) -> Optional[AdventureArea]: pass
+
+    @abstractmethod
+    def get_area_pokemon_by_area_id(self, area_id: int) -> List[AreaPokemon]: pass
+
+    @abstractmethod
+    def get_area_pokemon_by_area_code(self, area_code: str) -> List[AreaPokemon]: pass
+
+    @abstractmethod
+    def add_area(self, area: AdventureArea) -> int: pass
+
+    @abstractmethod
+    def add_area_pokemon(self, area_pokemon: AreaPokemon) -> int: pass

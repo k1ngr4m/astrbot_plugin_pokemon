@@ -51,37 +51,3 @@ class CommonHandlers:
         else:
             yield event.plain_result(f"❌ {result['message']}")
 
-    async def my_pokemon(self, event: AstrMessageEvent):
-        """查看我的宝可梦"""
-        user_id = self.plugin._get_effective_user_id(event)
-        user = self.plugin.user_repo.get_by_id(user_id)
-
-        if not user:
-            yield event.plain_result("❌ 您还没有注册，请先使用 /宝可梦注册 命令注册。")
-            return
-
-        result = self.user_service.get_user_pokemon(user_id)
-
-        if not result["success"]:
-            yield event.plain_result(f"❌ {result['message']}")
-            return
-
-        if not result["pokemon_list"]:
-            yield event.plain_result(result["message"])
-            return
-
-        # 组织显示信息
-        message = f"🌟 {result['message']}：\n\n"
-        for i, pokemon in enumerate(result["pokemon_list"], 1):
-            shiny_str = "✨" if pokemon["is_shiny"] else ""
-            gender_str = {
-                "M": "♂️",
-                "F": "♀️",
-                "N": "⚲"
-            }.get(pokemon["gender"], "")
-
-            message += f"{i}. {shiny_str}{pokemon['nickname']} {gender_str}\n"
-            message += f"   短码: {pokemon['shortcode']} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']}\n"
-            # message += f"   种族ID: {pokemon['species_id']} | 捕获时间: {pokemon['caught_time']}\n\n"
-
-        yield event.plain_result(message.strip())

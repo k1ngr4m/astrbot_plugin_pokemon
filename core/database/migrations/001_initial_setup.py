@@ -238,4 +238,40 @@ def up(cursor: sqlite3.Cursor):
     except sqlite3.Error as e:
         logger.error(f"❌ 创建其他索引时出错: {e}")
 
+    # --- 11. 冒险区域 ---
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS adventure_areas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, -- 区域ID
+            area_code TEXT UNIQUE NOT NULL,       -- 区域短码（A开头的三位数，如A001）
+            name TEXT NOT NULL,                   -- 区域名称
+            description TEXT,                     -- 区域描述
+            min_level INTEGER DEFAULT 1,          -- 最低推荐等级
+            max_level INTEGER DEFAULT 100,        -- 最高推荐等级
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    # --- 12. 区域宝可梦关联表 ---
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS area_pokemon (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            area_id INTEGER NOT NULL,             -- 区域ID
+            pokemon_species_id INTEGER NOT NULL,  -- 宝可梦种族ID
+            encounter_rate REAL DEFAULT 10.0,     -- 遇见概率（百分比）
+            min_level INTEGER DEFAULT 1,          -- 最低等级
+            max_level INTEGER DEFAULT 10,         -- 最高等级
+            FOREIGN KEY (area_id) REFERENCES adventure_areas(id) ON DELETE CASCADE,
+            FOREIGN KEY (pokemon_species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
+            UNIQUE(area_id, pokemon_species_id)
+        );
+    """)
+
+    # 为冒险区域相关表创建索引
+    try:
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_adventure_areas_code ON adventure_areas(area_code)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_area_pokemon_area_id ON area_pokemon(area_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_area_pokemon_species_id ON area_pokemon(pokemon_species_id)")
+    except sqlite3.Error as e:
+        logger.error(f"❌ 创建冒险区域相关索引时出错: {e}")
+
     logger.info("✅ 数据库初始结构创建完成 (SQLite)")

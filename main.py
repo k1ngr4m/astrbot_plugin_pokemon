@@ -7,10 +7,15 @@ from .core.database.migration import run_migrations
 from .core.repositories.sqlite_item_template_repo import SqliteItemTemplateRepository
 from .core.repositories.sqlite_team_repo import SqliteTeamRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
+from .core.repositories.sqlite_area_repo import SqliteAreaRepository
 from .core.services.data_setup_service import DataSetupService
+from .core.services.pokemon_service import PokemonService
 from .core.services.team_service import TeamService
+from .core.services.area_service import AreaService
 from .handlers.common_handlers import CommonHandlers
+from .handlers.pokemon_handlers import PokemonHandlers
 from .handlers.team_handlers import TeamHandlers
+from .handlers.area_handlers import AreaHandlers
 
 from .core.services.user_service import UserService
 
@@ -57,6 +62,7 @@ class PokemonPlugin(Star):
         self.user_repo = SqliteUserRepository(db_path)
         self.item_template_repo = SqliteItemTemplateRepository(db_path)
         self.team_repo = SqliteTeamRepository(db_path)
+        self.area_repo = SqliteAreaRepository(db_path)
 
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
@@ -76,8 +82,22 @@ class PokemonPlugin(Star):
             config=self.game_config
         )
 
+        self.pokemon_service = PokemonService(
+            user_repo=self.user_repo,
+            item_template_repo=self.item_template_repo,
+            team_repo=self.team_repo,
+            config=self.game_config
+        )
+        self.area_service = AreaService(
+            area_repo=self.area_repo,
+            item_template_repo=self.item_template_repo,
+            user_repo=self.user_repo,
+            config=self.game_config
+        )
         self.common_handlers = CommonHandlers(self)
         self.team_handlers = TeamHandlers(self)
+        self.pokemon_handlers = PokemonHandlers(self)
+        self.area_handlers = AreaHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -113,8 +133,8 @@ class PokemonPlugin(Star):
 
     @filter.command("我的宝可梦")
     async def my_pokemon(self, event: AstrMessageEvent):
-        """查看我的宝可梦列表"""
-        async for r in self.common_handlers.my_pokemon(event):
+        """查看我的宝可梦列表，或使用 /我的宝可梦 <短码> 查看特定宝可梦详细信息"""
+        async for r in self.pokemon_handlers.my_pokemon(event):
             yield r
 
     @filter.command("设置队伍")
@@ -127,6 +147,18 @@ class PokemonPlugin(Star):
     async def view_team(self, event: AstrMessageEvent):
         """查看当前队伍配置"""
         async for r in self.team_handlers.view_team(event):
+            yield r
+
+    @filter.command("查看区域")
+    async def view_areas(self, event: AstrMessageEvent):
+        """查看所有可冒险的区域"""
+        async for r in self.area_handlers.view_areas(event):
+            yield r
+
+    @filter.command("冒险")
+    async def adventure(self, event: AstrMessageEvent):
+        """在指定区域进行冒险"""
+        async for r in self.area_handlers.adventure(event):
             yield r
 
     async def terminate(self):

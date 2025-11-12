@@ -74,7 +74,7 @@ class TeamHandlers:
         message = "🏆 当前队伍配置：\n\n"
         if "active_pokemon_info" in team:
             pokemon = team["active_pokemon_info"]
-            shortcode = pokemon.get("shortcode", f"P{pokemon['id']:04d}")
+            shortcode = pokemon.get("shortcode", pokemon.get("id", "P0000"))
             message += f"⚔️ 出战宝可梦：{pokemon['species_name']}\n"
             message += f"   短码: {shortcode} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']}\n"
         else:

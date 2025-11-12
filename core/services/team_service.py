@@ -150,7 +150,12 @@ class TeamService:
                     "species_name": active_pokemon["species_name"],
                     "nickname": active_pokemon["nickname"] or active_pokemon["species_name"],
                     "level": active_pokemon["level"],
-                    "current_hp": active_pokemon["current_hp"]
+                    "current_hp": active_pokemon["current_hp"],
+                    "attack": active_pokemon.get("attack", 0),
+                    "defense": active_pokemon.get("defense", 0),
+                    "sp_attack": active_pokemon.get("sp_attack", 0),
+                    "sp_defense": active_pokemon.get("sp_defense", 0),
+                    "speed": active_pokemon.get("speed", 0)
                 }
 
         return {

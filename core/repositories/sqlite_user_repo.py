@@ -139,12 +139,14 @@ class SqliteUserRepository(AbstractUserRepository):
             user_id, species_id, nickname, level, exp, gender,
             hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
             hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-            current_hp, is_shiny, moves, caught_time, shortcode
+            current_hp, attack, defense, sp_attack, sp_defense, speed,
+            is_shiny, moves, caught_time, shortcode
         )
         VALUES (?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, CURRENT_TIMESTAMP, ?
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, CURRENT_TIMESTAMP, ?
         )
         """
 
@@ -158,20 +160,35 @@ class SqliteUserRepository(AbstractUserRepository):
                 base_hp, base_attack, base_defense, base_sp_attack, base_sp_defense, base_speed = base_row
                 # 计算初始HP值，等级为1
                 # 宝可梦的HP计算公式：int((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 等级 + 10
-                # 对于1级宝可梦：int((39*2 + IV + 0) * 1/100) + 1 + 10 = int((78 + IV) * 0.01) + 11
-                # 这会导致HP值偏低，所以使用基础公式但对1级做特殊处理
-                # 根据宝可梦官方机制，1级宝可梦HP更接近种族HP值加上修正
-                current_hp = max(base_hp, int((base_hp * 2 + hp_iv + hp_ev // 4) * level / 100) + level + 10)
+                base_calc = int((base_hp * 2 + hp_iv + hp_ev // 4) * level / 100) + level + 10
+                # 确保HP至少为基础值的一半（向下取整后至少为1）
+                min_hp = max(1, base_hp // 2)
+                current_hp = max(min_hp, base_calc)
+
+                # 计算其他属性值（非HP属性使用不同的计算公式）
+                # 非HP属性计算公式：int(((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 5) * 性情修正
+                # 对于1级宝可梦，没有性情修正，所以公式为：int(((种族值*2 + 个体值) * 1/100) + 5)
+                calculated_attack = int((base_attack * 2 + attack_iv + attack_ev // 4) * level / 100) + 5
+                calculated_defense = int((base_defense * 2 + defense_iv + defense_ev // 4) * level / 100) + 5
+                calculated_sp_attack = int((base_sp_attack * 2 + sp_attack_iv + sp_attack_ev // 4) * level / 100) + 5
+                calculated_sp_defense = int((base_sp_defense * 2 + sp_defense_iv + sp_defense_ev // 4) * level / 100) + 5
+                calculated_speed = int((base_speed * 2 + speed_iv + speed_ev // 4) * level / 100) + 5
             else:
                 base_hp = 0
                 current_hp = 0
+                calculated_attack = 0
+                calculated_defense = 0
+                calculated_sp_attack = 0
+                calculated_sp_defense = 0
+                calculated_speed = 0
 
             # 获取新记录的ID（先插入然后获取ID用于生成短码）
             cursor.execute(sql, (
                 user_id, species_id, nickname, level, exp, gender,
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-                current_hp, is_shiny, moves, f"P{0:04d}"
+                current_hp, calculated_attack, calculated_defense, calculated_sp_attack, calculated_sp_defense, calculated_speed,
+                is_shiny, moves, f"P{0:04d}"
             ))
             new_id = cursor.lastrowid
             conn.commit()
