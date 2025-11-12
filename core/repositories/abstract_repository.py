@@ -42,9 +42,9 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[Dict[str, Any]]: pass
 
-class AbstractItemTemplateRepository(ABC):
-    """物品模板数据仓储接口"""
-    # 获取Pokemon模板
+class AbstractPokemonRepository(ABC):
+    """宝可梦数据仓储接口"""
+    # 获取宝可梦模板
     @abstractmethod
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[Pokemon]: pass
     # 获取所有Pokemon模板
@@ -71,6 +71,9 @@ class AbstractItemTemplateRepository(ABC):
 
     @abstractmethod
     def add_pokemon_species_move_template(self, species_move_data: Dict[str, Any]) -> None: pass
+
+    @abstractmethod
+    def get_pokemon_types(self, species_id: int) -> List[str]: pass
 
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""

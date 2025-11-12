@@ -1,7 +1,7 @@
 import random
 from typing import Dict, Any, List, Optional
 from ..repositories.abstract_repository import (
-    AbstractAreaRepository, AbstractItemTemplateRepository, AbstractUserRepository
+    AbstractAreaRepository, AbstractPokemonRepository, AbstractUserRepository
 )
 from ..domain.area import AdventureArea, AreaPokemon
 from ..utils import get_now
@@ -13,12 +13,12 @@ class AreaService:
     def __init__(
             self,
             area_repo: AbstractAreaRepository,
-            item_template_repo: AbstractItemTemplateRepository,
+            pokemon_repo: AbstractPokemonRepository,
             user_repo: AbstractUserRepository,
             config: Dict[str, Any]
     ):
         self.area_repo = area_repo
-        self.item_template_repo = item_template_repo
+        self.pokemon_repo = pokemon_repo
         self.user_repo = user_repo
         self.config = config
 
@@ -145,7 +145,7 @@ class AreaService:
             # 获取宝可梦详细信息
             pokemon_details = []
             for area_pokemon in area_pokemon_list:
-                pokemon_template = self.item_template_repo.get_pokemon_by_id(area_pokemon.pokemon_species_id)
+                pokemon_template = self.pokemon_repo.get_pokemon_by_id(area_pokemon.pokemon_species_id)
                 if pokemon_template:
                     pokemon_details.append({
                         "species_id": pokemon_template.id,
@@ -235,7 +235,7 @@ class AreaService:
                 selected_area_pokemon = area_pokemon_list[-1]
 
             # 获取选中宝可梦的详细信息
-            pokemon_template = self.item_template_repo.get_pokemon_by_id(selected_area_pokemon.pokemon_species_id)
+            pokemon_template = self.pokemon_repo.get_pokemon_by_id(selected_area_pokemon.pokemon_species_id)
             if not pokemon_template:
                 return {
                     "success": False,

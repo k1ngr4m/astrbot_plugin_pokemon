@@ -1,5 +1,5 @@
 from ..repositories.abstract_repository import (
-    AbstractItemTemplateRepository,
+    AbstractPokemonRepository,
 )
 from ..initial_data import (
     POKEMON_SPECIES_DATA, POKEMON_TYPES_DATA, POKEMON_SPECIES_TYPES_DATA, POKEMON_EVOLUTION_DATA, ITEM_DATA,
@@ -11,10 +11,10 @@ class DataSetupService:
     """负责在首次启动时初始化游戏基础数据。"""
 
     def __init__(self,
-                 item_template_repo: AbstractItemTemplateRepository,
+                 pokemon_repo: AbstractPokemonRepository,
                  area_repo=None,  # 可选参数，用于冒险区域数据初始化
-):
-        self.item_template_repo = item_template_repo
+                 ):
+        self.pokemon_repo = pokemon_repo
         self.area_repo = area_repo
 
 
@@ -24,7 +24,7 @@ class DataSetupService:
         这是一个幂等操作（idempotent），可以安全地多次调用而不会重复插入数据。
         """
         try:
-            existing_pokemon = self.item_template_repo.get_all_pokemon()
+            existing_pokemon = self.pokemon_repo.get_all_pokemon()
             if existing_pokemon:
                 logger.info("数据库核心数据已存在，跳过初始化。")
                 return
@@ -36,14 +36,14 @@ class DataSetupService:
 
         # 填充Pokemon类型数据
         for type in POKEMON_TYPES_DATA:
-            self.item_template_repo.add_pokemon_type_template(
+            self.pokemon_repo.add_pokemon_type_template(
                 {
                     "name": type[0],
                 }
             )
         # 填充Pokemon数据
         for pokemon in POKEMON_SPECIES_DATA:
-            self.item_template_repo.add_pokemon_template(
+            self.pokemon_repo.add_pokemon_template(
                 {
                     "id": pokemon[0],
                     "name_en": pokemon[1],
@@ -62,14 +62,14 @@ class DataSetupService:
             )
         # 填充Pokemon类型关联数据
         for species_type in POKEMON_SPECIES_TYPES_DATA:
-            self.item_template_repo.add_pokemon_species_type_template(
+            self.pokemon_repo.add_pokemon_species_type_template(
                 {
                     "species_id": species_type[0],
                     "type_id": species_type[1],
                 }
             )
         for evaluation in POKEMON_EVOLUTION_DATA:
-            self.item_template_repo.add_pokemon_evolution_template(
+            self.pokemon_repo.add_pokemon_evolution_template(
                 {
                     "from_species_id": evaluation[0],
                     "to_species_id": evaluation[1],
@@ -78,7 +78,7 @@ class DataSetupService:
                 }
             )
         for item in ITEM_DATA:
-            self.item_template_repo.add_item_template(
+            self.pokemon_repo.add_item_template(
                 {
                     "id": item[0],
                     "name": item[1],
@@ -89,7 +89,7 @@ class DataSetupService:
                 }
             )
         for moves in POKEMON_MOVES_DATA:
-            self.item_template_repo.add_pokemon_move_template(
+            self.pokemon_repo.add_pokemon_move_template(
                 {
                     "id": moves[0],
                     "name": moves[1],
@@ -102,7 +102,7 @@ class DataSetupService:
                 }
             )
         for species_moves in POKEMON_SPECIES_MOVES_DATA:
-            self.item_template_repo.add_pokemon_species_move_template(
+            self.pokemon_repo.add_pokemon_species_move_template(
                 {
                     "species_id": species_moves[0],
                     "move_id": species_moves[1],

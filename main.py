@@ -4,7 +4,7 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from .core.database.migration import run_migrations
-from .core.repositories.sqlite_item_template_repo import SqliteItemTemplateRepository
+from .core.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from .core.repositories.sqlite_team_repo import SqliteTeamRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
 from .core.repositories.sqlite_area_repo import SqliteAreaRepository
@@ -12,10 +12,12 @@ from .core.services.data_setup_service import DataSetupService
 from .core.services.pokemon_service import PokemonService
 from .core.services.team_service import TeamService
 from .core.services.area_service import AreaService
+from .core.services.battle_service import BattleService
 from .handlers.common_handlers import CommonHandlers
 from .handlers.pokemon_handlers import PokemonHandlers
 from .handlers.team_handlers import TeamHandlers
 from .handlers.area_handlers import AreaHandlers
+from .handlers.battle_handlers import BattleHandlers
 
 from .core.services.user_service import UserService
 
@@ -60,7 +62,7 @@ class PokemonPlugin(Star):
 
         # --- 2. 组合根：实例化所有仓储层 ---
         self.user_repo = SqliteUserRepository(db_path)
-        self.item_template_repo = SqliteItemTemplateRepository(db_path)
+        self.pokemon_repo = SqlitePokemonRepository(db_path)
         self.team_repo = SqliteTeamRepository(db_path)
         self.area_repo = SqliteAreaRepository(db_path)
 
@@ -71,37 +73,43 @@ class PokemonPlugin(Star):
         # 3.3 实例化其他核心服务
         self.user_service = UserService(
             user_repo=self.user_repo,
-            item_template_repo=self.item_template_repo,
+            pokemon_repo=self.pokemon_repo,
             config=self.game_config
         )
 
         self.team_service = TeamService(
             user_repo=self.user_repo,
-            item_template_repo=self.item_template_repo,
+            pokemon_repo=self.pokemon_repo,
             team_repo=self.team_repo,
             config=self.game_config
         )
 
         self.pokemon_service = PokemonService(
             user_repo=self.user_repo,
-            item_template_repo=self.item_template_repo,
+            pokemon_repo=self.pokemon_repo,
             team_repo=self.team_repo,
             config=self.game_config
         )
         self.area_service = AreaService(
             area_repo=self.area_repo,
-            item_template_repo=self.item_template_repo,
+            pokemon_repo=self.pokemon_repo,
             user_repo=self.user_repo,
+            config=self.game_config
+        )
+        self.battle_service = BattleService(
+            user_repo=self.user_repo,
+            pokemon_repo=self.pokemon_repo,
             config=self.game_config
         )
         self.common_handlers = CommonHandlers(self)
         self.team_handlers = TeamHandlers(self)
         self.pokemon_handlers = PokemonHandlers(self)
         self.area_handlers = AreaHandlers(self)
+        self.battle_handlers = BattleHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
-        data_setup_service = DataSetupService(self.item_template_repo, self.area_repo)
+        data_setup_service = DataSetupService(self.pokemon_repo, self.area_repo)
         data_setup_service.setup_initial_data()
 
         # 管理员扮演功能
@@ -159,6 +167,12 @@ class PokemonPlugin(Star):
     async def adventure(self, event: AstrMessageEvent):
         """在指定区域进行冒险"""
         async for r in self.area_handlers.adventure(event):
+            yield r
+
+    @filter.command("战斗")
+    async def battle(self, event: AstrMessageEvent):
+        """与当前遇到的野生宝可梦战斗"""
+        async for r in self.battle_handlers.battle(event):
             yield r
 
     async def terminate(self):

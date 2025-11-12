@@ -63,7 +63,13 @@ class AreaHandlers:
             message = f"🌳 在 {result['area']['name']} 中冒险！\n\n"
             message += f"✨ 遇到了野生的 {wild_pokemon['name']}！\n"
             message += f"等级: {wild_pokemon['level']}\n"
-            message += "接下来你可以选择捕捉、战斗或其他操作...\n（冒险功能后续实现）"
+
+            # 缓存野生宝可梦信息，供战斗使用
+            if not hasattr(self.plugin, '_cached_wild_pokemon'):
+                self.plugin._cached_wild_pokemon = {}
+            self.plugin._cached_wild_pokemon[user_id] = wild_pokemon
+
+            message += "接下来你可以选择战斗或捕捉...\n使用 /战斗 指令进行对战！"
             yield event.plain_result(message)
         else:
             yield event.plain_result(f"❌ {result['message']}")

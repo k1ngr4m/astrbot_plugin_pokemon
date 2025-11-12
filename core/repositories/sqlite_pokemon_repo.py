@@ -3,10 +3,10 @@ import threading
 from typing import Optional, List, Dict, Any
 
 # 导入抽象基类和领域模型
-from .abstract_repository import AbstractItemTemplateRepository
+from .abstract_repository import AbstractPokemonRepository
 from ..domain.models import Pokemon
 
-class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
+class SqlitePokemonRepository(AbstractPokemonRepository):
     """物品模板仓储的SQLite实现"""
 
     def __init__(self, db_path: str):
@@ -114,3 +114,13 @@ class SqliteItemTemplateRepository(AbstractItemTemplateRepository):
                 VALUES (:species_id, :move_id, :learn_method, :learn_value)
             """, {**data})
             conn.commit()
+
+    def get_pokemon_types(self, species_id: int) -> List[str]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT t.name FROM pokemon_types t
+                JOIN pokemon_species_types st ON t.id = st.type_id
+                WHERE st.species_id = ?
+            """, (species_id,))
+            return [row[0] for row in cursor.fetchall()]

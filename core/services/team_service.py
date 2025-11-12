@@ -1,6 +1,6 @@
 from typing import Dict, Any, List
 from ..repositories.abstract_repository import (
-    AbstractUserRepository, AbstractItemTemplateRepository, AbstractTeamRepository,
+    AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
 )
 
 from ..utils import get_now, get_today
@@ -12,12 +12,12 @@ class TeamService:
     def __init__(
             self,
             user_repo: AbstractUserRepository,
-            item_template_repo: AbstractItemTemplateRepository,
+            pokemon_repo: AbstractPokemonRepository,
             team_repo: AbstractTeamRepository,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
-        self.item_template_repo = item_template_repo
+        self.pokemon_repo = pokemon_repo
         self.team_repo = team_repo
         self.config = config
 
