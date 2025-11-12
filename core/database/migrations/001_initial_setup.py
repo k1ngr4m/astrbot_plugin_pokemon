@@ -84,6 +84,11 @@ def up(cursor: sqlite3.Cursor):
             sp_defense_ev INTEGER DEFAULT 0,
             speed_ev INTEGER DEFAULT 0,
             current_hp INTEGER DEFAULT 0,
+            attack INTEGER DEFAULT 0,             -- 实际攻击值
+            defense INTEGER DEFAULT 0,            -- 实际防御值
+            sp_attack INTEGER DEFAULT 0,          -- 实际特攻值
+            sp_defense INTEGER DEFAULT 0,         -- 实际特防值
+            speed INTEGER DEFAULT 0,              -- 实际速度值
             is_shiny INTEGER DEFAULT 0,           -- 是否异色（0/1）
             moves TEXT,                           -- 技能列表（JSON字符串）
             caught_time TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -97,6 +102,9 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_shortcode ON user_pokemon(shortcode)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_user_id ON user_pokemon(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_species_id ON user_pokemon(species_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_attack ON user_pokemon(attack)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_defense ON user_pokemon(defense)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_speed ON user_pokemon(speed)")
 
     # --- 6. 宝可梦技能定义 ---
     cursor.execute("""
@@ -206,6 +214,11 @@ def up(cursor: sqlite3.Cursor):
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_items_user_id ON user_items(user_id)")
 
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_items_item_id ON user_items(item_id)")
+
+        # user_pokemon属性值索引
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_attack ON user_pokemon(attack)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_defense ON user_pokemon(defense)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_speed ON user_pokemon(speed)")
 
         # pokemon_species_moves表索引
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_moves_species_id ON pokemon_species_moves(species_id)")

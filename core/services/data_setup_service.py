@@ -3,7 +3,7 @@ from ..repositories.abstract_repository import (
 )
 from ..initial_data import (
     POKEMON_SPECIES_DATA, POKEMON_TYPES_DATA, POKEMON_SPECIES_TYPES_DATA, POKEMON_EVOLUTION_DATA, ITEM_DATA,
-    POKEMON_MOVES_DATA, POKEMON_SPECIES_MOVES_DATA,
+    POKEMON_MOVES_DATA, POKEMON_SPECIES_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA,
 )
 from astrbot.api import logger
 
@@ -12,8 +12,10 @@ class DataSetupService:
 
     def __init__(self,
                  item_template_repo: AbstractItemTemplateRepository,
+                 area_repo=None,  # 可选参数，用于冒险区域数据初始化
 ):
         self.item_template_repo = item_template_repo
+        self.area_repo = area_repo
 
 
     def setup_initial_data(self):
@@ -108,3 +110,34 @@ class DataSetupService:
                     "learn_value": species_moves[3],
                 }
             )
+
+        # 填充冒险区域数据（仅在area_repo可用时执行）
+        if self.area_repo:
+            from ..domain.area import AdventureArea, AreaPokemon
+            for area in ADVENTURE_AREAS_DATA:
+                # 创建AdventureArea对象，使用临时id（数据库会自动生成正确id）
+                area_obj = AdventureArea(
+                    id=0,  # 临时id，实际id会在数据库插入后生成
+                    area_code=area[0],
+                    name=area[1],
+                    description=area[2],
+                    min_level=area[3],
+                    max_level=area[4]
+                )
+                self.area_repo.add_area(area_obj)
+
+            # 填充区域宝可梦关联数据
+            for area_pokemon in AREA_POKEMON_DATA:
+                # area_pokemon[0]是区域代码，需要先获取区域ID
+                area = self.area_repo.get_area_by_code(area_pokemon[0])
+                if area:
+                    # 创建AreaPokemon对象，使用临时id（数据库会自动生成正确id）
+                    ap_obj = AreaPokemon(
+                        id=0,  # 临时id，实际id会在数据库插入后生成
+                        area_id=area.id,
+                        pokemon_species_id=area_pokemon[1],
+                        encounter_rate=area_pokemon[2],
+                        min_level=area_pokemon[3],
+                        max_level=area_pokemon[4]
+                    )
+                    self.area_repo.add_area_pokemon(ap_obj)

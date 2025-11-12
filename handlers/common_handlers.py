@@ -1,5 +1,6 @@
 from astrbot.api.event import filter, AstrMessageEvent
 from typing import TYPE_CHECKING
+from ..core.answer.answer_enum import AnswerEnum
 
 if TYPE_CHECKING:
     from ..main import PokemonPlugin
@@ -23,7 +24,7 @@ class CommonHandlers:
         user_id = self.plugin._get_effective_user_id(event)
         user = self.plugin.user_repo.get_by_id(user_id)
         if not user:
-            yield event.plain_result("❌ 您还没有注册，请先使用 /宝可梦注册 命令注册。")
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
             return
         if user.init_selected:
             yield event.plain_result("❌ 用户已初始化选择宝可梦")

@@ -101,7 +101,7 @@ class PokemonPlugin(Star):
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
-        data_setup_service = DataSetupService(self.item_template_repo)
+        data_setup_service = DataSetupService(self.item_template_repo, self.area_repo)
         data_setup_service.setup_initial_data()
 
         # 管理员扮演功能

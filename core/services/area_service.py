@@ -22,6 +22,61 @@ class AreaService:
         self.user_repo = user_repo
         self.config = config
 
+    def _calculate_pokemon_stats(self, base_stats: Dict[str, int], level: int) -> Dict[str, int]:
+        """
+        计算宝可梦的属性值（用于野生宝可梦）
+        Args:
+            base_stats: 基础属性值字典，包括hp, attack, defense, sp_attack, sp_defense, speed
+            level: 宝可梦等级
+        Returns:
+            包含各项属性值的字典
+        """
+        # 为野生宝可梦生成独立的IV值（每项0-31均匀随机，符合官方设定）
+        ivs = {
+            'hp': random.randint(0, 31),
+            'attack': random.randint(0, 31),
+            'defense': random.randint(0, 31),
+            'sp_attack': random.randint(0, 31),
+            'sp_defense': random.randint(0, 31),
+            'speed': random.randint(0, 31)
+        }
+
+        # 野生宝可梦初始努力值为0
+        evs = {
+            'hp': 0,
+            'attack': 0,
+            'defense': 0,
+            'sp_attack': 0,
+            'sp_defense': 0,
+            'speed': 0
+        }
+
+        # 计算HP值
+        # 宝可梦的HP计算公式：int((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 等级 + 10
+        hp = int((base_stats['hp'] * 2 + ivs['hp'] + evs['hp'] // 4) * level / 100) + level + 10
+        # 确保HP至少为基础值的一半（向下取整后至少为1）
+        min_hp = max(1, base_stats['hp'] // 2)
+        current_hp = max(min_hp, hp)
+
+        # 计算其他属性值（非HP属性使用不同的计算公式）
+        # 非HP属性计算公式：int(((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 5)
+        attack = int(((base_stats['attack'] * 2 + ivs['attack'] + evs['attack'] // 4) * level / 100) + 5)
+        defense = int(((base_stats['defense'] * 2 + ivs['defense'] + evs['defense'] // 4) * level / 100) + 5)
+        sp_attack = int(((base_stats['sp_attack'] * 2 + ivs['sp_attack'] + evs['sp_attack'] // 4) * level / 100) + 5)
+        sp_defense = int(((base_stats['sp_defense'] * 2 + ivs['sp_defense'] + evs['sp_defense'] // 4) * level / 100) + 5)
+        speed = int(((base_stats['speed'] * 2 + ivs['speed'] + evs['speed'] // 4) * level / 100) + 5)
+
+        return {
+            'hp': current_hp,
+            'attack': attack,
+            'defense': defense,
+            'sp_attack': sp_attack,
+            'sp_defense': sp_defense,
+            'speed': speed,
+            'ivs': ivs,
+            'evs': evs
+        }
+
     def get_all_areas(self) -> Dict[str, Any]:
         """
         获取所有可冒险的区域列表
@@ -192,6 +247,17 @@ class AreaService:
             max_level = selected_area_pokemon.max_level
             wild_pokemon_level = random.randint(min_level, max_level)
 
+            # 计算野生宝可梦的属性值
+            base_stats = {
+                'hp': pokemon_template.base_hp,
+                'attack': pokemon_template.base_attack,
+                'defense': pokemon_template.base_defense,
+                'sp_attack': pokemon_template.base_sp_attack,
+                'sp_defense': pokemon_template.base_sp_defense,
+                'speed': pokemon_template.base_speed
+            }
+            stats = self._calculate_pokemon_stats(base_stats, wild_pokemon_level)
+
             return {
                 "success": True,
                 "message": f"在 {area.name} 中遇到了野生的 {pokemon_template.name_cn}！",
@@ -199,7 +265,16 @@ class AreaService:
                     "species_id": pokemon_template.id,
                     "name": pokemon_template.name_cn,
                     "level": wild_pokemon_level,
-                    "encounter_rate": selected_area_pokemon.encounter_rate
+                    "encounter_rate": selected_area_pokemon.encounter_rate,
+                    # 属性值
+                    "hp": stats['hp'],
+                    "attack": stats['attack'],
+                    "defense": stats['defense'],
+                    "sp_attack": stats['sp_attack'],
+                    "sp_defense": stats['sp_defense'],
+                    "speed": stats['speed'],
+                    "ivs": stats['ivs'],
+                    "evs": stats['evs']
                 },
                 "area": {
                     "area_code": area.area_code,

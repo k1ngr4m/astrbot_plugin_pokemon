@@ -1,5 +1,6 @@
 from typing import Dict, Any
 from astrbot.api.event import AstrMessageEvent, MessageEventResult
+from ..core.answer.answer_enum import AnswerEnum
 
 
 class AreaHandlers:
@@ -10,6 +11,11 @@ class AreaHandlers:
     async def view_areas(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
         user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
 
         result = self.area_service.get_all_areas()
 
@@ -57,7 +63,6 @@ class AreaHandlers:
             message = f"🌳 在 {result['area']['name']} 中冒险！\n\n"
             message += f"✨ 遇到了野生的 {wild_pokemon['name']}！\n"
             message += f"等级: {wild_pokemon['level']}\n"
-            message += f"遇见概率: {wild_pokemon['encounter_rate']:.1f}%\n\n"
             message += "接下来你可以选择捕捉、战斗或其他操作...\n（冒险功能后续实现）"
             yield event.plain_result(message)
         else:
