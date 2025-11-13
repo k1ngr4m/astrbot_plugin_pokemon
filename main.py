@@ -21,6 +21,7 @@ from .handlers.area_handlers import AreaHandlers
 from .handlers.battle_handlers import BattleHandlers
 from .handlers.checkin_handlers import CheckinHandlers
 from .handlers.item_handlers import ItemHandlers
+from .handlers.catch_handlers import CatchHandlers
 
 from .core.services.user_service import UserService
 from .core.services.checkin_service import CheckinService
@@ -128,6 +129,7 @@ class PokemonPlugin(Star):
         self.battle_handlers = BattleHandlers(self)
         self.checkin_handlers = CheckinHandlers(self)
         self.item_handlers = ItemHandlers(self)
+        self.catch_handlers = CatchHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -201,6 +203,12 @@ class PokemonPlugin(Star):
     async def battle(self, event: AstrMessageEvent):
         """与当前遇到的野生宝可梦战斗"""
         async for r in self.battle_handlers.battle(event):
+            yield r
+
+    @filter.command("捕捉")
+    async def catch_pokemon(self, event: AstrMessageEvent):
+        """捕捉当前遇到的野生宝可梦"""
+        async for r in self.catch_handlers.catch_pokemon(event):
             yield r
 
     @filter.command("宝可梦背包")
