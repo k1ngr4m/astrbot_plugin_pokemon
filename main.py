@@ -107,6 +107,7 @@ class PokemonPlugin(Star):
         self.battle_service = BattleService(
             user_repo=self.user_repo,
             pokemon_repo=self.pokemon_repo,
+            team_repo=self.team_repo,
             config=self.game_config,
             exp_service=self.exp_service
         )

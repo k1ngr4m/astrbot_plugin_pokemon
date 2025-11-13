@@ -91,29 +91,33 @@ class BattleHandlers:
 
             # 添加经验值信息
             if exp_details:
-                pokemon_exp_info = exp_details.get("pokemon_exp", {})
+                team_pokemon_results = exp_details.get("team_pokemon_results", [])
                 user_exp_info = exp_details.get("user_exp", {})
 
-                if pokemon_exp_info.get("success"):
-                    exp_gained = pokemon_exp_info.get("exp_gained", 0)
-                    level_up_info = pokemon_exp_info.get("level_up_info", {})
+                if team_pokemon_results:
                     message += f"\n📈 经验值获取:\n"
-                    message += f"  {user_pokemon['name']} 获得了 {exp_gained} 点经验值\n"
+                    for i, pokemon_result in enumerate(team_pokemon_results):
+                        if pokemon_result.get("success"):
+                            exp_gained = pokemon_result.get("exp_gained", 0)
+                            pokemon_name = pokemon_result.get("pokemon_name", f"宝可梦{i+1}")
+                            message += f"  {pokemon_name} 获得了 {exp_gained} 点经验值\n"
 
-                    if level_up_info.get("should_level_up"):
-                        levels_gained = level_up_info.get("levels_gained", 0)
-                        new_level = level_up_info.get("new_level", user_pokemon['level'])
-                        message += f"  🎉 恭喜 {user_pokemon['name']} 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n"
+                            level_up_info = pokemon_result.get("level_up_info", {})
+                            if level_up_info.get("should_level_up"):
+                                levels_gained = level_up_info.get("levels_gained", 0)
+                                new_level = level_up_info.get("new_level", 0)
+                                message += f"  🎉 恭喜 {pokemon_name} 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n"
 
                 if user_exp_info.get("success"):
                     user_exp_gained = user_exp_info.get("exp_gained", 0)
-                    user_levels_gained = user_exp_info.get("levels_gained", 0)
-                    new_user_level = user_exp_info.get("new_level", user.level)
-                    message += f"  训练家获得了 {user_exp_gained} 点经验值"
-                    if user_levels_gained > 0:
-                        message += f"，等级提升 {user_levels_gained} 级，现在是 {new_user_level} 级！\n"
-                    else:
-                        message += "\n"
+                    if user_exp_gained > 0:  # 只有在获得经验时才显示
+                        user_levels_gained = user_exp_info.get("levels_gained", 0)
+                        new_user_level = user_exp_info.get("new_level", user.level)
+                        message += f"  训练家获得了 {user_exp_gained} 点经验值"
+                        if user_levels_gained > 0:
+                            message += f"，等级提升 {user_levels_gained} 级，现在是 {new_user_level} 级！\n"
+                        else:
+                            message += "\n"
 
             # 清除缓存的野生宝可梦信息
             if hasattr(self.plugin, '_cached_wild_pokemon'):

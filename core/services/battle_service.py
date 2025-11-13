@@ -14,6 +14,7 @@ class BattleService:
         self,
         user_repo: AbstractUserRepository,
         pokemon_repo: AbstractPokemonRepository,
+        team_repo,
         config: Dict[str, Any],
         exp_service = None
     ):
@@ -22,6 +23,7 @@ class BattleService:
             from .exp_service import ExpService
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
+        self.team_repo = team_repo
         self.config = config
         self.exp_service = exp_service
 
@@ -187,23 +189,67 @@ class BattleService:
             import random
             result = "胜利" if random.random() * 100 < user_win_rate else "失败"
 
-            # 处理经验值
+            # 处理经验值（仅在胜利时）
             exp_details = {}
-            if self.exp_service:
+            if self.exp_service and result == "胜利":
                 # 计算宝可梦获得的经验值
                 pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon['level'], result)
                 user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon['level'], result)
 
-                # 更新宝可梦经验值
-                pokemon_update_result = self.exp_service.update_pokemon_after_battle(
-                    user_id, str(user_pokemon['id']), pokemon_exp_gained)
+                # 获取用户队伍中的所有宝可梦
+                user_team_data = self.team_repo.get_user_team(user_id)
+                team_pokemon_results = []
 
-                # 更新用户经验值
-                user_update_result = self.exp_service.update_user_after_battle(user_id, user_exp_gained)
+                if user_team_data:
+                    import json
+                    try:
+                        team_pokemon_ids = json.loads(user_team_data) if user_team_data else []
+
+                        # 检查team_pokemon_ids是否为字典（如果是字典格式，则获取值列表）
+                        if isinstance(team_pokemon_ids, dict):
+                            # 如果是字典格式，获取其中的宝可梦IDs列表
+                            if 'pokemon_list' in team_pokemon_ids:
+                                team_pokemon_ids = team_pokemon_ids['pokemon_list']
+                            elif 'team' in team_pokemon_ids:
+                                team_pokemon_ids = team_pokemon_ids['team']
+                            else:
+                                # 尝试获取字典中的所有值
+                                team_pokemon_ids = list(team_pokemon_ids.values())
+                                if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
+                                    team_pokemon_ids = team_pokemon_ids[0]
+
+                        # 确保team_pokemon_ids是列表
+                        if not isinstance(team_pokemon_ids, list):
+                            # 如果不是列表，尝试转换为列表
+                            if isinstance(team_pokemon_ids, (str, int)):
+                                team_pokemon_ids = [team_pokemon_ids]
+                            else:
+                                team_pokemon_ids = []
+
+                        # 更新队伍中所有宝可梦的经验值
+                        if team_pokemon_ids:
+                            team_pokemon_results = self.exp_service.update_team_pokemon_after_battle(
+                                user_id, team_pokemon_ids, pokemon_exp_gained)
+
+                    except json.JSONDecodeError:
+                        team_pokemon_results = [{"success": False, "message": "队伍数据格式错误"}]
+
+                # 更新用户经验值（如果用户获得经验）
+                user_update_result = {"success": True, "exp_gained": 0}
+                if user_exp_gained > 0:
+                    user_update_result = self.exp_service.update_user_after_battle(user_id, user_exp_gained)
 
                 exp_details = {
-                    "pokemon_exp": pokemon_update_result,
-                    "user_exp": user_update_result
+                    "pokemon_exp": team_pokemon_results[0] if team_pokemon_results else {"success": False, "message": "未找到队伍中的宝可梦"},
+                    "user_exp": user_update_result,
+                    "team_pokemon_results": team_pokemon_results
+                }
+            elif self.exp_service and result != "胜利":
+                # 战斗失败时不获得经验
+                exp_details = {
+                    "pokemon_exp": {"success": True, "exp_gained": 0, "message": "战斗失败，未获得经验值"},
+                    "user_exp": {"success": True, "exp_gained": 0, "message": "战斗失败，未获得经验值"},
+                    "team_pokemon_results": []
                 }
 
             # 返回战斗结果
