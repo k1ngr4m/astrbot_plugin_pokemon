@@ -1,6 +1,6 @@
 from typing import Dict, Any
 from ..repositories.abstract_repository import (
-    AbstractUserRepository, AbstractItemTemplateRepository, AbstractTeamRepository,
+    AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
 )
 
 class ExpService:
@@ -9,12 +9,12 @@ class ExpService:
     def __init__(
         self,
         user_repo: AbstractUserRepository,
-        item_template_repo: AbstractItemTemplateRepository,
+        pokemon_repo: AbstractPokemonRepository,
         team_repo: AbstractTeamRepository,
         config: Dict[str, Any]
     ):
         self.user_repo = user_repo
-        self.item_template_repo = item_template_repo
+        self.pokemon_repo = pokemon_repo
         self.team_repo = team_repo
         self.config = config
 
@@ -100,18 +100,18 @@ class ExpService:
         # 检查是否升级
         level_up_info = self.check_pokemon_level_up(current_level, new_total_exp)
 
+        # 使用宝可梦的数字ID，而不是短码ID
+        # 从数据库返回的数据中获取数字ID
+        pokemon_numeric_id = pokemon_data.get('id')
+        if not isinstance(pokemon_numeric_id, int):
+            return {"success": False, "message": f"无法获取宝可梦的数字ID: {pokemon_numeric_id}"}
+
         # 更新宝可梦数据
-        with self.user_repo._get_connection() as conn:
-            cursor = conn.cursor()
+        self.pokemon_repo.update_pokemon_exp(level_up_info["new_level"], level_up_info["new_exp"], pokemon_numeric_id, user_id)
 
-            # 更新经验和等级
-            cursor.execute("""
-                UPDATE user_pokemon
-                SET level = ?, exp = ?
-                WHERE id = ? AND user_id = ?
-            """, (level_up_info["new_level"], level_up_info["new_exp"], int(pokemon_id), user_id))
-
-            conn.commit()
+        # 如果有升级，更新属性
+        if level_up_info.get("levels_gained", 0) > 0:
+            self._calculate_and_update_pokemon_stats(pokemon_numeric_id, pokemon_data['species_id'], level_up_info["new_level"], user_id)
 
         return {
             "success": True,
@@ -119,6 +119,74 @@ class ExpService:
             "level_up_info": level_up_info,
             "pokemon_name": pokemon_data.get('nickname', '未知宝可梦')
         }
+
+    def _calculate_and_update_pokemon_stats(self, pokemon_id: int, species_id: int, new_level: int, user_id: str) -> bool:
+        """
+        根据新的等级计算并更新宝可梦的属性
+        使用官方宝可梦公式: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5 或 + 10 (HP)
+        """
+        try:
+            # 获取宝可梦的种族值
+            species_data = self.pokemon_repo.get_pokemon_by_id(species_id)
+            if not species_data:
+                return False
+
+            # 获取宝可梦的IV和EV值
+            pokemon_data = self.user_repo.get_user_pokemon_by_numeric_id(pokemon_id)
+            if not pokemon_data:
+                return False
+
+            # 获取各种族值
+            base_hp = getattr(species_data, 'base_hp', 0)
+            base_attack = getattr(species_data, 'base_attack', 0)
+            base_defense = getattr(species_data, 'base_defense', 0)
+            base_sp_attack = getattr(species_data, 'base_sp_attack', 0)
+            base_sp_defense = getattr(species_data, 'base_sp_defense', 0)
+            base_speed = getattr(species_data, 'base_speed', 0)
+
+            # 获取IV值
+            hp_iv = pokemon_data.get('hp_iv', 0)
+            attack_iv = pokemon_data.get('attack_iv', 0)
+            defense_iv = pokemon_data.get('defense_iv', 0)
+            sp_attack_iv = pokemon_data.get('sp_attack_iv', 0)
+            sp_defense_iv = pokemon_data.get('sp_defense_iv', 0)
+            speed_iv = pokemon_data.get('speed_iv', 0)
+
+            # 获取EV值
+            hp_ev = pokemon_data.get('hp_ev', 0)
+            attack_ev = pokemon_data.get('attack_ev', 0)
+            defense_ev = pokemon_data.get('defense_ev', 0)
+            sp_attack_ev = pokemon_data.get('sp_attack_ev', 0)
+            sp_defense_ev = pokemon_data.get('sp_defense_ev', 0)
+            speed_ev = pokemon_data.get('speed_ev', 0)
+
+            # 根据公式计算新属性值
+            # HP: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 等级 + 10
+            new_hp = int((base_hp * 2 + hp_iv + hp_ev // 4) * new_level / 100) + new_level + 10
+            # 非HP属性: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5
+            new_attack = int((base_attack * 2 + attack_iv + attack_ev // 4) * new_level / 100) + 5
+            new_defense = int((base_defense * 2 + defense_iv + defense_ev // 4) * new_level / 100) + 5
+            new_sp_attack = int((base_sp_attack * 2 + sp_attack_iv + sp_attack_ev // 4) * new_level / 100) + 5
+            new_sp_defense = int((base_sp_defense * 2 + sp_defense_iv + sp_defense_ev // 4) * new_level / 100) + 5
+            new_speed = int((base_speed * 2 + speed_iv + speed_ev // 4) * new_level / 100) + 5
+
+            new_pokemon_attributes = {
+                'current_hp': new_hp,
+                'attack': new_attack,
+                'defense': new_defense,
+                'sp_attack': new_sp_attack,
+                'sp_defense': new_sp_defense,
+                'speed': new_speed,
+            }
+            # 更新宝可梦的属性
+            self.pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
+
+
+
+            return True
+        except Exception as e:
+            print(f"更新宝可梦属性时出错: {e}")
+            return False
 
     def update_team_pokemon_after_battle(self, user_id: str, team_pokemon_ids: list, exp_gained: int) -> list:
         """
@@ -158,16 +226,7 @@ class ExpService:
             remaining_exp = new_total_exp
 
         # 更新用户数据
-        with self.user_repo._get_connection() as conn:
-            cursor = conn.cursor()
-
-            cursor.execute("""
-                UPDATE users
-                SET level = ?, exp = ?
-                WHERE user_id = ?
-            """, (new_level, remaining_exp, user_id))
-
-            conn.commit()
+        self.user_repo.update_user_exp(new_level, remaining_exp, user_id)
 
         return {
             "success": True,

@@ -124,3 +124,23 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 WHERE st.species_id = ?
             """, (species_id,))
             return [row[0] for row in cursor.fetchall()]
+
+    def update_pokemon_exp(self, level: int, exp: int, pokemon_id: int, user_id: str) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE user_pokemon
+                SET level = ?, exp = ?
+                WHERE id = ? AND user_id = ?
+            """, (level, exp, pokemon_id, user_id))
+            conn.commit()
+
+    def update_pokemon_attributes(self, attributes: Dict[str, int], pokemon_id: int, user_id: str) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE user_pokemon
+                SET current_hp = :current_hp, attack = :attack, defense = :defense, sp_attack = :sp_attack, sp_defense = :sp_defense, speed = :speed
+                WHERE id = :id AND user_id = :user_id
+            """, {**attributes, 'id': pokemon_id, 'user_id': user_id})
+            conn.commit()

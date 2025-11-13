@@ -42,6 +42,9 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[Dict[str, Any]]: pass
 
+    @abstractmethod
+    def update_user_exp(self, level: int, exp: int, user_id: str) -> None: pass
+
 class AbstractPokemonRepository(ABC):
     """宝可梦数据仓储接口"""
     # 获取宝可梦模板
@@ -74,6 +77,12 @@ class AbstractPokemonRepository(ABC):
 
     @abstractmethod
     def get_pokemon_types(self, species_id: int) -> List[str]: pass
+
+    @abstractmethod
+    def update_pokemon_exp(self, level: int, exp: int, pokemon_id: int, user_id: str) -> None: pass
+
+    @abstractmethod
+    def update_pokemon_attributes(self, attributes: Dict[str, int], pokemon_id: int, user_id: str) -> None: pass
 
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""

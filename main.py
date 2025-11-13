@@ -99,7 +99,7 @@ class PokemonPlugin(Star):
         )
         self.exp_service = ExpService(
             user_repo=self.user_repo,
-            item_template_repo=self.pokemon_repo,
+            pokemon_repo=self.pokemon_repo,
             team_repo=self.team_repo,
             config=self.game_config
         )

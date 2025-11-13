@@ -303,3 +303,13 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute(sql, (shortcode,))
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    def update_user_exp(self, level: int, exp: int, user_id: str) -> None:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users
+                SET level = ?, exp = ?
+                WHERE user_id = ?
+            """, (level, exp, user_id))
+            conn.commit()
