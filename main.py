@@ -13,6 +13,7 @@ from .core.services.pokemon_service import PokemonService
 from .core.services.team_service import TeamService
 from .core.services.area_service import AreaService
 from .core.services.battle_service import BattleService
+from .core.services.exp_service import ExpService
 from .handlers.common_handlers import CommonHandlers
 from .handlers.pokemon_handlers import PokemonHandlers
 from .handlers.team_handlers import TeamHandlers
@@ -96,10 +97,18 @@ class PokemonPlugin(Star):
             user_repo=self.user_repo,
             config=self.game_config
         )
+        self.exp_service = ExpService(
+            user_repo=self.user_repo,
+            item_template_repo=self.pokemon_repo,
+            team_repo=self.team_repo,
+            config=self.game_config
+        )
+
         self.battle_service = BattleService(
             user_repo=self.user_repo,
             pokemon_repo=self.pokemon_repo,
-            config=self.game_config
+            config=self.game_config,
+            exp_service=self.exp_service
         )
         self.common_handlers = CommonHandlers(self)
         self.team_handlers = TeamHandlers(self)

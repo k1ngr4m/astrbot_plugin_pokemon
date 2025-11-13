@@ -44,6 +44,48 @@ class AreaHandlers:
         """进入指定区域冒险"""
         user_id = self.plugin._get_effective_user_id(event)
 
+        # 检查用户是否有设置队伍
+        user_team_data = self.plugin.team_repo.get_user_team(user_id)
+        if not user_team_data:
+            yield event.plain_result("❌ 您还没有设置队伍。请先使用 /设置队伍 指令设置您的出场队伍，才能进行冒险。")
+            return
+
+        # 解析队伍数据
+        import json
+        try:
+            team_pokemon_ids = json.loads(user_team_data) if user_team_data else []
+            if not team_pokemon_ids:
+                yield event.plain_result("❌ 您的队伍是空的，无法进行冒险。请先使用 /设置队伍 指令设置您的出场队伍。")
+                return
+
+            # 检查team_pokemon_ids是否为字典（如果是字典格式，则获取值列表）
+            if isinstance(team_pokemon_ids, dict):
+                # 如果是字典格式，获取其中的宝可梦IDs列表
+                if 'pokemon_list' in team_pokemon_ids:
+                    team_pokemon_ids = team_pokemon_ids['pokemon_list']
+                elif 'team' in team_pokemon_ids:
+                    team_pokemon_ids = team_pokemon_ids['team']
+                else:
+                    # 尝试获取字典中的所有值
+                    team_pokemon_ids = list(team_pokemon_ids.values())
+                    if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
+                        team_pokemon_ids = team_pokemon_ids[0]
+
+            # 确保team_pokemon_ids是列表
+            if not isinstance(team_pokemon_ids, list):
+                # 如果不是列表，尝试转换为列表
+                if isinstance(team_pokemon_ids, (str, int)):
+                    team_pokemon_ids = [team_pokemon_ids]
+                else:
+                    team_pokemon_ids = []
+
+            if not team_pokemon_ids:
+                yield event.plain_result("❌ 您的队伍是空的，无法进行冒险。请先使用 /设置队伍 指令设置您的出场队伍。")
+                return
+        except json.JSONDecodeError:
+            yield event.plain_result("❌ 队伍数据格式错误，请重新设置队伍。")
+            return
+
         args = event.message_str.split(" ")
         if len(args) < 2:
             yield event.plain_result("❌ 请输入要冒险的区域短码。用法：冒险 <区域短码>\n\n💡 提示：使用 查看区域 指令查看所有可冒险的区域。")

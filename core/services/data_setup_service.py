@@ -1,9 +1,12 @@
 from ..repositories.abstract_repository import (
     AbstractPokemonRepository,
 )
-from ..initial_data import (
+from ..database.data.initial_data import (
     POKEMON_SPECIES_DATA, POKEMON_TYPES_DATA, POKEMON_SPECIES_TYPES_DATA, POKEMON_EVOLUTION_DATA, ITEM_DATA,
-    POKEMON_MOVES_DATA, POKEMON_SPECIES_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA,
+    POKEMON_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA,
+)
+from ..database.data.pokemon_moves_data import (
+    POKEMON_SPECIES_MOVES_DATA,
 )
 from astrbot.api import logger
 

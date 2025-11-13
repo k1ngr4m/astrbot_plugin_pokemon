@@ -14,11 +14,16 @@ class BattleService:
         self,
         user_repo: AbstractUserRepository,
         pokemon_repo: AbstractPokemonRepository,
-        config: Dict[str, Any]
+        config: Dict[str, Any],
+        exp_service = None
     ):
+        from typing import TYPE_CHECKING
+        if TYPE_CHECKING:
+            from .exp_service import ExpService
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.config = config
+        self.exp_service = exp_service
 
         # ----------------------
         # 宝可梦属性克制表（第三世代及之后全属性，key: 攻击属性, value: {防御属性: 克制系数}）
@@ -182,6 +187,25 @@ class BattleService:
             import random
             result = "胜利" if random.random() * 100 < user_win_rate else "失败"
 
+            # 处理经验值
+            exp_details = {}
+            if self.exp_service:
+                # 计算宝可梦获得的经验值
+                pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon['level'], result)
+                user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon['level'], result)
+
+                # 更新宝可梦经验值
+                pokemon_update_result = self.exp_service.update_pokemon_after_battle(
+                    user_id, str(user_pokemon['id']), pokemon_exp_gained)
+
+                # 更新用户经验值
+                user_update_result = self.exp_service.update_user_after_battle(user_id, user_exp_gained)
+
+                exp_details = {
+                    "pokemon_exp": pokemon_update_result,
+                    "user_exp": user_update_result
+                }
+
             # 返回战斗结果
             battle_result = {
                 "success": True,
@@ -208,7 +232,8 @@ class BattleService:
                         "user_win_rate": user_win_rate,
                         "wild_win_rate": wild_win_rate
                     },
-                    "result": result
+                    "result": result,
+                    "exp_details": exp_details
                 }
             }
 
