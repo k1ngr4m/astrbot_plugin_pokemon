@@ -397,3 +397,37 @@ class SqliteUserRepository(AbstractUserRepository):
                     VALUES (?, ?, ?)
                 """, (user_id, item_id, quantity))
             conn.commit()
+
+    def get_user_items(self, user_id: str) -> list:
+        """
+        获取用户的所有物品
+        Args:
+            user_id: 用户ID
+        Returns:
+            用户物品列表，每个物品包含item_id, item_name, quantity等信息
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # 查询用户物品及其详细信息
+            sql = """
+            SELECT ui.item_id, ui.quantity, i.name, i.type, i.description, i.rarity
+            FROM user_items ui
+            JOIN items i ON ui.item_id = i.id
+            WHERE ui.user_id = ?
+            ORDER BY i.type, i.rarity DESC, i.name
+            """
+            cursor.execute(sql, (user_id,))
+            rows = cursor.fetchall()
+
+            user_items = []
+            for row in rows:
+                user_items.append({
+                    "item_id": row[0],
+                    "quantity": row[1],
+                    "name": row[2],
+                    "type": row[3],
+                    "description": row[4],
+                    "rarity": row[5]
+                })
+
+            return user_items

@@ -61,6 +61,10 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def add_user_item(self, user_id: str, item_id: int, quantity: int) -> None: pass
 
+    # 获取用户的所有物品
+    @abstractmethod
+    def get_user_items(self, user_id: str) -> list: pass
+
 class AbstractPokemonRepository(ABC):
     """宝可梦数据仓储接口"""
     # 获取宝可梦模板

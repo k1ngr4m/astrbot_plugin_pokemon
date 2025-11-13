@@ -20,9 +20,11 @@ from .handlers.team_handlers import TeamHandlers
 from .handlers.area_handlers import AreaHandlers
 from .handlers.battle_handlers import BattleHandlers
 from .handlers.checkin_handlers import CheckinHandlers
+from .handlers.item_handlers import ItemHandlers
 
 from .core.services.user_service import UserService
 from .core.services.checkin_service import CheckinService
+from .core.services.item_service import ItemService
 
 
 class PokemonPlugin(Star):
@@ -116,12 +118,16 @@ class PokemonPlugin(Star):
         self.checkin_service = CheckinService(
             user_repo=self.user_repo
         )
+        self.item_service = ItemService(
+            user_repo=self.user_repo
+        )
         self.common_handlers = CommonHandlers(self)
         self.team_handlers = TeamHandlers(self)
         self.pokemon_handlers = PokemonHandlers(self)
         self.area_handlers = AreaHandlers(self)
         self.battle_handlers = BattleHandlers(self)
         self.checkin_handlers = CheckinHandlers(self)
+        self.item_handlers = ItemHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -195,6 +201,12 @@ class PokemonPlugin(Star):
     async def battle(self, event: AstrMessageEvent):
         """与当前遇到的野生宝可梦战斗"""
         async for r in self.battle_handlers.battle(event):
+            yield r
+
+    @filter.command("宝可梦背包")
+    async def view_items(self, event: AstrMessageEvent):
+        """查看用户背包中的所有道具"""
+        async for r in self.item_handlers.view_items(event):
             yield r
 
     async def terminate(self):
