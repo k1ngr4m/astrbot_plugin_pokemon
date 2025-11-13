@@ -45,6 +45,22 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def update_user_exp(self, level: int, exp: int, user_id: str) -> None: pass
 
+    # 检查用户今日是否已签到
+    @abstractmethod
+    def has_user_checked_in_today(self, user_id: str, today: str) -> bool: pass
+
+    # 为用户添加签到记录
+    @abstractmethod
+    def add_user_checkin(self, user_id: str, checkin_date: str, gold_reward: int, item_reward_id: int = 1, item_quantity: int = 1) -> None: pass
+
+    # 更新用户的金币数量
+    @abstractmethod
+    def update_user_coins(self, user_id: str, coins: int) -> None: pass
+
+    # 为用户添加物品
+    @abstractmethod
+    def add_user_item(self, user_id: str, item_id: int, quantity: int) -> None: pass
+
 class AbstractPokemonRepository(ABC):
     """宝可梦数据仓储接口"""
     # 获取宝可梦模板

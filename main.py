@@ -19,8 +19,10 @@ from .handlers.pokemon_handlers import PokemonHandlers
 from .handlers.team_handlers import TeamHandlers
 from .handlers.area_handlers import AreaHandlers
 from .handlers.battle_handlers import BattleHandlers
+from .handlers.checkin_handlers import CheckinHandlers
 
 from .core.services.user_service import UserService
+from .core.services.checkin_service import CheckinService
 
 
 class PokemonPlugin(Star):
@@ -111,11 +113,15 @@ class PokemonPlugin(Star):
             config=self.game_config,
             exp_service=self.exp_service
         )
+        self.checkin_service = CheckinService(
+            user_repo=self.user_repo
+        )
         self.common_handlers = CommonHandlers(self)
         self.team_handlers = TeamHandlers(self)
         self.pokemon_handlers = PokemonHandlers(self)
         self.area_handlers = AreaHandlers(self)
         self.battle_handlers = BattleHandlers(self)
+        self.checkin_handlers = CheckinHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -141,6 +147,12 @@ class PokemonPlugin(Star):
     async def register(self, event: AstrMessageEvent):
         """注册成为宝可梦游戏玩家，开始你的宝可梦之旅"""
         async for r in self.common_handlers.register_user(event):
+            yield r
+
+    @filter.command("宝可梦签到")
+    async def checkin(self, event: AstrMessageEvent):
+        """每日签到，获得金币和道具奖励"""
+        async for r in self.checkin_handlers.checkin(event):
             yield r
 
     @filter.command("初始选择")

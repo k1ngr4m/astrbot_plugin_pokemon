@@ -313,3 +313,87 @@ class SqliteUserRepository(AbstractUserRepository):
                 WHERE user_id = ?
             """, (level, exp, user_id))
             conn.commit()
+
+    def has_user_checked_in_today(self, user_id: str, today: str) -> bool:
+        """
+        检查用户今日是否已签到
+        Args:
+            user_id: 用户ID
+            today: 今日日期，格式为YYYY-MM-DD
+        Returns:
+            bool: 如果用户今天已签到则返回True，否则返回False
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 1 FROM user_checkins
+                WHERE user_id = ? AND checkin_date = ?
+            """, (user_id, today))
+            return cursor.fetchone() is not None
+
+    def add_user_checkin(self, user_id: str, checkin_date: str, gold_reward: int, item_reward_id: int = 1, item_quantity: int = 1) -> None:
+        """
+        为用户添加签到记录
+        Args:
+            user_id: 用户ID
+            checkin_date: 签到日期，格式为YYYY-MM-DD
+            gold_reward: 金币奖励
+            item_reward_id: 道具奖励ID
+            item_quantity: 道具奖励数量
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO user_checkins (user_id, checkin_date, gold_reward, item_reward_id, item_quantity)
+                VALUES (?, ?, ?, ?, ?)
+            """, (user_id, checkin_date, gold_reward, item_reward_id, item_quantity))
+            conn.commit()
+
+    def update_user_coins(self, user_id: str, coins: int) -> None:
+        """
+        更新用户的金币数量
+        Args:
+            user_id: 用户ID
+            coins: 新的金币数量
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users
+                SET coins = ?
+                WHERE user_id = ?
+            """, (coins, user_id))
+            conn.commit()
+
+    def add_user_item(self, user_id: str, item_id: int, quantity: int) -> None:
+        """
+        为用户添加物品
+        Args:
+            user_id: 用户ID
+            item_id: 物品ID
+            quantity: 物品数量
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # 检查用户是否已经有该物品
+            cursor.execute("""
+                SELECT quantity FROM user_items
+                WHERE user_id = ? AND item_id = ?
+            """, (user_id, item_id))
+            row = cursor.fetchone()
+
+            if row:
+                # 如果已有该物品，更新数量
+                new_quantity = row[0] + quantity
+                cursor.execute("""
+                    UPDATE user_items
+                    SET quantity = ?
+                    WHERE user_id = ? AND item_id = ?
+                """, (new_quantity, user_id, item_id))
+            else:
+                # 如果没有该物品，插入新记录
+                cursor.execute("""
+                    INSERT INTO user_items (user_id, item_id, quantity)
+                    VALUES (?, ?, ?)
+                """, (user_id, item_id, quantity))
+            conn.commit()
