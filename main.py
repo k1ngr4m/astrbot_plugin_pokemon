@@ -2,7 +2,7 @@ import os
 
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
 from .core.database.migration import run_migrations
 from .core.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from .core.repositories.sqlite_team_repo import SqliteTeamRepository
@@ -32,7 +32,7 @@ from .core.services.shop_service import ShopService
 
 
 class PokemonPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
 
         # 插件ID
@@ -61,7 +61,14 @@ class PokemonPlugin(Star):
         #
         # 从框架读取嵌套配置
         # 注意：框架会自动解析 _conf_schema.json 中的嵌套对象
-        self.game_config = {}
+        adventure_config = config.get("adventure", {})
+
+        self.game_config = {
+            "adventure": {
+                "cooldown": adventure_config.get("cooldown", 60)
+            }
+        }
+
 
         # 初始化数据库模式
         plugin_root_dir = os.path.dirname(__file__)
@@ -145,11 +152,20 @@ class PokemonPlugin(Star):
         data_setup_service = DataSetupService(self.pokemon_repo, self.area_repo, self.shop_repo)
         data_setup_service.setup_initial_data()
 
+        # --- Web后台配置 ---
+        self.web_admin_task = None
+        webui_config = config.get("webui", {})
+        self.secret_key = webui_config.get("secret_key")
+        if not self.secret_key:
+            logger.error("安全警告：Web后台管理的'secret_key'未在配置中设置！强烈建议您设置一个长且随机的字符串以保证安全。")
+            self.secret_key = None
+        self.port = webui_config.get("port", 7777)
+
         # 管理员扮演功能
         self.impersonation_map = {}
 
         # 冒险冷却时间管理（默认60秒）
-        self.adventure_cooldown = 60
+        self.adventure_cooldown = self.game_config["adventure"]["cooldown"]
         self._last_adventure_time = {}
 
     def _get_effective_user_id(self, event: AstrMessageEvent):

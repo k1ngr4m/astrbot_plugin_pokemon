@@ -1,0 +1,32 @@
+{
+  "webui": {
+    "description": "Web管理界面配置",
+    "type": "object",
+    "items": {
+      "secret_key": {
+        "description": "webui的密钥",
+        "type": "string",
+        "hint": "登录管理界面的密钥，建议使用随机字符串",
+        "default": "SecretKey"
+      },
+      "port": {
+        "description": "webui的端口",
+        "type": "int",
+        "hint": "请确保端口未被占用",
+        "default": 6199
+      }
+    }
+  },
+  "adventure": {
+    "description": "冒险系统配置",
+    "type": "object",
+    "items": {
+      "cooldown_seconds": {
+        "description": "冒险的冷却时间",
+        "type": "int",
+        "hint": "每次冒险后的冷却时间，单位为秒",
+        "default": 60
+      }
+    }
+  }
+}
