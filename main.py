@@ -8,6 +8,7 @@ from .core.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from .core.repositories.sqlite_team_repo import SqliteTeamRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
 from .core.repositories.sqlite_area_repo import SqliteAreaRepository
+from .core.repositories.sqlite_shop_repo import SqliteShopRepository
 from .core.services.data_setup_service import DataSetupService
 from .core.services.pokemon_service import PokemonService
 from .core.services.team_service import TeamService
@@ -22,10 +23,12 @@ from .handlers.battle_handlers import BattleHandlers
 from .handlers.checkin_handlers import CheckinHandlers
 from .handlers.item_handlers import ItemHandlers
 from .handlers.catch_handlers import CatchHandlers
+from .handlers.shop_handlers import ShopHandlers
 
 from .core.services.user_service import UserService
 from .core.services.checkin_service import CheckinService
 from .core.services.item_service import ItemService
+from .core.services.shop_service import ShopService
 
 
 class PokemonPlugin(Star):
@@ -71,6 +74,7 @@ class PokemonPlugin(Star):
         self.pokemon_repo = SqlitePokemonRepository(db_path)
         self.team_repo = SqliteTeamRepository(db_path)
         self.area_repo = SqliteAreaRepository(db_path)
+        self.shop_repo = SqliteShopRepository(db_path)
 
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
@@ -122,6 +126,9 @@ class PokemonPlugin(Star):
         self.item_service = ItemService(
             user_repo=self.user_repo
         )
+        self.shop_service = ShopService(
+            user_repo=self.user_repo
+        )
         self.common_handlers = CommonHandlers(self)
         self.team_handlers = TeamHandlers(self)
         self.pokemon_handlers = PokemonHandlers(self)
@@ -130,10 +137,11 @@ class PokemonPlugin(Star):
         self.checkin_handlers = CheckinHandlers(self)
         self.item_handlers = ItemHandlers(self)
         self.catch_handlers = CatchHandlers(self)
+        self.shop_handlers = ShopHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
-        data_setup_service = DataSetupService(self.pokemon_repo, self.area_repo)
+        data_setup_service = DataSetupService(self.pokemon_repo, self.area_repo, self.shop_repo)
         data_setup_service.setup_initial_data()
 
         # 管理员扮演功能
@@ -215,6 +223,18 @@ class PokemonPlugin(Star):
     async def view_items(self, event: AstrMessageEvent):
         """查看用户背包中的所有道具"""
         async for r in self.item_handlers.view_items(event):
+            yield r
+
+    @filter.command("商店")
+    async def view_shop(self, event: AstrMessageEvent):
+        """查看商店中的所有商品"""
+        async for r in self.shop_handlers.view_shop(event):
+            yield r
+
+    @filter.command("商店购买")
+    async def purchase_item(self, event: AstrMessageEvent):
+        """购买商店中的商品"""
+        async for r in self.shop_handlers.purchase_item(event):
             yield r
 
     async def terminate(self):

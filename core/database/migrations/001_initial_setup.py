@@ -312,4 +312,41 @@ def up(cursor: sqlite3.Cursor):
 
     logger.info("✅ 签到记录表创建完成")
 
+    # --- 1. 商店表 ---
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS shops (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,     -- 商店ID
+            shop_code TEXT UNIQUE NOT NULL,           -- 商店短码（S开头后跟3位数字，如S001）
+            name TEXT NOT NULL,                       -- 商店名称
+            description TEXT,                         -- 商店描述
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    # --- 2. 商店商品表 ---
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS shop_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,     -- 商品ID
+            shop_id INTEGER NOT NULL,                 -- 商店ID
+            item_id INTEGER NOT NULL,                 -- 道具ID
+            price INTEGER NOT NULL DEFAULT 0,         -- 价格
+            stock INTEGER NOT NULL DEFAULT -1,        -- 库存（-1表示无限库存）
+            is_active INTEGER NOT NULL DEFAULT 1,     -- 是否上架（0/1）
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+            FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
+            UNIQUE(shop_id, item_id)                  -- 确保商店内同一道具只出现一次
+        );
+    """)
+
+    # 为商店表创建索引
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_shops_code ON shops(shop_code)")
+
+    # 为商店商品表创建索引
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_shop_items_shop_id ON shop_items(shop_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_shop_items_item_id ON shop_items(item_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_shop_items_active ON shop_items(is_active)")
+
+    logger.info("✅ 商店系统表创建完成")
+
     logger.info("✅ 数据库初始结构创建完成 (SQLite)")

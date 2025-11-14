@@ -1,7 +1,7 @@
 import sqlite3
 import threading
 from typing import Optional, List
-from ..domain.area import AdventureArea, AreaPokemon
+from ..domain.models import AdventureArea, AreaPokemon
 from .abstract_repository import AbstractAreaRepository
 
 

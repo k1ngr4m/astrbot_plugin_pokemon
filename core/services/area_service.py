@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Optional
 from ..repositories.abstract_repository import (
     AbstractAreaRepository, AbstractPokemonRepository, AbstractUserRepository
 )
-from ..domain.area import AdventureArea, AreaPokemon
+from ..domain.models import AdventureArea, AreaPokemon
 from ..utils import get_now
 
 

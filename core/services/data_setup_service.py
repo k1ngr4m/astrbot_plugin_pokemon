@@ -1,10 +1,13 @@
 from ..repositories.abstract_repository import (
     AbstractPokemonRepository,
+    AbstractAreaRepository,
+    AbstractShopRepository,
 )
 from ..database.data.initial_data import (
     POKEMON_SPECIES_DATA, POKEMON_TYPES_DATA, POKEMON_SPECIES_TYPES_DATA, POKEMON_EVOLUTION_DATA, ITEM_DATA,
-    POKEMON_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA,
+    POKEMON_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA, SHOP_DATA, SHOP_ITEM_DATA,
 )
+from ..domain.models import AdventureArea, AreaPokemon, Shop, ShopItem
 from ..database.data.pokemon_moves_data import (
     POKEMON_SPECIES_MOVES_DATA,
 )
@@ -15,10 +18,12 @@ class DataSetupService:
 
     def __init__(self,
                  pokemon_repo: AbstractPokemonRepository,
-                 area_repo=None,  # 可选参数，用于冒险区域数据初始化
+                 area_repo=AbstractAreaRepository,
+                 shop_repo=AbstractShopRepository,
                  ):
         self.pokemon_repo = pokemon_repo
         self.area_repo = area_repo
+        self.shop_repo = shop_repo
 
 
     def setup_initial_data(self):
@@ -116,7 +121,6 @@ class DataSetupService:
 
         # 填充冒险区域数据（仅在area_repo可用时执行）
         if self.area_repo:
-            from ..domain.area import AdventureArea, AreaPokemon
             for area in ADVENTURE_AREAS_DATA:
                 # 创建AdventureArea对象，使用临时id（数据库会自动生成正确id）
                 area_obj = AdventureArea(
@@ -144,3 +148,33 @@ class DataSetupService:
                         max_level=area_pokemon[4]
                     )
                     self.area_repo.add_area_pokemon(ap_obj)
+
+        # 填充商店数据（仅在shop_repo可用时执行）
+        if self.shop_repo:
+            for shop in SHOP_DATA:
+                # 创建Shop对象，使用临时id（数据库会自动生成正确id）
+                shop_obj = Shop(
+                    id=0,  # 临时id，实际id会在数据库插入后生成
+                    shop_code=shop[0],
+                    name=shop[1],
+                    description=shop[2],
+                )
+                self.shop_repo.add_shop(shop_obj)
+
+            # 填充商店商品关联数据
+            for shop_item in SHOP_ITEM_DATA:
+                # shop_item[0]是商店代码，需要先获取商店ID
+                shop = self.shop_repo.get_shop_by_code(shop_item[0])
+                if shop:
+                    # 创建ShopItem对象，使用临时id（数据库会自动生成正确id）
+                    si_obj = ShopItem(
+                        id=0,  # 临时id，实际id会在数据库插入后生成
+                        shop_id=shop.id,
+                        item_id=shop_item[1],
+                        price=shop_item[2],
+                        stock=shop_item[3],
+                        is_active=shop_item[4],
+                    )
+                    self.shop_repo.add_shop_item(si_obj)
+
+                logger.info("✅ 商店数据初始化完成")

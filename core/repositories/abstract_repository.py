@@ -1,9 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 from ..domain.models import (
-    User, Pokemon,
+    User, Pokemon, Shop, ShopItem
 )
-from ..domain.area import AdventureArea, AreaPokemon
+from ..domain.models import AdventureArea, AreaPokemon
 
 
 
@@ -133,3 +133,20 @@ class AbstractAreaRepository(ABC):
 
     @abstractmethod
     def add_area_pokemon(self, area_pokemon: AreaPokemon) -> int: pass
+
+class AbstractShopRepository(ABC):
+    """商店数据仓储接口"""
+    @abstractmethod
+    def add_shop(self, shop: Shop) -> None: pass
+
+    @abstractmethod
+    def add_shop_item(self, shop_item: ShopItem) -> None: pass
+
+    @abstractmethod
+    def get_shop_by_code(self, shop_code: str) -> Optional[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def get_shop_items_by_shop_id(self, shop_id: int) -> List[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def check_shop_exists_by_code(self, shop_code: str) -> bool: pass

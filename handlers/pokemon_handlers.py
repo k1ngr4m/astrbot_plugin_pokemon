@@ -109,7 +109,7 @@ class PokemonHandlers:
                 }.get(pokemon["gender"], "")
 
                 message += f"{i}. {shiny_str}{pokemon['nickname']} {gender_str}\n"
-                message += f"   短码: {pokemon['shortcode']} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']} | 速度: {pokemon.get('speed', 0)}\n"
+                message += f"   短码: {pokemon['shortcode']} | 等级: {pokemon['level']} | HP: {pokemon['current_hp']}\n"
                 # message += f"   种族ID: {pokemon['species_id']} | 捕获时间: {pokemon['caught_time']}\n\n"
 
             message += f"\n您可以使用 /我的宝可梦 <短码> 来查看特定宝可梦的详细信息。"
