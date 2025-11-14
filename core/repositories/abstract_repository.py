@@ -150,3 +150,9 @@ class AbstractShopRepository(ABC):
 
     @abstractmethod
     def check_shop_exists_by_code(self, shop_code: str) -> bool: pass
+
+    @abstractmethod
+    def get_a_shop_item_by_id(self, shop_item_id: int, shop_id: int) -> Optional[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def update_shop_item_stock(self, shop_item_id: int, stock: int) -> None: pass

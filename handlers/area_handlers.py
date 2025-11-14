@@ -43,6 +43,11 @@ class AreaHandlers:
     async def adventure(self, event: AstrMessageEvent):
         """进入指定区域冒险"""
         user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
 
         # 检查用户是否有设置队伍
         user_team_data = self.plugin.team_repo.get_user_team(user_id)

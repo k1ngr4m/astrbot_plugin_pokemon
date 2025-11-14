@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 from astrbot.api.event import AstrMessageEvent
+from ..core.answer.answer_enum import AnswerEnum
 
 if TYPE_CHECKING:
     from ..main import PokemonPlugin
@@ -12,11 +13,10 @@ class BattleHandlers:
     async def battle(self, event: AstrMessageEvent):
         """处理战斗指令"""
         user_id = self.plugin._get_effective_user_id(event)
-
-        # 检查用户是否已注册
         user = self.plugin.user_repo.get_by_id(user_id)
+
         if not user:
-            yield event.plain_result("❌ 您尚未注册成为宝可梦训练家，请先使用 /宝可梦注册 指令注册。")
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
             return
 
         # 检查是否有缓存的野生宝可梦信息

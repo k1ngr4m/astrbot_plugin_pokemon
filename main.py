@@ -127,7 +127,8 @@ class PokemonPlugin(Star):
             user_repo=self.user_repo
         )
         self.shop_service = ShopService(
-            user_repo=self.user_repo
+            user_repo=self.user_repo,
+            shop_repo=self.shop_repo
         )
         self.common_handlers = CommonHandlers(self)
         self.team_handlers = TeamHandlers(self)

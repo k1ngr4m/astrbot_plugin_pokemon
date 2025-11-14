@@ -1,6 +1,8 @@
 from astrbot.api.event import AstrMessageEvent
 from typing import TYPE_CHECKING
 
+from ..core.answer.answer_enum import AnswerEnum
+
 if TYPE_CHECKING:
     from ..main import PokemonPlugin
 
@@ -12,10 +14,15 @@ class ShopHandlers:
     async def view_shop(self, event: AstrMessageEvent):
         """查看商店命令处理器"""
         user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
 
         args = event.message_str.split(" ")
         if len(args) < 2:
-            yield event.plain_result("❌ 请输入商店短码！\n用法：商店 [商店短码]\n例如：商店 S01")
+            yield event.plain_result("❌ 请输入商店短码！\n用法：商店 [商店短码]\n例如：商店 S001")
             return
 
         shop_code = args[1].upper()  # 支持小写输入
@@ -37,7 +44,7 @@ class ShopHandlers:
 
         # 格式化商店信息和商品列表
         shop_info = result["shop"]
-        message = f"🏪 {result['message']}\n"
+        message = f"🏪 {result['message']}\n\n"
         if shop_info.get("description"):
             message += f"📝 {shop_info['description']}\n\n"
 
@@ -59,13 +66,13 @@ class ShopHandlers:
 
         for item_type, items in items_by_type.items():
             type_name = type_names.get(item_type, item_type)
-            message += f"🔸 {type_name}:\n"
+            message += f"🔸 {type_name}:\n\n"
 
             for item in items:
                 stock_text = "无限" if item["stock"] == -1 else f"{item['stock']}个"
                 message += f"  • {item['name']} - {item['price']} 金币/个 (库存: {stock_text})\n"
                 if item['description']:
-                    message += f"    {item['description']}\n"
+                    message += f"    {item['description']}\n\n"
             message += "\n"
 
         yield event.plain_result(message.strip())
@@ -73,14 +80,19 @@ class ShopHandlers:
     async def purchase_item(self, event: AstrMessageEvent):
         """购买商品命令处理器"""
         user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
 
         args = event.message_str.split(" ")
         if len(args) < 4:
-            yield event.plain_result("❌ 请提供完整的购买信息！\n用法：商店购买 [商店短码] [物品名称] [数量]\n例如：商店购买 S01 精灵球 5")
+            yield event.plain_result("❌ 请提供完整的购买信息！\n用法：商店购买 [商店短码] [物品ID] [数量]\n例如：商店购买 S001 1 5")
             return
 
         shop_code = args[1].upper()  # 商店短码
-        item_name = args[2]  # 物品名称
+        item_id = args[2]  # 物品ID
         try:
             quantity = int(args[3])  # 数量
         except ValueError:
@@ -96,6 +108,6 @@ class ShopHandlers:
         shop_number = shop_code[1:]  # 获取数字部分
         formatted_shop_code = f"S{shop_number.zfill(3)}"  # 补零到3位
 
-        result = self.shop_service.purchase_item(user_id, formatted_shop_code, item_name, quantity)
+        result = self.shop_service.purchase_item(user_id, formatted_shop_code, item_id, quantity)
 
         yield event.plain_result(result["message"])

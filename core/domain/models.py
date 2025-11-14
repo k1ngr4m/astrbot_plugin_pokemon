@@ -46,6 +46,15 @@ class Shop:
     name: str
     description: str
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "shop_code": self.shop_code,
+            "name": self.name,
+            "description": self.description
+        }
+
+
 @dataclass
 class ShopItem:
     """代表一个商店物品领域模型"""

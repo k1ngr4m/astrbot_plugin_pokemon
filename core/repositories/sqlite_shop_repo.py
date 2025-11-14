@@ -2,9 +2,8 @@ import sqlite3
 import threading
 from typing import Optional, List, Dict, Any
 
-from data.plugins.astrbot_plugin_fishing.core.domain.models import ShopItem
 from .abstract_repository import AbstractUserRepository, AbstractShopRepository
-from ..domain.models import Shop
+from ..domain.models import Shop, ShopItem
 
 
 class SqliteShopRepository(AbstractShopRepository):
@@ -69,9 +68,10 @@ class SqliteShopRepository(AbstractShopRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT shop_id, item_id, price, stock, is_active
-                FROM shop_items
-                WHERE shop_id = ?
+                SELECT s.shop_id, s.id, i.name, i.type, i.description, i.rarity, s.price, s.stock, s.is_active
+                FROM shop_items s 
+                JOIN items i ON s.item_id = i.id
+                WHERE s.shop_id = ?
             """, (shop_id,))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
@@ -80,3 +80,29 @@ class SqliteShopRepository(AbstractShopRepository):
         """检查商店是否存在"""
         shop = self.get_shop_by_code(shop_code)
         return shop is not None
+
+    def get_a_shop_item_by_id(self, shop_item_id: int, shop_id: int) -> Optional[Dict[str, Any]]:
+        """根据商店商品ID获取商店商品信息"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT si.id as shop_item_id, si.price, si.stock, i.id as item_id, i.name
+                FROM shop_items si
+                JOIN items i ON si.item_id = i.id
+                WHERE si.shop_id = ? AND i.id = ? AND si.is_active = 1
+            """, (shop_id, shop_item_id))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
+    def update_shop_item_stock(self, shop_item_id: int, stock: int) -> None:
+        """更新商店商品库存"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE shop_items
+                SET stock = ?
+                WHERE id = ?
+            """, (stock, shop_item_id))
+            conn.commit()
