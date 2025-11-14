@@ -29,16 +29,42 @@ class CatchHandlers:
             yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
             return
 
-        # 检查用户背包中是否有精灵球（检查类型为Pokeball的物品）
+        # 解析用户可能传递的道具ID参数
+        message_content = event.message_str
+        command_parts = message_content.split()
+        item_id = None
+
+        if len(command_parts) > 1:
+            # 尝试解析第二个参数作为道具ID
+            try:
+                item_id = int(command_parts[1])
+            except ValueError:
+                # 如果不是数字，提示用户使用道具ID
+                yield event.plain_result("❌ 无效的道具ID格式。请使用命令格式: /捕捉 [道具ID] 或 /捕捉")
+                return
+
+        # 检查用户背包中的道具
         user_items = self.plugin.user_repo.get_user_items(user_id)
         pokeball_item = None
-        for item in user_items:
-            if item['type'] == 'Pokeball' and item['quantity'] > 0:
-                pokeball_item = item
-                break
 
-        if not pokeball_item or pokeball_item['quantity'] <= 0:
-            yield event.plain_result("❌ 您的背包中没有精灵球，无法进行捕捉！请先通过签到或其他方式获得精灵球。")
+        if item_id is not None:
+            # 用户指定了特定的道具ID
+            for item in user_items:
+                if item['item_id'] == item_id and item['type'] == 'Pokeball' and item['quantity'] > 0:
+                    pokeball_item = item
+                    break
+        else:
+            # 用户未指定道具ID，自动寻找第一个可用的精灵球
+            for item in user_items:
+                if item['type'] == 'Pokeball' and item['quantity'] > 0:
+                    pokeball_item = item
+                    break
+
+        if not pokeball_item:
+            if item_id is not None:
+                yield event.plain_result(f"❌ 找不到ID为 {item_id} 的精灵球或该道具不存在，无法进行捕捉！请检查道具ID或先通过签到或其他方式获得精灵球。")
+            else:
+                yield event.plain_result("❌ 您的背包中没有精灵球，无法进行捕捉！请先通过签到或其他方式获得精灵球。")
             return
 
         # 计算捕捉成功率
@@ -111,10 +137,10 @@ class CatchHandlers:
             new_pokemon = self.plugin.user_repo.get_user_pokemon_by_numeric_id(pokemon_id)
 
             message = f"🎉 捕捉成功！\n\n"
-            message += f"您成功捕捉到了 {wild_pokemon['name']} (Lv.{wild_pokemon['level']})！\n"
-            message += f"已添加到您的宝可梦队伍中。\n"
-            message += f"宝可梦ID: {new_pokemon['shortcode']}\n"
-            message += f"使用的精灵球: {pokeball_item['name']}\n"
+            message += f"您成功捕捉到了 {wild_pokemon['name']} (Lv.{wild_pokemon['level']})！\n\n"
+            message += f"已添加到您的宝可梦收藏中。\n\n"
+            message += f"宝可梦ID: {new_pokemon['shortcode']}\n\n"
+            message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
             message += f"剩余精灵球: {pokeball_item['quantity'] - 1}"
 
             # 清除缓存的野生宝可梦信息
@@ -122,9 +148,9 @@ class CatchHandlers:
                 self.plugin._cached_wild_pokemon.pop(user_id, None)
         else:
             message = f"❌ 捕捉失败！\n\n"
-            message += f"{wild_pokemon['name']} 逃脱了！\n"
-            message += f"使用的精灵球: {pokeball_item['name']}\n"
-            message += f"捕捉成功率: {catch_success_rate * 100:.1f}%\n"
+            message += f"{wild_pokemon['name']} 逃脱了！\n\n"
+            message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
+            message += f"捕捉成功率: {catch_success_rate * 100:.1f}%\n\n"
             message += f"剩余精灵球: {pokeball_item['quantity'] - 1}\n\n"
             message += "继续冒险可能会再次遇到它哦！"
 

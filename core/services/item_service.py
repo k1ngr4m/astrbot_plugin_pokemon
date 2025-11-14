@@ -84,7 +84,7 @@ class ItemService:
             formatted_text += f"🔸 {type_name}:\n"
 
             for item in items:
-                formatted_text += f"  • {item['name']} x{item['quantity']}\n"
+                formatted_text += f"  • [{item['item_id']}] {item['name']} x{item['quantity']}\n"
                 if item['description']:
                     formatted_text += f"    {item['description']}\n"
             formatted_text += "\n"

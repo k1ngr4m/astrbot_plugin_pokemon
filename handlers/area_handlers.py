@@ -49,6 +49,23 @@ class AreaHandlers:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
             return
 
+        # 检查用户是否已经遇到了野生宝可梦
+        if hasattr(self.plugin, '_cached_wild_pokemon'):
+            wild_pokemon = self.plugin._cached_wild_pokemon.get(user_id)
+            if wild_pokemon:
+                yield event.plain_result("❌ 您当前正在冒险中，已经遇到了野生宝可梦。请先处理当前遇到的宝可梦（战斗或捕捉），然后才能重新开始冒险。")
+                return
+
+        # 检查冒险冷却时间
+        import time
+        current_time = time.time()
+        last_adventure_time = self.plugin._last_adventure_time.get(user_id, 0)
+        cooldown_remaining = (last_adventure_time + self.plugin.adventure_cooldown) - current_time
+
+        if cooldown_remaining > 0:
+            yield event.plain_result(f"❌ 冒险冷却中，请等待 {int(cooldown_remaining)} 秒后再试。")
+            return
+
         # 检查用户是否有设置队伍
         user_team_data = self.plugin.team_repo.get_user_team(user_id)
         if not user_team_data:
@@ -116,7 +133,13 @@ class AreaHandlers:
                 self.plugin._cached_wild_pokemon = {}
             self.plugin._cached_wild_pokemon[user_id] = wild_pokemon
 
-            message += "接下来你可以选择战斗或捕捉...\n使用 /战斗 指令进行对战！"
+            # 记录冒险时间，用于冷却时间控制
+            import time
+            self.plugin._last_adventure_time[user_id] = time.time()
+
+            message += ("接下来你可以选择战斗或捕捉...\n\n"
+                        "使用 /战斗 指令进行对战！\n\n"
+                        "使用 /捕捉 指令尝试捕捉它！")
             yield event.plain_result(message)
         else:
             yield event.plain_result(f"❌ {result['message']}")
