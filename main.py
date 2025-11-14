@@ -24,6 +24,7 @@ from .handlers.checkin_handlers import CheckinHandlers
 from .handlers.item_handlers import ItemHandlers
 from .handlers.catch_handlers import CatchHandlers
 from .handlers.shop_handlers import ShopHandlers
+from .handlers.run_handlers import RunHandlers
 
 from .core.services.user_service import UserService
 from .core.services.checkin_service import CheckinService
@@ -146,6 +147,7 @@ class PokemonPlugin(Star):
         self.item_handlers = ItemHandlers(self)
         self.catch_handlers = CatchHandlers(self)
         self.shop_handlers = ShopHandlers(self)
+        self.run_handlers = RunHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -255,6 +257,12 @@ class PokemonPlugin(Star):
     async def purchase_item(self, event: AstrMessageEvent):
         """购买商店中的商品"""
         async for r in self.shop_handlers.purchase_item(event):
+            yield r
+
+    @filter.command("逃跑")
+    async def run(self, event: AstrMessageEvent):
+        """逃跑离开当前遇到的野生宝可梦"""
+        async for r in self.run_handlers.run(event):
             yield r
 
     async def terminate(self):

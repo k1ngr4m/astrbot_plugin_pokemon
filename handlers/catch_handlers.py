@@ -152,6 +152,6 @@ class CatchHandlers:
             message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
             message += f"捕捉成功率: {catch_success_rate * 100:.1f}%\n\n"
             message += f"剩余精灵球: {pokeball_item['quantity'] - 1}\n\n"
-            message += "继续冒险可能会再次遇到它哦！"
+            message += "你也可以使用 /逃跑 指令离开这只野生宝可梦。"
 
         yield event.plain_result(message)

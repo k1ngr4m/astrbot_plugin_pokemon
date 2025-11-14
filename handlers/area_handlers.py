@@ -139,9 +139,10 @@ class AreaHandlers:
             current_time = time.time()
             self.plugin.user_repo.update_user_last_adventure_time(user_id, current_time)
 
-            message += ("接下来你可以选择战斗或捕捉...\n\n"
+            message += ("接下来你可以选择战斗、捕捉或逃跑...\n\n"
                         "使用 /战斗 指令进行对战！\n\n"
-                        "使用 /捕捉 指令尝试捕捉它！")
+                        "使用 /捕捉 指令尝试捕捉它！\n\n"
+                        "使用 /逃跑 指令安全离开！")
             yield event.plain_result(message)
         else:
             yield event.plain_result(f"❌ {result['message']}")
