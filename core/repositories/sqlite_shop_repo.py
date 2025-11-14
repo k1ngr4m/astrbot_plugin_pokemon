@@ -23,25 +23,26 @@ class SqliteShopRepository(AbstractShopRepository):
             self._local.connection = conn
         return conn
 
-    def add_shop(self, shop: Shop) -> None:
+    def add_shop_template(self, shop: Dict[str, Any]) -> None:
         """添加商店"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO shops (shop_code, name, description)
-                VALUES (?, ?, ?)
-            """, (shop.shop_code, shop.name, shop.description))
+                INSERT OR IGNORE INTO shops
+                (shop_code, name, description)
+                VALUES (:shop_code, :name, :description)
+            """, {**shop})
             conn.commit()
 
-    def add_shop_item(self, shop_item: ShopItem) -> None:
+    def add_shop_item_template(self, shop_item: Dict[str, Any]) -> None:
         """添加商店商品"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO shop_items (shop_id, item_id, price, stock, is_active)
-                VALUES (?, ?, ?, ?, ?)
-            """, (shop_item.shop_id, shop_item.item_id,
-                  shop_item.price, shop_item.stock, shop_item.is_active))
+                INSERT INTO shop_items 
+                    (shop_id, item_id, price, stock, is_active)
+                VALUES (:shop_id, :item_id, :price, :stock, :is_active)
+            """, {**shop_item})
             conn.commit()
 
     def get_shop_by_code(self, shop_code: str) -> Optional[Shop]:

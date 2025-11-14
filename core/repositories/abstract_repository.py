@@ -129,21 +129,21 @@ class AbstractAreaRepository(ABC):
     def get_area_pokemon_by_area_code(self, area_code: str) -> List[AreaPokemon]: pass
 
     @abstractmethod
-    def add_area(self, area: AdventureArea) -> int: pass
+    def add_area_template(self, area: Dict[str, Any]) -> None: pass
 
     @abstractmethod
-    def add_area_pokemon(self, area_pokemon: AreaPokemon) -> int: pass
+    def add_area_pokemon_template(self, area_pokemon: Dict[str, Any]) -> None: pass
 
 class AbstractShopRepository(ABC):
     """商店数据仓储接口"""
     @abstractmethod
-    def add_shop(self, shop: Shop) -> None: pass
+    def add_shop_template(self, shop: Dict[str, Any]) -> None: pass
 
     @abstractmethod
-    def add_shop_item(self, shop_item: ShopItem) -> None: pass
+    def add_shop_item_template(self, shop_item: Dict[str, Any]) -> None: pass
 
     @abstractmethod
-    def get_shop_by_code(self, shop_code: str) -> Optional[Dict[str, Any]]: pass
+    def get_shop_by_code(self, shop_code: str) -> Optional[Shop]: pass
 
     @abstractmethod
     def get_shop_items_by_shop_id(self, shop_id: int) -> List[Dict[str, Any]]: pass

@@ -119,62 +119,52 @@ class DataSetupService:
                 }
             )
 
-        # 填充冒险区域数据（仅在area_repo可用时执行）
-        if self.area_repo:
-            for area in ADVENTURE_AREAS_DATA:
-                # 创建AdventureArea对象，使用临时id（数据库会自动生成正确id）
-                area_obj = AdventureArea(
-                    id=0,  # 临时id，实际id会在数据库插入后生成
-                    area_code=area[0],
-                    name=area[1],
-                    description=area[2],
-                    min_level=area[3],
-                    max_level=area[4]
+        for area in ADVENTURE_AREAS_DATA:
+            self.area_repo.add_area_template(
+                {
+                    "area_code": area[0],
+                    "name": area[1],
+                    "description": area[2],
+                    "min_level": area[3],
+                    "max_level": area[4],
+                }
+            )
+
+        # 填充区域宝可梦关联数据
+        for area_pokemon in AREA_POKEMON_DATA:
+            # area_pokemon[0]是区域代码，需要先获取区域ID
+            area = self.area_repo.get_area_by_code(area_pokemon[0])
+            if area:
+                self.area_repo.add_area_pokemon_template(
+                    {
+                        "area_id": area.id,
+                        "pokemon_species_id": area_pokemon[1],
+                        "encounter_rate": area_pokemon[2],
+                        "min_level": area_pokemon[3],
+                        "max_level": area_pokemon[4],
+                    }
                 )
-                self.area_repo.add_area(area_obj)
 
-            # 填充区域宝可梦关联数据
-            for area_pokemon in AREA_POKEMON_DATA:
-                # area_pokemon[0]是区域代码，需要先获取区域ID
-                area = self.area_repo.get_area_by_code(area_pokemon[0])
-                if area:
-                    # 创建AreaPokemon对象，使用临时id（数据库会自动生成正确id）
-                    ap_obj = AreaPokemon(
-                        id=0,  # 临时id，实际id会在数据库插入后生成
-                        area_id=area.id,
-                        pokemon_species_id=area_pokemon[1],
-                        encounter_rate=area_pokemon[2],
-                        min_level=area_pokemon[3],
-                        max_level=area_pokemon[4]
-                    )
-                    self.area_repo.add_area_pokemon(ap_obj)
+        # 填充商店数据
+        for shop in SHOP_DATA:
+            self.shop_repo.add_shop_template(
+                {
+                    "shop_code": shop[0],
+                    "name": shop[1],
+                    "description": shop[2],
+                }
+            )
 
-        # 填充商店数据（仅在shop_repo可用时执行）
-        if self.shop_repo:
-            for shop in SHOP_DATA:
-                # 创建Shop对象，使用临时id（数据库会自动生成正确id）
-                shop_obj = Shop(
-                    id=0,  # 临时id，实际id会在数据库插入后生成
-                    shop_code=shop[0],
-                    name=shop[1],
-                    description=shop[2],
+        # 填充商店商品数据
+        for shop_item in SHOP_ITEM_DATA:
+            shop = self.shop_repo.get_shop_by_code(shop_item[0])
+            if shop:
+                self.shop_repo.add_shop_item_template(
+                    {
+                        "shop_id": shop.id,
+                        "item_id": shop_item[1],
+                        "price": shop_item[2],
+                        "stock": shop_item[3],
+                        "is_active": shop_item[4],
+                    }
                 )
-                self.shop_repo.add_shop(shop_obj)
-
-            # 填充商店商品关联数据
-            for shop_item in SHOP_ITEM_DATA:
-                # shop_item[0]是商店代码，需要先获取商店ID
-                shop = self.shop_repo.get_shop_by_code(shop_item[0])
-                if shop:
-                    # 创建ShopItem对象，使用临时id（数据库会自动生成正确id）
-                    si_obj = ShopItem(
-                        id=0,  # 临时id，实际id会在数据库插入后生成
-                        shop_id=shop.id,
-                        item_id=shop_item[1],
-                        price=shop_item[2],
-                        stock=shop_item[3],
-                        is_active=shop_item[4],
-                    )
-                    self.shop_repo.add_shop_item(si_obj)
-
-                logger.info("✅ 商店数据初始化完成")

@@ -1,6 +1,7 @@
 import sqlite3
 import threading
-from typing import Optional, List
+from csv import DictWriter
+from typing import Optional, List, Dict, Any
 from ..domain.models import AdventureArea, AreaPokemon
 from .abstract_repository import AbstractAreaRepository
 
@@ -104,40 +105,24 @@ class SqliteAreaRepository(AbstractAreaRepository):
                 max_level=row["max_level"]
             ) for row in rows]
 
-    def add_area(self, area: AdventureArea) -> int:
+    def add_area_template(self, data: Dict[str, Any]) -> None:
         """添加新的冒险区域"""
-        sql = """
-        INSERT INTO adventure_areas (area_code, name, description, min_level, max_level)
-        VALUES (?, ?, ?, ?, ?)
-        """
-
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (
-                area.area_code,
-                area.name,
-                area.description,
-                area.min_level,
-                area.max_level
-            ))
+            cursor.execute("""
+                INSERT OR IGNORE INTO adventure_areas 
+                    (area_code, name, description, min_level, max_level)
+                VALUES (:area_code, :name, :description, :min_level, :max_level)
+            """, {**data})
             conn.commit()
-            return cursor.lastrowid
 
-    def add_area_pokemon(self, area_pokemon: AreaPokemon) -> int:
+    def add_area_pokemon_template(self, data: Dict[str, Any]) -> None:
         """添加区域宝可梦关联"""
-        sql = """
-        INSERT INTO area_pokemon (area_id, pokemon_species_id, encounter_rate, min_level, max_level)
-        VALUES (?, ?, ?, ?, ?)
-        """
-
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (
-                area_pokemon.area_id,
-                area_pokemon.pokemon_species_id,
-                area_pokemon.encounter_rate,
-                area_pokemon.min_level,
-                area_pokemon.max_level
-            ))
+            cursor.execute("""
+                INSERT OR IGNORE INTO area_pokemon 
+                    (area_id, pokemon_species_id, encounter_rate, min_level, max_level)
+                VALUES (:area_id, :pokemon_species_id, :encounter_rate, :min_level, :max_level)
+            """, {**data})
             conn.commit()
-            return cursor.lastrowid
