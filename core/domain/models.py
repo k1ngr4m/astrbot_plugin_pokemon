@@ -37,6 +37,7 @@ class User:
     level: int = 1
     exp: int = 0
     init_selected: Optional[int] = 0
+    last_adventure_time: Optional[float] = None
 
 @dataclass
 class Shop:

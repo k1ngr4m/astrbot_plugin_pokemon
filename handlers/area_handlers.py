@@ -59,7 +59,8 @@ class AreaHandlers:
         # 检查冒险冷却时间
         import time
         current_time = time.time()
-        last_adventure_time = self.plugin._last_adventure_time.get(user_id, 0)
+        user = self.plugin.user_repo.get_by_id(user_id)
+        last_adventure_time = user.last_adventure_time if user and user.last_adventure_time else 0
         cooldown_remaining = (last_adventure_time + self.plugin.adventure_cooldown) - current_time
 
         if cooldown_remaining > 0:
@@ -133,9 +134,10 @@ class AreaHandlers:
                 self.plugin._cached_wild_pokemon = {}
             self.plugin._cached_wild_pokemon[user_id] = wild_pokemon
 
-            # 记录冒险时间，用于冷却时间控制
+            # 记录冒险时间到数据库，用于冷却时间控制
             import time
-            self.plugin._last_adventure_time[user_id] = time.time()
+            current_time = time.time()
+            self.plugin.user_repo.update_user_last_adventure_time(user_id, current_time)
 
             message += ("接下来你可以选择战斗或捕捉...\n\n"
                         "使用 /战斗 指令进行对战！\n\n"

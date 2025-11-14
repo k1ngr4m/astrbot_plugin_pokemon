@@ -166,7 +166,6 @@ class PokemonPlugin(Star):
 
         # 冒险冷却时间管理（默认60秒）
         self.adventure_cooldown = self.game_config["adventure"]["cooldown"]
-        self._last_adventure_time = {}
 
     def _get_effective_user_id(self, event: AstrMessageEvent):
         """获取在当前上下文中应当作为指令执行者的用户ID。

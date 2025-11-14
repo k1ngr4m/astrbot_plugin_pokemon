@@ -49,18 +49,24 @@ class SqliteUserRepository(AbstractUserRepository):
                             return None
             return None
 
-            # 使用 .keys() 检查字段是否存在，确保向后兼容性
+        # 使用 .keys() 检查字段是否存在，确保向后兼容性
         row_keys = row.keys()
 
-        return User(
-            user_id=row["user_id"],
-            nickname=row["nickname"],
-            coins=row["coins"],
-            level=row["level"],
-            exp=row["exp"],
-            init_selected = row["init_selected"],
-            created_at=parse_datetime(row["created_at"]),
-        )
+        user_data = {
+            'user_id': row["user_id"],
+            'nickname': row["nickname"],
+            'coins': row["coins"],
+            'level': row["level"],
+            'exp': row["exp"],
+            'init_selected': row["init_selected"],
+            'created_at': parse_datetime(row["created_at"]),
+        }
+
+        # 如果数据库行包含 last_adventure_time 字段，则添加
+        if "last_adventure_time" in row_keys:
+            user_data['last_adventure_time'] = row["last_adventure_time"]
+
+        return User(**user_data)
 
     def get_by_id(self, user_id: str) -> Optional[User]:
         with self._get_connection() as conn:
@@ -431,3 +437,19 @@ class SqliteUserRepository(AbstractUserRepository):
                 })
 
             return user_items
+
+    def update_user_last_adventure_time(self, user_id: str, last_adventure_time: float) -> None:
+        """
+        更新用户的上次冒险时间
+        Args:
+            user_id: 用户ID
+            last_adventure_time: 上次冒险时间戳
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users
+                SET last_adventure_time = ?
+                WHERE user_id = ?
+            """, (last_adventure_time, user_id))
+            conn.commit()
