@@ -1,4 +1,16 @@
 {
+  "user": {
+    "description": "用户配置",
+    "type": "object",
+    "items": {
+      "initial_coins": {
+        "description": "初始金币数量",
+        "type": "int",
+        "hint": "用户初始化选择宝可梦时，必须从这些ID中选择",
+        "default": 200
+      }
+    }
+  },
   "webui": {
     "description": "Web管理界面配置",
     "type": "object",

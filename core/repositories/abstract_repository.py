@@ -19,7 +19,7 @@ class AbstractUserRepository(ABC):
 
     # 新增一个用户
     @abstractmethod
-    def add(self, user: User) -> None: pass
+    def add_user(self, user: User) -> None: pass
 
     # 创建用户宝可梦记录
     @abstractmethod
@@ -70,6 +70,7 @@ class AbstractPokemonRepository(ABC):
     # 获取宝可梦模板
     @abstractmethod
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[Pokemon]: pass
+
     # 获取所有Pokemon模板
     @abstractmethod
     def get_all_pokemon(self) -> List[Pokemon]: pass

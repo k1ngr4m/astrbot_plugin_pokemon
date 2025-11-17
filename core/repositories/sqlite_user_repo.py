@@ -81,7 +81,7 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
             return cursor.fetchone() is not None
 
-    def add(self, user: User) -> None:
+    def add_user(self, user: User) -> None:
         # 使用与 update 相同的动态方法，确保 add 也是完整的
         fields = [f.name for f in dataclasses.fields(User)]
         columns_clause = ", ".join(fields)
@@ -105,41 +105,6 @@ class SqliteUserRepository(AbstractUserRepository):
         Returns:
             新创建的宝可梦实例ID
         """
-        # 获取宝可梦完整基础数据
-        base_sql = """
-        SELECT base_hp, base_attack, base_defense, base_sp_attack, base_sp_defense, base_speed
-        FROM pokemon_species WHERE id = ?
-        """
-
-        # 性别从 M/F/N 随机选择
-        gender = random.choice(['M', 'F', 'N'])
-
-        # 为初始宝可梦生成随机个体值(IV)，范围0-31
-        hp_iv = random.randint(0, 31)
-        attack_iv = random.randint(0, 31)
-        defense_iv = random.randint(0, 31)
-        sp_attack_iv = random.randint(0, 31)
-        sp_defense_iv = random.randint(0, 31)
-        speed_iv = random.randint(0, 31)
-
-        # 初始努力值为0
-        hp_ev = 0
-        attack_ev = 0
-        defense_ev = 0
-        sp_attack_ev = 0
-        sp_defense_ev = 0
-        speed_ev = 0
-
-        # 初始等级为1
-        level = 1
-        exp = 0
-
-        # 初始技能为空数组
-        moves = '[]'
-
-        # 是否异色（1/4096概率）
-        is_shiny = 1 if random.randint(1, 4096) == 1 else 0
-
         sql = """
         INSERT INTO user_pokemon (
             user_id, species_id, nickname, level, exp, gender,

@@ -1,10 +1,14 @@
+import random
 from typing import Dict, Any
+
+from .pokemon_service import PokemonService
 from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository,
 )
 
 from ..utils import get_now, get_today
 from ..domain.models import User
+from ..answer.answer_enum import AnswerEnum
 
 
 class UserService:
@@ -29,7 +33,7 @@ class UserService:
             一个包含成功状态和消息的字典。
         """
         if self.user_repo.check_exists(user_id):
-            return {"success": False, "message": "用户已注册"}
+            return {"success": False, "message": AnswerEnum.USER_ALREADY_REGISTERED.value}
 
         initial_coins = self.config.get("user", {}).get("initial_coins", 200)
         new_user = User(
@@ -38,11 +42,64 @@ class UserService:
             coins=initial_coins,
             created_at=get_now()
         )
-        self.user_repo.add(new_user)
+        self.user_repo.add_user(new_user)
 
         return {
             "success": True,
             "message": f"注册成功！欢迎 {nickname} 🎉 你获得了 {initial_coins} 金币作为起始资金。\n\n请从妙蛙种子1、小火龙4、杰尼龟7中选择作为初始宝可梦。\n\n输入 /初始选择 <宝可梦ID> 来选择。"
+        }
+
+    def checkin(self, user_id: str) -> Dict[str, Any]:
+        """
+        用户签到
+        Args:
+            user_id: 用户ID
+        Returns:
+            包含签到结果的字典
+        """
+        # 获取今天的日期
+        today = get_today().strftime("%Y-%m-%d")
+
+        # 检查用户今天是否已经签到
+        if self.user_repo.has_user_checked_in_today(user_id, today):
+            return {
+                "success": False,
+                "message": AnswerEnum.USER_ALREADY_CHECKED_IN.value,
+            }
+
+        # 检查用户是否存在
+        user = self.user_repo.get_by_id(user_id)
+        if not user:
+            return {
+                "success": False,
+                "message": AnswerEnum.USER_NOT_REGISTERED.value,
+            }
+
+        # 生成随机金币奖励（100-300之间）
+        gold_reward = random.randint(100, 300)
+
+        # 道具奖励：普通精灵球（ID=1），数量=1
+        item_reward_id = 1
+        item_quantity = 1
+
+        # 更新用户金币
+        new_coins = user.coins + gold_reward
+        self.user_repo.update_user_coins(user_id, new_coins)
+
+        # 为用户添加道具
+        self.user_repo.add_user_item(user_id, item_reward_id, item_quantity)
+
+        # 记录签到信息
+        self.user_repo.add_user_checkin(user_id, today, gold_reward, item_reward_id, item_quantity)
+
+        return {
+            "success": True,
+            "message": f"✅ 签到成功！\n获得了 {gold_reward} 金币 💰\n获得了 普通精灵球 x{item_quantity} 🎒\n当前金币总数：{new_coins}",
+            "gold_reward": gold_reward,
+            "item_reward": {
+                "id": item_reward_id,
+                "quantity": item_quantity
+            }
         }
 
     def init_select_pokemon(self, user_id: str, pokemon_id: int) -> Dict[str, Any]:
@@ -56,14 +113,16 @@ class UserService:
         """
         user = self.user_repo.get_by_id(user_id)
         if not user:
-            return {"success": False, "message": "用户不存在"}
+            return {"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}
         if user.init_selected:
-            return {"success": False, "message": "用户已初始化选择宝可梦"}
+            return {"success": False, "message": AnswerEnum.USER_ALREADY_INITIALIZED_POKEMON.value}
 
         # 检查宝可梦是否存在
         pokemon_template = self.pokemon_repo.get_pokemon_by_id(pokemon_id)
         if not pokemon_template:
-            return {"success": False, "message": "宝可梦不存在"}
+            return {"success": False, "message": AnswerEnum.POKEMON_NOT_FOUND.value}
+
+        new_pokemon = self.create_single_pokemon(pokemon_id, max_level=1, min_level=1)
 
         # 创建用户宝可梦记录，使用模板数据完善实例
         new_pokemon_id = self.user_repo.create_user_pokemon(
@@ -126,3 +185,66 @@ class UserService:
             "message": f"您拥有 {len(formatted_pokemon)} 只宝可梦"
         }
 
+    def create_single_pokemon(self, species_id: int, max_level: int, min_level: int) -> Dict[str, Any]:
+        """
+        创建一个新的宝可梦实例，使用指定的宝可梦ID
+        Args:
+            species_id (int): 宝可梦的ID
+
+        Returns:
+            Pokemon: 新创建的宝可梦实例
+        """
+        # 获取宝可梦完整基础数据
+        base_pokemon = self.pokemon_repo.get_pokemon_by_id(species_id).to_dict()
+
+        # 性别从 M/F/N 随机选择
+        gender = random.choice(['M', 'F', 'N'])
+
+        # 为初始宝可梦生成随机个体值(IV)，范围0-31
+        hp_iv = random.randint(0, 31)
+        attack_iv = random.randint(0, 31)
+        defense_iv = random.randint(0, 31)
+        sp_attack_iv = random.randint(0, 31)
+        sp_defense_iv = random.randint(0, 31)
+        speed_iv = random.randint(0, 31)
+
+        # 初始努力值为0
+        hp_ev = 0
+        attack_ev = 0
+        defense_ev = 0
+        sp_attack_ev = 0
+        sp_defense_ev = 0
+        speed_ev = 0
+
+        # 初始等级为1
+        level = random.randint(min_level, max_level)
+        exp = 0
+
+        # 初始技能为空数组
+        moves = '[]'
+
+        # 是否异色（1/4096概率）
+        is_shiny = 1 if random.randint(1, 4096) == 1 else 0
+
+        pokemon = {
+            'base_pokemon': base_pokemon,
+            'gender': gender,
+            'hp_iv': hp_iv,
+            'attack_iv': attack_iv,
+            'defense_iv': defense_iv,
+            'sp_attack_iv': sp_attack_iv,
+            'sp_defense_iv': sp_defense_iv,
+            'speed_iv': speed_iv,
+            'hp_ev': hp_ev,
+            'attack_ev': attack_ev,
+            'defense_ev': defense_ev,
+            'sp_attack_ev': sp_attack_ev,
+            'sp_defense_ev': sp_defense_ev,
+            'speed_ev': speed_ev,
+            'level': level,
+            'exp': exp,
+            'moves': moves,
+            'is_shiny': is_shiny,
+        }
+
+        return pokemon

@@ -1,9 +1,12 @@
 import random
+from itertools import accumulate
 from typing import Dict, Any, List, Optional
+
+from .pokemon_service import PokemonService
 from ..repositories.abstract_repository import (
     AbstractAreaRepository, AbstractPokemonRepository, AbstractUserRepository
 )
-from ..domain.models import AdventureArea, AreaPokemon
+from ..domain.models import AdventureArea, AreaPokemon, AdventureResult, WildPokemonInfo
 from ..utils import get_now
 
 
@@ -14,68 +17,15 @@ class AreaService:
             self,
             area_repo: AbstractAreaRepository,
             pokemon_repo: AbstractPokemonRepository,
+            pokemon_service: PokemonService,
             user_repo: AbstractUserRepository,
             config: Dict[str, Any]
     ):
         self.area_repo = area_repo
         self.pokemon_repo = pokemon_repo
+        self.pokemon_service = pokemon_service
         self.user_repo = user_repo
         self.config = config
-
-    def _calculate_pokemon_stats(self, base_stats: Dict[str, int], level: int) -> Dict[str, int]:
-        """
-        计算宝可梦的属性值（用于野生宝可梦）
-        Args:
-            base_stats: 基础属性值字典，包括hp, attack, defense, sp_attack, sp_defense, speed
-            level: 宝可梦等级
-        Returns:
-            包含各项属性值的字典
-        """
-        # 为野生宝可梦生成独立的IV值（每项0-31均匀随机，符合官方设定）
-        ivs = {
-            'hp': random.randint(0, 31),
-            'attack': random.randint(0, 31),
-            'defense': random.randint(0, 31),
-            'sp_attack': random.randint(0, 31),
-            'sp_defense': random.randint(0, 31),
-            'speed': random.randint(0, 31)
-        }
-
-        # 野生宝可梦初始努力值为0
-        evs = {
-            'hp': 0,
-            'attack': 0,
-            'defense': 0,
-            'sp_attack': 0,
-            'sp_defense': 0,
-            'speed': 0
-        }
-
-        # 计算HP值
-        # 宝可梦的HP计算公式：int((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 等级 + 10
-        hp = int((base_stats['hp'] * 2 + ivs['hp'] + evs['hp'] // 4) * level / 100) + level + 10
-        # 确保HP至少为基础值的一半（向下取整后至少为1）
-        min_hp = max(1, base_stats['hp'] // 2)
-        current_hp = max(min_hp, hp)
-
-        # 计算其他属性值（非HP属性使用不同的计算公式）
-        # 非HP属性计算公式：int(((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 5)
-        attack = int(((base_stats['attack'] * 2 + ivs['attack'] + evs['attack'] // 4) * level / 100) + 5)
-        defense = int(((base_stats['defense'] * 2 + ivs['defense'] + evs['defense'] // 4) * level / 100) + 5)
-        sp_attack = int(((base_stats['sp_attack'] * 2 + ivs['sp_attack'] + evs['sp_attack'] // 4) * level / 100) + 5)
-        sp_defense = int(((base_stats['sp_defense'] * 2 + ivs['sp_defense'] + evs['sp_defense'] // 4) * level / 100) + 5)
-        speed = int(((base_stats['speed'] * 2 + ivs['speed'] + evs['speed'] // 4) * level / 100) + 5)
-
-        return {
-            'hp': current_hp,
-            'attack': attack,
-            'defense': defense,
-            'sp_attack': sp_attack,
-            'sp_defense': sp_defense,
-            'speed': speed,
-            'ivs': ivs,
-            'evs': evs
-        }
 
     def get_all_areas(self) -> Dict[str, Any]:
         """
@@ -176,7 +126,7 @@ class AreaService:
                 "message": f"获取区域详情失败: {str(e)}"
             }
 
-    def adventure_in_area(self, user_id: str, area_code: str) -> Dict[str, Any]:
+    def adventure_in_area(self, user_id: str, area_code: str) -> AdventureResult:
         """
         在指定区域进行冒险，随机刷新一只野生宝可梦
         Args:
@@ -185,104 +135,84 @@ class AreaService:
         Returns:
             包含冒险结果的字典
         """
+        # 统一错误返回函数（减少重复代码）
+        def error_response(message: str) -> AdventureResult:
+            return {
+                "success": False,
+                "message": message,
+                "wild_pokemon": None,
+                "area": None
+            }
+
         try:
-            # 首先验证用户是否存在
+            # 1. 验证用户是否存在
             user = self.user_repo.get_by_id(user_id)
             if not user:
-                return {
-                    "success": False,
-                    "message": "用户不存在"
-                }
+                return error_response("用户不存在")
 
-            # 验证区域代码格式
-            if not (area_code.startswith('A') and len(area_code) == 4 and area_code[1:].isdigit()):
-                return {
-                    "success": False,
-                    "message": "区域代码格式不正确（应为A开头的四位数，如A001）"
-                }
+            # 2. 验证区域代码格式（简化正则式判断，更易读）
+            if not (isinstance(area_code, str) and area_code.startswith("A") and len(area_code) == 4 and area_code[
+                                                                                                         1:].isdigit()):
+                return error_response("区域代码格式不正确（应为A开头的四位数，如A001）")
 
-            # 获取区域信息
+            # 3. 获取区域信息
             area = self.area_repo.get_area_by_code(area_code)
             if not area:
-                return {
-                    "success": False,
-                    "message": f"未找到区域 {area_code}"
-                }
+                return error_response(f"未找到区域 {area_code}")
 
-            # 获取该区域的宝可梦列表
+            # 4. 获取该区域的宝可梦列表
             area_pokemon_list = self.area_repo.get_area_pokemon_by_area_code(area_code)
             if not area_pokemon_list:
-                return {
-                    "success": False,
-                    "message": f"区域 {area.name} 中暂无野生宝可梦"
-                }
+                return error_response(f"区域 {area.name} 中暂无野生宝可梦")
 
-            # 根据遇见概率随机选择一只宝可梦
-            total_rate = sum(ap.encounter_rate for ap in area_pokemon_list)
+            # 5. 权重随机选择宝可梦（使用itertools.accumulate简化累加逻辑）
+            encounter_rates = [ap.encounter_rate for ap in area_pokemon_list]
+            total_rate = sum(encounter_rates)
             random_value = random.uniform(0, total_rate)
 
-            selected_area_pokemon = None
-            cumulative_rate = 0
-
-            for area_pokemon in area_pokemon_list:
-                cumulative_rate += area_pokemon.encounter_rate
+            # 累加概率，找到第一个超过随机值的宝可梦
+            for idx, cumulative_rate in enumerate(accumulate(encounter_rates)):
                 if random_value <= cumulative_rate:
-                    selected_area_pokemon = area_pokemon
+                    selected_area_pokemon = area_pokemon_list[idx]
                     break
-
-            # 如果没有选中，选择最后一个（兜底）
-            if not selected_area_pokemon:
+            else:
+                # 兜底：如果循环未触发break（理论上不会发生），取最后一个
                 selected_area_pokemon = area_pokemon_list[-1]
 
-            # 获取选中宝可梦的详细信息
-            pokemon_template = self.pokemon_repo.get_pokemon_by_id(selected_area_pokemon.pokemon_species_id)
-            if not pokemon_template:
-                return {
-                    "success": False,
-                    "message": "无法获取野生宝可梦信息"
-                }
-
-            # 根据区域设置随机等级
+            # 6. 生成宝可梦等级（使用变量名简化赋值）
             min_level = selected_area_pokemon.min_level
             max_level = selected_area_pokemon.max_level
             wild_pokemon_level = random.randint(min_level, max_level)
 
-            # 计算野生宝可梦的属性值
-            base_stats = {
-                'hp': pokemon_template.base_hp,
-                'attack': pokemon_template.base_attack,
-                'defense': pokemon_template.base_defense,
-                'sp_attack': pokemon_template.base_sp_attack,
-                'sp_defense': pokemon_template.base_sp_defense,
-                'speed': pokemon_template.base_speed
-            }
-            stats = self._calculate_pokemon_stats(base_stats, wild_pokemon_level)
-
+            # 7. 创建野生宝可梦（直接使用返回结果，无需额外处理）
+            wild_pokemon = self.pokemon_service.create_single_pokemon(
+                species_id=selected_area_pokemon.pokemon_species_id,
+                max_level=wild_pokemon_level,
+                min_level=wild_pokemon_level
+            )
+            # 8. 构造返回结果（直接复用create_single_pokemon的计算结果）
             return {
                 "success": True,
-                "message": f"在 {area.name} 中遇到了野生的 {pokemon_template.name_cn}！",
+                "message": f"在 {area.name} 中遇到了野生的 {wild_pokemon['base_pokemon'].name_cn}！",
                 "wild_pokemon": {
-                    "species_id": pokemon_template.id,
-                    "name": pokemon_template.name_cn,
+                    "species_id": wild_pokemon["base_pokemon"].id,
+                    "name": wild_pokemon["base_pokemon"].name_cn,
                     "level": wild_pokemon_level,
                     "encounter_rate": selected_area_pokemon.encounter_rate,
-                    # 属性值
-                    "hp": stats['hp'],
-                    "attack": stats['attack'],
-                    "defense": stats['defense'],
-                    "sp_attack": stats['sp_attack'],
-                    "sp_defense": stats['sp_defense'],
-                    "speed": stats['speed'],
-                    "ivs": stats['ivs'],
-                    "evs": stats['evs']
+                    "hp": wild_pokemon["stats"]["hp"],
+                    "attack": wild_pokemon["stats"]["attack"],
+                    "defense": wild_pokemon["stats"]["defense"],
+                    "sp_attack": wild_pokemon["stats"]["sp_attack"],
+                    "sp_defense": wild_pokemon["stats"]["sp_defense"],
+                    "speed": wild_pokemon["stats"]["speed"],
+                    "ivs": wild_pokemon["ivs"],
+                    "evs": wild_pokemon["evs"]
                 },
                 "area": {
                     "area_code": area.area_code,
                     "name": area.name
                 }
             }
+
         except Exception as e:
-            return {
-                "success": False,
-                "message": f"冒险过程中发生错误: {str(e)}"
-            }
+            return error_response(f"冒险过程中发生错误: {str(e)}")

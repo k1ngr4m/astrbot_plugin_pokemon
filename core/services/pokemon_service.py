@@ -1,23 +1,130 @@
+import random
 from typing import Dict, Any, List
 from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
 )
 
 from ..utils import get_now, get_today
-from ..domain.models import User
+from ..domain.models import User, Pokemon, PokemonCreateResult
 
 
 class PokemonService:
     """封装与宝可梦相关的业务逻辑"""
+
+    SHINY_PROBABILITY_DENOMINATOR = 4096  # 异色概率分母
+    HP_FORMULA_CONSTANT = 10  # HP计算公式常量
+    NON_HP_FORMULA_CONSTANT = 5  # 非HP属性计算公式常量
+
     def __init__(
             self,
-            user_repo: AbstractUserRepository,
             pokemon_repo: AbstractPokemonRepository,
-            team_repo: AbstractTeamRepository,
             config: Dict[str, Any]
     ):
-        self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
-        self.team_repo = team_repo
         self.config = config
 
+    def create_single_pokemon(self, species_id: int, max_level: int, min_level: int) -> PokemonCreateResult:
+        """
+        创建一个新的宝可梦实例，使用指定的宝可梦ID和等级范围
+        Args:
+            species_id (int): 宝可梦的ID
+            max_level (int): 宝可梦的最大等级
+            min_level (int): 宝可梦的最小等级
+        Returns:
+            包含宝可梦信息的字典
+        """
+
+        # 局部函数：生成0-31的随机IV
+        def generate_iv() -> int:
+            return random.randint(0, 31)
+
+        # 局部函数：计算属性值（提取重复的计算公式）
+        def calculate_stat(base: int, iv: int, ev: int, level: int, is_hp: bool = False) -> int:
+            """
+            根据种族值、IV、EV、等级计算最终属性值
+            Args:
+                base: 种族值
+                iv: 个体值
+                ev: 努力值
+                level: 等级
+                is_hp: 是否为HP属性（HP公式不同）
+            """
+            base_calculation = (base * 2 + iv + ev // 4) * level / 100
+            if is_hp:
+                return int(base_calculation) + level + self.HP_FORMULA_CONSTANT
+            return int(base_calculation) + self.NON_HP_FORMULA_CONSTANT
+
+        # 1. 获取宝可梦模板
+        pokemon_template = self.pokemon_repo.get_pokemon_by_id(species_id)
+        if not pokemon_template:
+            return {
+                "success": False,
+                "message": "无法获取野生宝可梦信息",
+                "base_stats": None,
+                "base_pokemon": None,
+                "stats": None,
+                "ivs": None,
+                "evs": None,
+                "gender": None,
+                "level": None,
+                "exp": None,
+                "moves": None,
+                "is_shiny": None
+            }
+
+        # 2. 生成基础信息
+        gender = random.choice(["M", "F", "N"])
+        level = random.randint(min_level, max_level)
+        exp = 0
+        moves = "[]"
+        is_shiny = 1 if random.randint(1, self.SHINY_PROBABILITY_DENOMINATOR) == 1 else 0
+
+        # 3. 生成IV和EV（使用局部函数简化）
+        ivs = {
+            "hp": generate_iv(),
+            "attack": generate_iv(),
+            "defense": generate_iv(),
+            "sp_attack": generate_iv(),
+            "sp_defense": generate_iv(),
+            "speed": generate_iv()
+        }
+        evs = {key: 0 for key in ivs.keys()}  # 简化EV初始化（与IV键一致）
+
+        # 4. 获取种族值
+        base_stats = {
+            "hp": pokemon_template.base_hp,
+            "attack": pokemon_template.base_attack,
+            "defense": pokemon_template.base_defense,
+            "sp_attack": pokemon_template.base_sp_attack,
+            "sp_defense": pokemon_template.base_sp_defense,
+            "speed": pokemon_template.base_speed
+        }
+
+        # 5. 计算最终属性（使用局部函数，避免重复代码）
+        stats = {
+            "hp": calculate_stat(base_stats["hp"], ivs["hp"], evs["hp"], level, is_hp=True),
+            "attack": calculate_stat(base_stats["attack"], ivs["attack"], evs["attack"], level),
+            "defense": calculate_stat(base_stats["defense"], ivs["defense"], evs["defense"], level),
+            "sp_attack": calculate_stat(base_stats["sp_attack"], ivs["sp_attack"], evs["sp_attack"], level),
+            "sp_defense": calculate_stat(base_stats["sp_defense"], ivs["sp_defense"], evs["sp_defense"], level),
+            "speed": calculate_stat(base_stats["speed"], ivs["speed"], evs["speed"], level)
+        }
+
+        # 6. 确保HP最小值（原逻辑保留，优化写法）
+        stats["hp"] = max(1, stats["hp"], base_stats["hp"] // 2)
+
+        # 7. 返回结果（统一键名格式，IV/EV使用一致的键）
+        return {
+            "success": True,
+            "message": "",
+            "base_stats": base_stats,
+            "base_pokemon": pokemon_template,
+            "stats": stats,
+            "ivs": ivs,
+            "evs": evs,
+            "gender": gender,
+            "level": level,
+            "exp": exp,
+            "moves": moves,
+            "is_shiny": is_shiny
+        }

@@ -20,16 +20,15 @@ from .handlers.pokemon_handlers import PokemonHandlers
 from .handlers.team_handlers import TeamHandlers
 from .handlers.area_handlers import AreaHandlers
 from .handlers.battle_handlers import BattleHandlers
-from .handlers.checkin_handlers import CheckinHandlers
 from .handlers.item_handlers import ItemHandlers
 from .handlers.catch_handlers import CatchHandlers
 from .handlers.shop_handlers import ShopHandlers
 from .handlers.run_handlers import RunHandlers
 
 from .core.services.user_service import UserService
-from .core.services.checkin_service import CheckinService
 from .core.services.item_service import ItemService
 from .core.services.shop_service import ShopService
+from .handlers.user_handlers import UserHandlers
 
 
 class PokemonPlugin(Star):
@@ -62,9 +61,13 @@ class PokemonPlugin(Star):
         #
         # 从框架读取嵌套配置
         # 注意：框架会自动解析 _conf_schema.json 中的嵌套对象
+        user_config = config.get("user", {})
         adventure_config = config.get("adventure", {})
 
         self.game_config = {
+            "user": {
+                "initial_coins": user_config.get("initial_coins", 200)
+            },
             "adventure": {
                 "cooldown": adventure_config.get("cooldown", 60)
             }
@@ -103,14 +106,13 @@ class PokemonPlugin(Star):
         )
 
         self.pokemon_service = PokemonService(
-            user_repo=self.user_repo,
             pokemon_repo=self.pokemon_repo,
-            team_repo=self.team_repo,
             config=self.game_config
         )
         self.area_service = AreaService(
             area_repo=self.area_repo,
             pokemon_repo=self.pokemon_repo,
+            pokemon_service=self.pokemon_service,
             user_repo=self.user_repo,
             config=self.game_config
         )
@@ -128,9 +130,6 @@ class PokemonPlugin(Star):
             config=self.game_config,
             exp_service=self.exp_service
         )
-        self.checkin_service = CheckinService(
-            user_repo=self.user_repo
-        )
         self.item_service = ItemService(
             user_repo=self.user_repo
         )
@@ -139,11 +138,11 @@ class PokemonPlugin(Star):
             shop_repo=self.shop_repo
         )
         self.common_handlers = CommonHandlers(self)
+        self.user_handlers = UserHandlers(self)
         self.team_handlers = TeamHandlers(self)
         self.pokemon_handlers = PokemonHandlers(self)
         self.area_handlers = AreaHandlers(self)
         self.battle_handlers = BattleHandlers(self)
-        self.checkin_handlers = CheckinHandlers(self)
         self.item_handlers = ItemHandlers(self)
         self.catch_handlers = CatchHandlers(self)
         self.shop_handlers = ShopHandlers(self)
@@ -184,13 +183,13 @@ class PokemonPlugin(Star):
     @filter.command("宝可梦注册")
     async def register(self, event: AstrMessageEvent):
         """注册成为宝可梦游戏玩家，开始你的宝可梦之旅"""
-        async for r in self.common_handlers.register_user(event):
+        async for r in self.user_handlers.register_user(event):
             yield r
 
     @filter.command("宝可梦签到")
     async def checkin(self, event: AstrMessageEvent):
         """每日签到，获得金币和道具奖励"""
-        async for r in self.checkin_handlers.checkin(event):
+        async for r in self.user_handlers.checkin(event):
             yield r
 
     @filter.command("初始选择")

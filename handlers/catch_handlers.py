@@ -109,6 +109,7 @@ class CatchHandlers:
         if is_successful:
             # 成功捕捉 - 将野生宝可梦添加到用户宝可梦列表中
             # 首先创建一个基础的宝可梦记录
+            pokemon = self.pokemon_service.create_single_pokemon(wild_pokemon['species_id'], wild_pokemon['level'], wild_pokemon['level'])
             pokemon_id = self.plugin.user_repo.create_user_pokemon(user_id, wild_pokemon['species_id'])
 
             # 然后更新宝可梦的等级和属性值为野生宝可梦的当前值
