@@ -1,13 +1,14 @@
 from ..repositories.abstract_repository import (
     AbstractPokemonRepository,
-    AbstractAreaRepository,
+    AbstractAdventureRepository,
     AbstractShopRepository,
 )
 from ..database.data.initial_data import (
     POKEMON_SPECIES_DATA, POKEMON_TYPES_DATA, POKEMON_SPECIES_TYPES_DATA, POKEMON_EVOLUTION_DATA, ITEM_DATA,
     POKEMON_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA, SHOP_DATA, SHOP_ITEM_DATA,
 )
-from ..domain.models import AdventureArea, AreaPokemon, Shop, ShopItem
+from ..domain.adventure_models import AdventureArea, AreaPokemon
+from ..domain.shop_models import Shop, ShopItem
 from ..database.data.pokemon_moves_data import (
     POKEMON_SPECIES_MOVES_DATA,
 )
@@ -18,7 +19,7 @@ class DataSetupService:
 
     def __init__(self,
                  pokemon_repo: AbstractPokemonRepository,
-                 area_repo=AbstractAreaRepository,
+                 area_repo=AbstractAdventureRepository,
                  shop_repo=AbstractShopRepository,
                  ):
         self.pokemon_repo = pokemon_repo

@@ -4,7 +4,7 @@ from ..repositories.abstract_repository import (
 )
 
 from ..utils import get_now, get_today
-from ..domain.models import User
+from ..domain.user_models import User
 
 
 class TeamService:

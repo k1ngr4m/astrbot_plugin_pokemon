@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
-from ..domain.models import Pokemon
+from ..domain.pokemon_models import PokemonTemplate
 
 class SqlitePokemonRepository(AbstractPokemonRepository):
     """物品模板仓储的SQLite实现"""
@@ -22,18 +22,18 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             self._local.connection = conn
         return conn
 
-    def _row_to_pokemon(self, row: sqlite3.Row) -> Optional[Pokemon]:
+    def _row_to_pokemon(self, row: sqlite3.Row) -> Optional[PokemonTemplate]:
         if not row:
             return None
-        return Pokemon(**row)
+        return PokemonTemplate(**row)
 
-    def get_pokemon_by_id(self, pokemon_id: int) -> Optional[Pokemon]:
+    def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonTemplate]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM pokemon_species WHERE id = ?", (pokemon_id,))
             return self._row_to_pokemon(cursor.fetchone())
 
-    def get_all_pokemon(self) -> List[Pokemon]:
+    def get_all_pokemon(self) -> List[PokemonTemplate]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM pokemon_species ORDER BY id DESC")

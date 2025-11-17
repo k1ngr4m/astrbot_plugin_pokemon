@@ -350,8 +350,8 @@ class AdventureHandlers:
 
         # 确保成功率在合理范围内
         # catch_success_rate = max(0.05, min(0.95, catch_success_rate))
-        # 先100%捕捉，后面再改概率
-        catch_success_rate = 1
+        # 先80%捕捉，后面再改概率
+        catch_success_rate = 0.8
 
         # 随机决定捕捉结果
         is_successful = random.random() < catch_success_rate
@@ -362,30 +362,7 @@ class AdventureHandlers:
         if is_successful:
             # 成功捕捉 - 将野生宝可梦添加到用户宝可梦列表中
             # 首先创建一个基础的宝可梦记录
-            pokemon = self.pokemon_service.create_single_pokemon(wild_pokemon['species_id'], wild_pokemon['level'], wild_pokemon['level'])
-            pokemon_id = self.plugin.user_repo.create_user_pokemon(user_id, wild_pokemon['species_id'])
-
-            # 然后更新宝可梦的等级和属性值为野生宝可梦的当前值
-            # 获取野生宝可梦的属性值
-            nickname = wild_pokemon['name']
-            level = wild_pokemon['level']
-            current_hp = wild_pokemon.get('current_hp', wild_pokemon.get('hp', 0))
-            attack = wild_pokemon.get('attack', 0)
-            defense = wild_pokemon.get('defense', 0)
-            sp_attack = wild_pokemon.get('sp_attack', 0)
-            sp_defense = wild_pokemon.get('sp_defense', 0)
-            speed = wild_pokemon.get('speed', 0)
-            name = wild_pokemon['name']
-            # 更新宝可梦的属性值
-            with self.plugin.user_repo._get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    UPDATE user_pokemon
-                    SET nickname = ?, level = ?, current_hp = ?, attack = ?, defense = ?,
-                        sp_attack = ?, sp_defense = ?, speed = ?
-                    WHERE id = ?
-                """, (name, level, current_hp, attack, defense, sp_attack, sp_defense, speed, pokemon_id))
-                conn.commit()
+            pokemon_id = self.plugin.user_repo.create_user_pokemon(user_id, wild_pokemon)
 
             # 获取新捕捉的宝可梦信息
             new_pokemon = self.plugin.user_repo.get_user_pokemon_by_numeric_id(pokemon_id)

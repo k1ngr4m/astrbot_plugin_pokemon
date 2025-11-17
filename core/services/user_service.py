@@ -7,9 +7,9 @@ from ..repositories.abstract_repository import (
 )
 
 from ..utils import get_now, get_today
-from ..domain.models import User
+from ..domain.user_models import User
+from ..domain.pokemon_models import UserPokemonInfo
 from ..answer.answer_enum import AnswerEnum
-
 
 class UserService:
     """封装与用户相关的业务逻辑"""
@@ -17,10 +17,12 @@ class UserService:
             self,
             user_repo: AbstractUserRepository,
             pokemon_repo: AbstractPokemonRepository,
+            pokemon_service: PokemonService,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
+        self.pokemon_service = pokemon_service
         self.config = config
 
     def register(self, user_id: str, nickname: str) -> Dict[str, Any]:
@@ -37,12 +39,16 @@ class UserService:
 
         initial_coins = self.config.get("user", {}).get("initial_coins", 200)
         new_user = User(
-            user_id=user_id,
-            nickname=nickname,
-            coins=initial_coins,
-            created_at=get_now()
+            user_id = user_id,
+            nickname = nickname,
+            level = 1,
+            exp = 0,
+            coins = initial_coins,
+            created_at = get_now(),
+            init_selected = None,
+            last_adventure_time = None,
         )
-        self.user_repo.add_user(new_user)
+        self.user_repo.create_user(new_user)
 
         return {
             "success": True,
@@ -122,14 +128,29 @@ class UserService:
         if not pokemon_template:
             return {"success": False, "message": AnswerEnum.POKEMON_NOT_FOUND.value}
 
-        new_pokemon = self.create_single_pokemon(pokemon_id, max_level=1, min_level=1)
+        new_pokemon = self.pokemon_service.create_single_pokemon(pokemon_id, 1, 1)
+
+        if not new_pokemon["success"]:
+            return {
+                "success": False,
+                "message": new_pokemon["message"],
+            }
+
+        user_pokemon_info = UserPokemonInfo(
+            species_id = new_pokemon["base_pokemon"].id,
+            name = new_pokemon["base_pokemon"].name_cn,
+            gender = new_pokemon["gender"],
+            level = new_pokemon["level"],
+            exp = new_pokemon["exp"],
+            stats = new_pokemon["stats"],
+            ivs = new_pokemon["ivs"],
+            evs = new_pokemon["evs"],
+            is_shiny = new_pokemon["is_shiny"],
+            moves = new_pokemon["moves"],
+        )
 
         # 创建用户宝可梦记录，使用模板数据完善实例
-        new_pokemon_id = self.user_repo.create_user_pokemon(
-            user_id,
-            pokemon_id,
-            pokemon_template.name_cn
-        )
+        self.user_repo.create_user_pokemon(user_id, user_pokemon_info,)
 
         # 更新用户的初始选择状态
         self.user_repo.update_init_select(user_id, pokemon_id)
@@ -160,7 +181,7 @@ class UserService:
         formatted_pokemon = []
         for pokemon in user_pokemon_list:
             formatted_pokemon.append({
-                "shortcode": pokemon.get("shortcode", f"P{pokemon['id']:04d}"),  # 使用短码，如果不存在则生成
+                "shortcode": pokemon["shortcode"] or f"P{pokemon['id']:04d}",  # 使用短码，如果不存在则生成
                 "species_id": pokemon["species_id"],
                 "species_name": pokemon["species_name"],
                 "species_en_name": pokemon["species_en_name"],
@@ -169,11 +190,11 @@ class UserService:
                 "exp": pokemon["exp"],
                 "gender": pokemon["gender"],
                 "current_hp": pokemon["current_hp"],
-                "attack": pokemon.get("attack", 0),
-                "defense": pokemon.get("defense", 0),
-                "sp_attack": pokemon.get("sp_attack", 0),
-                "sp_defense": pokemon.get("sp_defense", 0),
-                "speed": pokemon.get("speed", 0),
+                "attack": pokemon["stats"]["attack"],
+                "defense": pokemon["stats"]["defense"],
+                "sp_attack": pokemon["stats"]["sp_attack"],
+                "sp_defense": pokemon["stats"]["sp_defense"],
+                "speed": pokemon["stats"]["speed"],
                 "is_shiny": bool(pokemon["is_shiny"]),
                 "caught_time": pokemon["caught_time"]
             })
@@ -185,7 +206,7 @@ class UserService:
             "message": f"您拥有 {len(formatted_pokemon)} 只宝可梦"
         }
 
-    def create_single_pokemon(self, species_id: int, max_level: int, min_level: int) -> Dict[str, Any]:
+    def create_init_pokemon(self, species_id: int) -> Dict[str, Any]:
         """
         创建一个新的宝可梦实例，使用指定的宝可梦ID
         Args:
@@ -194,6 +215,10 @@ class UserService:
         Returns:
             Pokemon: 新创建的宝可梦实例
         """
+        # 局部函数：生成0-31的随机IV
+        def generate_iv() -> int:
+            return random.randint(0, 31)
+
         # 获取宝可梦完整基础数据
         base_pokemon = self.pokemon_repo.get_pokemon_by_id(species_id).to_dict()
 
@@ -201,12 +226,12 @@ class UserService:
         gender = random.choice(['M', 'F', 'N'])
 
         # 为初始宝可梦生成随机个体值(IV)，范围0-31
-        hp_iv = random.randint(0, 31)
-        attack_iv = random.randint(0, 31)
-        defense_iv = random.randint(0, 31)
-        sp_attack_iv = random.randint(0, 31)
-        sp_defense_iv = random.randint(0, 31)
-        speed_iv = random.randint(0, 31)
+        hp_iv = generate_iv()
+        attack_iv = generate_iv()
+        defense_iv = generate_iv()
+        sp_attack_iv = generate_iv()
+        sp_defense_iv = generate_iv()
+        speed_iv = generate_iv()
 
         # 初始努力值为0
         hp_ev = 0
@@ -217,14 +242,13 @@ class UserService:
         speed_ev = 0
 
         # 初始等级为1
-        level = random.randint(min_level, max_level)
+        level = 1
         exp = 0
 
         # 初始技能为空数组
         moves = '[]'
 
-        # 是否异色（1/4096概率）
-        is_shiny = 1 if random.randint(1, 4096) == 1 else 0
+        is_shiny = 0
 
         pokemon = {
             'base_pokemon': base_pokemon,

@@ -3,7 +3,7 @@ import threading
 from typing import Optional, List, Dict, Any
 
 from .abstract_repository import AbstractUserRepository, AbstractShopRepository
-from ..domain.models import Shop, ShopItem
+from ..domain.shop_models import Shop, ShopItem
 
 
 class SqliteShopRepository(AbstractShopRepository):

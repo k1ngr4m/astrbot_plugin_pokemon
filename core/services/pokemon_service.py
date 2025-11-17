@@ -5,7 +5,9 @@ from ..repositories.abstract_repository import (
 )
 
 from ..utils import get_now, get_today
-from ..domain.models import User, Pokemon, PokemonCreateResult
+from ..domain.pokemon_models import PokemonTemplate, PokemonCreateResult, PokemonDetail, PokemonStats, PokemonIVs, \
+    PokemonEVs
+from ..domain.user_models import User
 
 
 class PokemonService:
@@ -57,20 +59,11 @@ class PokemonService:
         # 1. 获取宝可梦模板
         pokemon_template = self.pokemon_repo.get_pokemon_by_id(species_id)
         if not pokemon_template:
-            return {
-                "success": False,
-                "message": "无法获取野生宝可梦信息",
-                "base_stats": None,
-                "base_pokemon": None,
-                "stats": None,
-                "ivs": None,
-                "evs": None,
-                "gender": None,
-                "level": None,
-                "exp": None,
-                "moves": None,
-                "is_shiny": None
-            }
+            return PokemonCreateResult(
+                success=False,
+                message="无法获取宝可梦信息",
+                data=None
+            )
 
         # 2. 生成基础信息
         gender = random.choice(["M", "F", "N"])
@@ -92,12 +85,12 @@ class PokemonService:
 
         # 4. 获取种族值
         base_stats = {
-            "hp": pokemon_template.base_hp,
-            "attack": pokemon_template.base_attack,
-            "defense": pokemon_template.base_defense,
-            "sp_attack": pokemon_template.base_sp_attack,
-            "sp_defense": pokemon_template.base_sp_defense,
-            "speed": pokemon_template.base_speed
+            "hp": pokemon_template.base_stats["hp"],
+            "attack": pokemon_template.base_stats["attack"],
+            "defense": pokemon_template.base_stats["defense"],
+            "sp_attack": pokemon_template.base_stats["sp_attack"],
+            "sp_defense": pokemon_template.base_stats["sp_defense"],
+            "speed": pokemon_template.base_stats["speed"]
         }
 
         # 5. 计算最终属性（使用局部函数，避免重复代码）
@@ -114,17 +107,40 @@ class PokemonService:
         stats["hp"] = max(1, stats["hp"], base_stats["hp"] // 2)
 
         # 7. 返回结果（统一键名格式，IV/EV使用一致的键）
-        return {
-            "success": True,
-            "message": "",
-            "base_stats": base_stats,
-            "base_pokemon": pokemon_template,
-            "stats": stats,
-            "ivs": ivs,
-            "evs": evs,
-            "gender": gender,
-            "level": level,
-            "exp": exp,
-            "moves": moves,
-            "is_shiny": is_shiny
-        }
+        result = PokemonCreateResult(
+            success=True,
+            message="宝可梦生成成功",
+            data= PokemonDetail(
+                base_pokemon=pokemon_template,
+                gender=gender,
+                level=level,
+                exp=exp,
+                is_shiny=is_shiny,
+                stats= PokemonStats(
+                    hp=stats["hp"],
+                    attack=stats["attack"],
+                    defense=stats["defense"],
+                    sp_attack=stats["sp_attack"],
+                    sp_defense=stats["sp_defense"],
+                    speed=stats["speed"],
+                ),
+                ivs= PokemonIVs(
+                    hp_iv=ivs["hp"],
+                    attack_iv=ivs["attack"],
+                    defense_iv=ivs["defense"],
+                    sp_attack_iv=ivs["sp_attack"],
+                    sp_defense_iv=ivs["sp_defense"],
+                    speed_iv=ivs["speed"],
+                ),
+                evs= PokemonEVs(
+                    hp_ev=evs["hp"],
+                    attack_ev=evs["attack"],
+                    defense_ev=evs["defense"],
+                    sp_attack_ev=evs["sp_attack"],
+                    sp_defense_ev=evs["sp_defense"],
+                    speed_ev=evs["speed"],
+                ),
+                moves= None
+            )
+        )
+        return result

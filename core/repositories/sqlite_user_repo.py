@@ -6,7 +6,9 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from astrbot.api import logger
-from ..domain.models import User
+from ..domain.pokemon_models import PokemonTemplate
+from ..domain.user_models import User
+from ..domain.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserRepository
 
 class SqliteUserRepository(AbstractUserRepository):
@@ -81,7 +83,7 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
             return cursor.fetchone() is not None
 
-    def add_user(self, user: User) -> None:
+    def create_user(self, user: User) -> None:
         # 使用与 update 相同的动态方法，确保 add 也是完整的
         fields = [f.name for f in dataclasses.fields(User)]
         columns_clause = ", ".join(fields)
@@ -95,7 +97,7 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute(sql, tuple(values))
             conn.commit()
 
-    def create_user_pokemon(self, user_id: str, species_id: int, nickname: Optional[str] = None) -> int:
+    def create_user_pokemon(self, user_id: str, pokemon: UserPokemonInfo) -> int:
         """
         创建用户宝可梦记录，使用模板数据完善实例
         Args:
@@ -105,60 +107,62 @@ class SqliteUserRepository(AbstractUserRepository):
         Returns:
             新创建的宝可梦实例ID
         """
-        sql = """
-        INSERT INTO user_pokemon (
-            user_id, species_id, nickname, level, exp, gender,
-            hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
-            hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-            current_hp, attack, defense, sp_attack, sp_defense, speed,
-            is_shiny, moves, caught_time, shortcode
-        )
-        VALUES (?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, CURRENT_TIMESTAMP, ?
-        )
-        """
-
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            # 先获取基础数据
-            cursor.execute(base_sql, (species_id,))
-            base_row = cursor.fetchone()
+            sql = """
+            INSERT INTO user_pokemon (
+                user_id, species_id, nickname, level, exp, gender,
+                hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
+                hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
+                current_hp, attack, defense, sp_attack, sp_defense, speed,
+                is_shiny, moves, caught_time, shortcode
+            )
+            VALUES (?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, CURRENT_TIMESTAMP, ?
+            )
+            """
 
-            if base_row:
-                base_hp, base_attack, base_defense, base_sp_attack, base_sp_defense, base_speed = base_row
-                # 计算初始HP值，等级为1
-                # 宝可梦的HP计算公式：int((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 等级 + 10
-                base_calc = int((base_hp * 2 + hp_iv + hp_ev // 4) * level / 100) + level + 10
-                # 确保HP至少为基础值的一半（向下取整后至少为1）
-                min_hp = max(1, base_hp // 2)
-                current_hp = max(min_hp, base_calc)
+            species_id = pokemon["species_id"]
+            nickname = pokemon["name"]
+            level = pokemon["level"]
+            exp = pokemon["exp"]
+            gender = pokemon["gender"]
 
-                # 计算其他属性值（非HP属性使用不同的计算公式）
-                # 非HP属性计算公式：int(((种族值*2 + 个体值 + 努力值/4) * 等级/100) + 5) * 性情修正
-                # 对于1级宝可梦，没有性情修正，所以公式为：int(((种族值*2 + 个体值) * 1/100) + 5)
-                calculated_attack = int((base_attack * 2 + attack_iv + attack_ev // 4) * level / 100) + 5
-                calculated_defense = int((base_defense * 2 + defense_iv + defense_ev // 4) * level / 100) + 5
-                calculated_sp_attack = int((base_sp_attack * 2 + sp_attack_iv + sp_attack_ev // 4) * level / 100) + 5
-                calculated_sp_defense = int((base_sp_defense * 2 + sp_defense_iv + sp_defense_ev // 4) * level / 100) + 5
-                calculated_speed = int((base_speed * 2 + speed_iv + speed_ev // 4) * level / 100) + 5
-            else:
-                base_hp = 0
-                current_hp = 0
-                calculated_attack = 0
-                calculated_defense = 0
-                calculated_sp_attack = 0
-                calculated_sp_defense = 0
-                calculated_speed = 0
+            ivs = pokemon["ivs"]
+            hp_iv = ivs["hp"]
+            attack_iv = ivs["attack"]
+            defense_iv = ivs["defense"]
+            sp_attack_iv = ivs["sp_attack"]
+            sp_defense_iv = ivs["sp_defense"]
+            speed_iv = ivs["speed"]
 
+            evs = pokemon["evs"]
+            hp_ev = evs["hp"]
+            attack_ev = evs["attack"]
+            defense_ev = evs["defense"]
+            sp_attack_ev = evs["sp_attack"]
+            sp_defense_ev = evs["sp_defense"]
+            speed_ev = evs["speed"]
+
+            stats = pokemon["stats"]
+            hp = stats["hp"]
+            attack = stats["attack"]
+            defense = stats["defense"]
+            sp_attack = stats["sp_attack"]
+            sp_defense = stats["sp_defense"]
+            speed = stats["speed"]
+
+            is_shiny = pokemon["is_shiny"]
+            moves = pokemon["moves"]
             # 获取新记录的ID（先插入然后获取ID用于生成短码）
             cursor.execute(sql, (
                 user_id, species_id, nickname, level, exp, gender,
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-                current_hp, calculated_attack, calculated_defense, calculated_sp_attack, calculated_sp_defense, calculated_speed,
+                hp, attack, defense, sp_attack, sp_defense, speed,
                 is_shiny, moves, f"P{0:04d}"
             ))
             new_id = cursor.lastrowid
@@ -170,7 +174,7 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute(update_shortcode_sql, (shortcode, new_id))
             conn.commit()
 
-            return new_id
+        return new_id
 
     def update_init_select(self, user_id: str, pokemon_id: int) -> None:
         """
@@ -186,7 +190,7 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute(sql, (pokemon_id, user_id))
             conn.commit()
 
-    def get_user_pokemon(self, user_id: str) -> List[Dict[str, Any]]:
+    def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
         """
         获取用户的所有宝可梦
         Args:

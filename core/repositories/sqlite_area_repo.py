@@ -2,11 +2,11 @@ import sqlite3
 import threading
 from csv import DictWriter
 from typing import Optional, List, Dict, Any
-from ..domain.models import AdventureArea, AreaPokemon
-from .abstract_repository import AbstractAreaRepository
+from ..domain.adventure_models import AdventureArea, AreaPokemon
+from .abstract_repository import AbstractAdventureRepository
 
 
-class SqliteAreaRepository(AbstractAreaRepository):
+class SqliteAdventureRepository(AbstractAdventureRepository):
     """冒险区域数据仓储的SQLite实现"""
 
     def __init__(self, db_path: str):

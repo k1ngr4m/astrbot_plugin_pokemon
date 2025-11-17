@@ -6,7 +6,6 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from astrbot.api import logger
-from ..domain.models import User
 from .abstract_repository import AbstractTeamRepository
 
 class SqliteTeamRepository(AbstractTeamRepository):

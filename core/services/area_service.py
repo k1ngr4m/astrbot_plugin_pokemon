@@ -4,9 +4,9 @@ from typing import Dict, Any, List, Optional
 
 from .pokemon_service import PokemonService
 from ..repositories.abstract_repository import (
-    AbstractAreaRepository, AbstractPokemonRepository, AbstractUserRepository
+    AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository
 )
-from ..domain.models import AdventureArea, AreaPokemon, AdventureResult, WildPokemonInfo
+from ..domain.adventure_models import AdventureArea, AreaPokemon, AdventureResult
 from ..utils import get_now
 
 
@@ -15,7 +15,7 @@ class AreaService:
 
     def __init__(
             self,
-            area_repo: AbstractAreaRepository,
+            area_repo: AbstractAdventureRepository,
             pokemon_repo: AbstractPokemonRepository,
             pokemon_service: PokemonService,
             user_repo: AbstractUserRepository,
