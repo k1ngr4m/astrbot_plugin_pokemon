@@ -1,7 +1,12 @@
 import datetime
-from typing import Optional, TypedDict, Dict
+from typing import Optional, TypedDict, Dict, List
 
 from dataclasses import dataclass
+
+from lark_oapi.api.search.v2 import ListDataSourceRequest
+
+from .pokemon_models import UserPokemonInfo
+
 
 @dataclass
 class User:
@@ -14,3 +19,9 @@ class User:
     created_at: datetime
     init_selected: Optional[int] = None
     last_adventure_time: Optional[int] = None
+
+@dataclass
+class UserTeam:
+    """代表一个用户的队伍领域模型"""
+    user_id: str
+    team_data: List[UserPokemonInfo] = None

@@ -190,6 +190,59 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute(sql, (pokemon_id, user_id))
             conn.commit()
 
+    def _row_to_user_pokemon(self, row: sqlite3.Row) -> UserPokemonInfo:
+        """
+        将数据库行转换为 UserPokemonInfo 对象
+        """
+        row_dict = dict(row)
+
+        # 构造 PokemonStats 对象
+        stats = PokemonStats(
+            hp=row_dict['current_hp'],
+            attack=row_dict['attack'],
+            defense=row_dict['defense'],
+            sp_attack=row_dict['sp_attack'],
+            sp_defense=row_dict['sp_defense'],
+            speed=row_dict['speed']
+        )
+
+        # 构造 PokemonIVs 对象
+        ivs = PokemonIVs(
+            hp_iv=row_dict['hp_iv'],
+            attack_iv=row_dict['attack_iv'],
+            defense_iv=row_dict['defense_iv'],
+            sp_attack_iv=row_dict['sp_attack_iv'],
+            sp_defense_iv=row_dict['sp_defense_iv'],
+            speed_iv=row_dict['speed_iv']
+        )
+
+        # 构造 PokemonEVs 对象
+        evs = PokemonEVs(
+            hp_ev=row_dict['hp_ev'],
+            attack_ev=row_dict['attack_ev'],
+            defense_ev=row_dict['defense_ev'],
+            sp_attack_ev=row_dict['sp_attack_ev'],
+            sp_defense_ev=row_dict['sp_defense_ev'],
+            speed_ev=row_dict['speed_ev']
+        )
+
+        # 获取宝可梦名称（优先使用昵称，否则使用物种名称）
+        pokemon_name = row_dict['nickname'] or row_dict.get('species_name', 'Unknown')
+
+        return UserPokemonInfo(
+            species_id=row_dict['species_id'],
+            name=pokemon_name,
+            gender=row_dict['gender'],
+            level=row_dict['level'],
+            exp=row_dict['exp'],
+            is_shiny=row_dict['is_shiny'],
+            stats=stats,
+            ivs=ivs,
+            evs=evs,
+            moves=row_dict['moves'],  # 假设moves字段已经正确处理
+            shortcode=row_dict.get('shortcode', f"P{row_dict['id']:04d}")
+        )
+
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
         """
         获取用户的所有宝可梦
@@ -212,14 +265,10 @@ class SqliteUserRepository(AbstractUserRepository):
             rows = cursor.fetchall()
             result = []
             for row in rows:
-                row_dict = dict(row)
-                # 添加短码ID，如果数据库中没有则生成默认值
-                if not row_dict.get('shortcode'):
-                    row_dict['shortcode'] = f"P{row_dict['id']:04d}"
-                result.append(row_dict)
+                result.append(self._row_to_user_pokemon(row))
             return result
 
-    def get_user_pokemon_by_id(self, pokemon_id: str) -> Optional[Dict[str, Any]]:
+    def get_user_pokemon_by_id(self, pokemon_id: str) -> Optional[UserPokemonInfo]:
         """
         通过ID获取用户的宝可梦实例（支持短码ID和数字ID）
         Args:
@@ -237,7 +286,7 @@ class SqliteUserRepository(AbstractUserRepository):
         else:
             return None
 
-    def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[Dict[str, Any]]:
+    def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[UserPokemonInfo]:
         """
         通过数字ID获取用户的宝可梦实例
         Args:
@@ -256,9 +305,9 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor = conn.cursor()
             cursor.execute(sql, (pokemon_numeric_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            return self._row_to_user_pokemon(row) if row else None
 
-    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[Dict[str, Any]]:
+    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[UserPokemonInfo]:
         """
         通过短码获取用户的宝可梦实例
         Args:
@@ -277,7 +326,7 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor = conn.cursor()
             cursor.execute(sql, (shortcode,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            return self._row_to_user_pokemon(row) if row else None
 
     def update_user_exp(self, level: int, exp: int, user_id: str) -> None:
         with self._get_connection() as conn:

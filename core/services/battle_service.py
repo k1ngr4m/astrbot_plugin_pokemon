@@ -1,7 +1,7 @@
 import math
 from typing import Dict, Any, Tuple, List
 
-from ..domain.pokemon_models import WildPokemonInfo
+from ..domain.pokemon_models import WildPokemonInfo, UserPokemonInfo
 from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository,
 )
@@ -70,35 +70,35 @@ class BattleService:
 
     def calculate_battle_win_rate(
         self,
-        attacker_pokemon: Dict[str, Any],
-        defender_pokemon: Dict[str, Any],
+        user_pokemon: UserPokemonInfo,
+        wild_pokemon: WildPokemonInfo,
         skill_type: str = 'special'
     ) -> Tuple[float, float]:
         """
         计算宝可梦战斗胜率
         Args:
-            attacker_pokemon: 攻击方宝可梦数据
-            defender_pokemon: 防御方宝可梦数据
+            user_pokemon: 攻击方宝可梦数据
+            wild_pokemon: 防御方宝可梦数据
             skill_type: 技能类型 ('physical' 或 'special')，决定使用攻击/防御还是特攻/特防
         Returns:
             Tuple[float, float]: (攻击方胜率%, 防御方胜率%)
         """
         # 获取宝可梦的属性类型
-        attacker_types = self.pokemon_repo.get_pokemon_types(attacker_pokemon['species_id'])
-        defender_types = self.pokemon_repo.get_pokemon_types(defender_pokemon['species_id'])
+        user_pokemon_types = self.pokemon_repo.get_pokemon_types(user_pokemon.species_id)
+        wild_pokemon_types = self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id)
 
         # 如果获取不到类型数据，使用默认的普通属性
-        if not attacker_types:
-            attacker_types = ['normal']
-        if not defender_types:
-            defender_types = ['normal']
+        if not user_pokemon_types:
+            user_pokemon_types = ['normal']
+        if not wild_pokemon_types:
+            wild_pokemon_types = ['normal']
 
         # ----------------------
         # 步骤1：计算属性克制系数（攻击方对防御方的总克制系数）
         # ----------------------
-        self_type_modifier = self.calculate_type_effectiveness(attacker_types, defender_types)
+        self_type_modifier = self.calculate_type_effectiveness(user_pokemon_types, wild_pokemon_types)
         # 防御方对攻击方的克制系数
-        opp_type_modifier = self.calculate_type_effectiveness(defender_types, attacker_types)
+        opp_type_modifier = self.calculate_type_effectiveness(wild_pokemon_types, user_pokemon_types)
         # ----------------------
         # 步骤2：计算攻防能力（结合等级、属性修正）
         # ----------------------
@@ -106,18 +106,18 @@ class BattleService:
         # 攻击方输出属性：按技能类型选择
         atk_stat_attacker = 'attack' if skill_type == 'physical' else 'sp_attack'
         # 防御方输出属性：取自身物攻和特攻的最大值（贴合实际定位）
-        atk_stat_defender = 'attack' if defender_pokemon['attack'] > defender_pokemon['sp_attack'] else 'sp_attack'
+        atk_stat_defender = 'attack' if wild_pokemon.stats.attack > wild_pokemon.stats.sp_attack else 'sp_attack'
         def_stat = 'defense' if skill_type == 'physical' else 'sp_defense'
         # 等级修正系数（等级差距影响，避免碾压）
-        self_level_mod = attacker_pokemon['level'] / 50  # 等级50修正1.0，等级100修正2.0，等级25修正0.5
-        opp_level_mod = defender_pokemon['level'] / 50
+        self_level_mod = user_pokemon.level / 50  # 等级50修正1.0，等级100修正2.0，等级25修正0.5
+        opp_level_mod = wild_pokemon.level / 50
 
         # 攻击方输出能力 = 攻击属性值 × 等级修正 × 属性克制系数
-        self_offense = attacker_pokemon[atk_stat_attacker] * self_level_mod * self_type_modifier
-        opp_offense = defender_pokemon[atk_stat_defender] * opp_level_mod * opp_type_modifier  # 防御方用自己的核心输出属性
+        self_offense = user_pokemon.stats[atk_stat_attacker] * self_level_mod * self_type_modifier
+        opp_offense = wild_pokemon.stats[atk_stat_defender] * opp_level_mod * opp_type_modifier  # 防御方用自己的核心输出属性
         # 防御方承伤能力 = 防御属性值 × 等级修正
-        self_defense = attacker_pokemon[def_stat] * self_level_mod
-        opp_defense = defender_pokemon[def_stat] * opp_level_mod
+        self_defense = user_pokemon.stats[def_stat] * self_level_mod
+        opp_defense = wild_pokemon.stats[def_stat] * opp_level_mod
 
         # 有效战力 = 输出能力 / 承伤能力（比值越大，战力越强）
         self_effective_power = self_offense / self_defense if self_defense > 0 else 0
@@ -125,7 +125,7 @@ class BattleService:
         # ----------------------
         # 步骤3：速度先手权修正（速度快的获得额外战力加成）
         # ----------------------
-        speed_ratio = attacker_pokemon['speed'] / max(defender_pokemon['speed'], 1)
+        speed_ratio = user_pokemon.stats.speed / max(wild_pokemon.stats.speed, 1)
         self_speed_bonus = 0.0  # 初始化，避免未定义
         opp_speed_bonus = 0.0
 
@@ -149,92 +149,70 @@ class BattleService:
         opp_win_rate = 1 - self_win_rate
         return round(self_win_rate * 100, 1), round(opp_win_rate * 100, 1)
 
-    def start_battle(self, user_id: str, wild_pokemon: WildPokemonInfo, pokemon_id: str = None) -> Dict[str, Any]:
+    def start_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo, user_team_list: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         开始一场与野生宝可梦的战斗
         Args:
             user_id: 用户ID
-            wild_pokemon: 野生宝可梦数据
-            pokemon_id: 用户选择的宝可梦ID（如果为None则使用队伍中的第一只）
+            wild_pokemon_info: 野生宝可梦数据
+            user_team_list: 用户队伍配置（字典列表）
         Returns:
             包含战斗结果的字典
         """
         try:
-            # 获取用户信息
-            user = self.user_repo.get_by_id(user_id)
-            if not user:
-                return {
-                    "success": False,
-                    "message": "用户不存在"
-                }
-
-            # 获取用户宝可梦（如果未指定则使用队伍中的第一只）
-            user_pokemon = None
-            if pokemon_id:
-                user_pokemon = self.user_repo.get_user_pokemon_by_id(pokemon_id)
-            else:
-                # 获取用户的第一只宝可梦（作为默认战斗宝可梦）
-                user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
-                if user_pokemon_list:
-                    user_pokemon = user_pokemon_list[0]
-
-            if not user_pokemon:
-                return {
-                    "success": False,
-                    "message": "您没有可用的宝可梦进行战斗"
-                }
+            user_pokemon_id = user_team_list[0].get('id',"")
+            user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_pokemon_id)
 
             # 计算战斗胜率
-            user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon, wild_pokemon)
+            user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
 
             # 随机决定战斗结果
             import random
-            result = "胜利" if random.random() * 100 < user_win_rate else "失败"
+            result = "success" if random.random() * 100 < user_win_rate else "fail"
 
             # 处理经验值（仅在胜利时）
             exp_details = {}
-            if self.exp_service and result == "胜利":
+            if self.exp_service and result == "success":
                 # 计算宝可梦获得的经验值
-                pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon['level'], result)
-                user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon['level'], result)
+                pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_info.level, result)
+                user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon_info.level, result)
 
                 # 获取用户队伍中的所有宝可梦
                 user_team_data = self.team_repo.get_user_team(user_id)
                 team_pokemon_results = []
 
                 if user_team_data:
-                    import json
-                    try:
-                        team_pokemon_ids = json.loads(user_team_data) if user_team_data else []
+                    # user_team_data 已经是字典，不需要再解析JSON
+                    # 检查user_team_data是否为字典（如果是字典格式，则获取值列表）
+                    if isinstance(user_team_data, dict):
+                        # 如果是字典格式，获取其中的宝可梦IDs列表
+                        if 'pokemon_list' in user_team_data:
+                            team_pokemon_ids = user_team_data['pokemon_list']
+                        elif 'team' in user_team_data:
+                            team_pokemon_ids = user_team_data['team']
+                        elif 'team_list' in user_team_data:
+                            team_pokemon_ids = user_team_data['team_list']
+                        else:
+                            # 尝试获取字典中的所有值
+                            team_pokemon_ids = list(user_team_data.values())
+                            if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
+                                team_pokemon_ids = team_pokemon_ids[0]
+                    else:
+                        # 如果不是字典，说明数据格式有问题
+                        team_pokemon_ids = []
 
-                        # 检查team_pokemon_ids是否为字典（如果是字典格式，则获取值列表）
-                        if isinstance(team_pokemon_ids, dict):
-                            # 如果是字典格式，获取其中的宝可梦IDs列表
-                            if 'pokemon_list' in team_pokemon_ids:
-                                team_pokemon_ids = team_pokemon_ids['pokemon_list']
-                            elif 'team' in team_pokemon_ids:
-                                team_pokemon_ids = team_pokemon_ids['team']
-                            else:
-                                # 尝试获取字典中的所有值
-                                team_pokemon_ids = list(team_pokemon_ids.values())
-                                if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
-                                    team_pokemon_ids = team_pokemon_ids[0]
+                    # 确保team_pokemon_ids是列表
+                    if not isinstance(team_pokemon_ids, list):
+                        # 如果不是列表，尝试转换为列表
+                        if isinstance(team_pokemon_ids, (str, int)):
+                            team_pokemon_ids = [team_pokemon_ids]
+                        else:
+                            team_pokemon_ids = []
 
-                        # 确保team_pokemon_ids是列表
-                        if not isinstance(team_pokemon_ids, list):
-                            # 如果不是列表，尝试转换为列表
-                            if isinstance(team_pokemon_ids, (str, int)):
-                                team_pokemon_ids = [team_pokemon_ids]
-                            else:
-                                team_pokemon_ids = []
-
-                        # 更新队伍中所有宝可梦的经验值
-                        if team_pokemon_ids:
-                            team_pokemon_results = self.exp_service.update_team_pokemon_after_battle(
-                                user_id, team_pokemon_ids, pokemon_exp_gained)
-
-                    except json.JSONDecodeError:
-                        team_pokemon_results = [{"success": False, "message": "队伍数据格式错误"}]
+                    # 更新队伍中所有宝可梦的经验值
+                    if team_pokemon_ids:
+                        team_pokemon_results = self.exp_service.update_team_pokemon_after_battle(
+                            user_id, team_pokemon_ids, pokemon_exp_gained)
 
                 # 更新用户经验值（如果用户获得经验）
                 user_update_result = {"success": True, "exp_gained": 0}
@@ -246,7 +224,7 @@ class BattleService:
                     "user_exp": user_update_result,
                     "team_pokemon_results": team_pokemon_results
                 }
-            elif self.exp_service and result != "胜利":
+            elif self.exp_service and result != "success":
                 # 战斗失败时不获得经验
                 exp_details = {
                     "pokemon_exp": {"success": True, "exp_gained": 0, "message": "战斗失败，未获得经验值"},
@@ -257,24 +235,24 @@ class BattleService:
             # 返回战斗结果
             battle_result = {
                 "success": True,
-                "message": f"战斗结束！用户宝可梦 {user_pokemon['nickname']} vs 野生宝可梦 {wild_pokemon['name']}",
+                "message": f"战斗结束！用户宝可梦 {user_pokemon_info.name} vs 野生宝可梦 {wild_pokemon_info.name}",
                 "battle_details": {
                     "user_pokemon": {
-                        "name": user_pokemon['nickname'],
-                        "species": user_pokemon['species_name'],
-                        "level": user_pokemon['level'],
-                        "hp": user_pokemon.get('current_hp', 0),
-                        "attack": user_pokemon.get('attack', 0),
-                        "defense": user_pokemon.get('defense', 0),
-                        "speed": user_pokemon.get('speed', 0)
+                        "name": user_pokemon_info.name,
+                        "species": user_pokemon_info.species_id,
+                        "level": user_pokemon_info.level,
+                        "hp": user_pokemon_info.stats.hp,
+                        "attack": user_pokemon_info.stats.attack,
+                        "defense": user_pokemon_info.stats.defense,
+                        "speed": user_pokemon_info.stats.speed
                     },
                     "wild_pokemon": {
-                        "name": wild_pokemon['name'],
-                        "level": wild_pokemon['level'],
-                        "hp": wild_pokemon.get('hp', 0),
-                        "attack": wild_pokemon.get('attack', 0),
-                        "defense": wild_pokemon.get('defense', 0),
-                        "speed": wild_pokemon.get('speed', 0)
+                        "name": wild_pokemon_info.name,
+                        "level": wild_pokemon_info.level,
+                        "hp": wild_pokemon_info.stats.hp,
+                        "attack": wild_pokemon_info.stats.attack,
+                        "defense": wild_pokemon_info.stats.defense,
+                        "speed": wild_pokemon_info.stats.speed
                     },
                     "win_rates": {
                         "user_win_rate": user_win_rate,

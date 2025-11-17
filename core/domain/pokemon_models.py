@@ -138,4 +138,4 @@ class WildPokemonInfo:
     ivs: PokemonIVs
     evs: PokemonEVs
     moves: PokemonMoves | None
-    encounter_rate: float
+    encounter_rate: Optional[float] = None

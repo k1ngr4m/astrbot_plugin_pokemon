@@ -1,3 +1,4 @@
+import json
 import random
 import sqlite3
 import threading
@@ -23,13 +24,13 @@ class SqliteTeamRepository(AbstractTeamRepository):
             self._local.connection = conn
         return conn
 
-    def get_user_team(self, user_id: str) -> Optional[str]:
+    def get_user_team(self, user_id: str) -> Dict[str, Any]:
         """
         获取用户的队伍配置
         Args:
             user_id: 用户ID
         Returns:
-            队伍配置的JSON字符串，如果不存在则返回None
+            队伍配置的字典，如果不存在或格式错误则返回空字典
         """
         sql = "SELECT team FROM user_team WHERE user_id = ?"
 
@@ -37,7 +38,17 @@ class SqliteTeamRepository(AbstractTeamRepository):
             cursor = conn.cursor()
             cursor.execute(sql, (user_id,))
             row = cursor.fetchone()
-            return row["team"] if row else None
+
+            if not row:
+                return {}
+
+            try:
+                # 将 JSON 字符串反序列化为字典
+                return json.loads(row["team"])
+            except (json.JSONDecodeError, TypeError) as e:
+                # 处理 JSON 格式错误或字段为空的情况
+                print(f"解析队伍配置失败：{e}")
+                return {}
 
     def update_user_team(self, user_id: str, team_data: str) -> None:
         """
