@@ -18,12 +18,9 @@ from .core.services.exp_service import ExpService
 from .handlers.common_handlers import CommonHandlers
 from .handlers.pokemon_handlers import PokemonHandlers
 from .handlers.team_handlers import TeamHandlers
-from .handlers.area_handlers import AreaHandlers
-from .handlers.battle_handlers import BattleHandlers
+from .handlers.adventure_handlers import AdventureHandlers
 from .handlers.item_handlers import ItemHandlers
-from .handlers.catch_handlers import CatchHandlers
 from .handlers.shop_handlers import ShopHandlers
-from .handlers.run_handlers import RunHandlers
 
 from .core.services.user_service import UserService
 from .core.services.item_service import ItemService
@@ -141,12 +138,9 @@ class PokemonPlugin(Star):
         self.user_handlers = UserHandlers(self)
         self.team_handlers = TeamHandlers(self)
         self.pokemon_handlers = PokemonHandlers(self)
-        self.area_handlers = AreaHandlers(self)
-        self.battle_handlers = BattleHandlers(self)
+        self.adventure_handlers = AdventureHandlers(self)
         self.item_handlers = ItemHandlers(self)
-        self.catch_handlers = CatchHandlers(self)
         self.shop_handlers = ShopHandlers(self)
-        self.run_handlers = RunHandlers(self)
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
@@ -219,27 +213,35 @@ class PokemonPlugin(Star):
     @filter.command("查看区域")
     async def view_areas(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
-        async for r in self.area_handlers.view_areas(event):
+        async for r in self.adventure_handlers.view_areas(event):
             yield r
 
+    # ====================== 冒险相关指令 ======================
     @filter.command("冒险")
     async def adventure(self, event: AstrMessageEvent):
         """在指定区域进行冒险"""
-        async for r in self.area_handlers.adventure(event):
+        async for r in self.adventure_handlers.adventure(event):
             yield r
 
     @filter.command("战斗")
     async def battle(self, event: AstrMessageEvent):
         """与当前遇到的野生宝可梦战斗"""
-        async for r in self.battle_handlers.battle(event):
+        async for r in self.adventure_handlers.battle(event):
             yield r
 
     @filter.command("捕捉")
     async def catch_pokemon(self, event: AstrMessageEvent):
         """捕捉当前遇到的野生宝可梦"""
-        async for r in self.catch_handlers.catch_pokemon(event):
+        async for r in self.adventure_handlers.catch_pokemon(event):
             yield r
 
+    @filter.command("逃跑")
+    async def run(self, event: AstrMessageEvent):
+        """逃跑离开当前遇到的野生宝可梦"""
+        async for r in self.adventure_handlers.run(event):
+            yield r
+
+    # ====================== 道具相关指令 ======================
     @filter.command("宝可梦背包")
     async def view_items(self, event: AstrMessageEvent):
         """查看用户背包中的所有道具"""
@@ -258,11 +260,7 @@ class PokemonPlugin(Star):
         async for r in self.shop_handlers.purchase_item(event):
             yield r
 
-    @filter.command("逃跑")
-    async def run(self, event: AstrMessageEvent):
-        """逃跑离开当前遇到的野生宝可梦"""
-        async for r in self.run_handlers.run(event):
-            yield r
+
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""

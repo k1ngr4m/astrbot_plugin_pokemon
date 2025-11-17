@@ -1,0 +1,498 @@
+import random
+from typing import Dict, Any
+from astrbot.api.event import AstrMessageEvent, MessageEventResult
+from ..core.answer.answer_enum import AnswerEnum
+
+
+class AdventureHandlers:
+    def __init__(self, plugin):
+        self.plugin = plugin
+        self.area_service = plugin.area_service
+        self.battle_service = plugin.battle_service
+        self.pokemon_service = plugin.pokemon_service
+
+    async def view_areas(self, event: AstrMessageEvent):
+        """查看所有可冒险的区域"""
+        user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
+
+        result = self.area_service.get_all_areas()
+
+        if not result["success"]:
+            yield event.plain_result(f"❌ {result['message']}")
+            return
+
+        if not result["areas"]:
+            yield event.plain_result(result["message"])
+            return
+
+        # 组织显示信息
+        message = f"🗺️ {result['message']}：\n\n"
+        for i, area in enumerate(result["areas"], 1):
+            message += f"{i}. {area['name']}\n"
+            message += f"   短码: {area['area_code']} | 等级: {area['min_level']}-{area['max_level']}\n"
+            if area['description'] != "暂无描述":
+                message += f"   描述: {area['description']}\n"
+            message += "\n"
+
+        message += "💡 使用 冒险 <区域短码> 指令进入冒险！"
+
+        yield event.plain_result(message.strip())
+
+    async def adventure(self, event: AstrMessageEvent):
+        """进入指定区域冒险"""
+        user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
+
+        # 检查用户是否已经遇到了野生宝可梦
+        if hasattr(self.plugin, '_cached_wild_pokemon'):
+            wild_pokemon = self.plugin._cached_wild_pokemon.get(user_id)
+            if wild_pokemon:
+                yield event.plain_result("❌ 您当前正在冒险中，已经遇到了野生宝可梦。请先处理当前遇到的宝可梦（战斗或捕捉），然后才能重新开始冒险。")
+                return
+
+        # 检查冒险冷却时间
+        import time
+        current_time = time.time()
+        user = self.plugin.user_repo.get_by_id(user_id)
+        last_adventure_time = user.last_adventure_time if user and user.last_adventure_time else 0
+        cooldown_remaining = (last_adventure_time + self.plugin.adventure_cooldown) - current_time
+
+        if cooldown_remaining > 0:
+            yield event.plain_result(f"❌ 冒险冷却中，请等待 {int(cooldown_remaining)} 秒后再试。")
+            return
+
+        # 检查用户是否有设置队伍
+        user_team_data = self.plugin.team_repo.get_user_team(user_id)
+        if not user_team_data:
+            yield event.plain_result("❌ 您还没有设置队伍。请先使用 /设置队伍 指令设置您的出场队伍，才能进行冒险。")
+            return
+
+        # 解析队伍数据
+        import json
+        try:
+            team_pokemon_ids = json.loads(user_team_data) if user_team_data else []
+            if not team_pokemon_ids:
+                yield event.plain_result("❌ 您的队伍是空的，无法进行冒险。请先使用 /设置队伍 指令设置您的出场队伍。")
+                return
+
+            # 检查team_pokemon_ids是否为字典（如果是字典格式，则获取值列表）
+            if isinstance(team_pokemon_ids, dict):
+                # 如果是字典格式，获取其中的宝可梦IDs列表
+                if 'pokemon_list' in team_pokemon_ids:
+                    team_pokemon_ids = team_pokemon_ids['pokemon_list']
+                elif 'team' in team_pokemon_ids:
+                    team_pokemon_ids = team_pokemon_ids['team']
+                else:
+                    # 尝试获取字典中的所有值
+                    team_pokemon_ids = list(team_pokemon_ids.values())
+                    if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
+                        team_pokemon_ids = team_pokemon_ids[0]
+
+            # 确保team_pokemon_ids是列表
+            if not isinstance(team_pokemon_ids, list):
+                # 如果不是列表，尝试转换为列表
+                if isinstance(team_pokemon_ids, (str, int)):
+                    team_pokemon_ids = [team_pokemon_ids]
+                else:
+                    team_pokemon_ids = []
+
+            if not team_pokemon_ids:
+                yield event.plain_result("❌ 您的队伍是空的，无法进行冒险。请先使用 /设置队伍 指令设置您的出场队伍。")
+                return
+        except json.JSONDecodeError:
+            yield event.plain_result("❌ 队伍数据格式错误，请重新设置队伍。")
+            return
+
+        args = event.message_str.split(" ")
+        if len(args) < 2:
+            yield event.plain_result("❌ 请输入要冒险的区域短码。用法：冒险 <区域短码>\n\n💡 提示：使用 查看区域 指令查看所有可冒险的区域。")
+            return
+
+        area_code = args[1].upper()  # 转换为大写
+
+        # 验证区域代码格式（A开头的四位数）
+        if not (area_code.startswith('A') and len(area_code) == 4 and area_code[1:].isdigit()):
+            yield event.plain_result(f"❌ 区域短码 {area_code} 格式不正确（应为A开头的四位数，如A001）。")
+            return
+
+        result = self.area_service.adventure_in_area(user_id, area_code)
+
+        if result["success"]:
+            wild_pokemon = result["wild_pokemon"]
+            message = f"🌳 在 {result['area']['name']} 中冒险！\n\n"
+            message += f"✨ 遇到了野生的 {wild_pokemon['name']}！\n"
+            message += f"等级: {wild_pokemon['level']}\n"
+
+            # 缓存野生宝可梦信息，供战斗使用
+            if not hasattr(self.plugin, '_cached_wild_pokemon'):
+                self.plugin._cached_wild_pokemon = {}
+            self.plugin._cached_wild_pokemon[user_id] = wild_pokemon
+
+            # 记录冒险时间到数据库，用于冷却时间控制
+            import time
+            current_time = time.time()
+            self.plugin.user_repo.update_user_last_adventure_time(user_id, current_time)
+
+            message += ("接下来你可以选择战斗、捕捉或逃跑...\n\n"
+                        "使用 /战斗 指令进行对战！\n\n"
+                        "使用 /捕捉 指令尝试捕捉它！\n\n"
+                        "使用 /逃跑 指令安全离开！")
+            yield event.plain_result(message)
+        else:
+            yield event.plain_result(f"❌ {result['message']}")
+
+    async def battle(self, event: AstrMessageEvent):
+        """处理战斗指令"""
+        user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
+
+        # 检查是否有缓存的野生宝可梦信息
+        wild_pokemon = getattr(self.plugin, '_cached_wild_pokemon', {}).get(user_id)
+
+        if not wild_pokemon:
+            yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
+            return
+
+        # 检查用户是否有设置队伍
+        user_team_data = self.plugin.team_repo.get_user_team(user_id)
+        if not user_team_data:
+            yield event.plain_result("❌ 您还没有设置队伍。请先使用 /设置队伍 指令设置您的出场队伍。")
+            return
+
+        # 解析队伍数据
+        import json
+        try:
+            team_pokemon_ids = json.loads(user_team_data) if user_team_data else []
+            if not team_pokemon_ids:
+                yield event.plain_result("❌ 您的队伍是空的，无法进行战斗。请先使用 /设置队伍 指令设置您的出场队伍。")
+                return
+
+            # 检查team_pokemon_ids是否为字典（如果是字典格式，则获取值列表）
+            if isinstance(team_pokemon_ids, dict):
+                # 如果是字典格式，获取其中的宝可梦IDs列表
+                if 'pokemon_list' in team_pokemon_ids:
+                    team_pokemon_ids = team_pokemon_ids['pokemon_list']
+                elif 'team' in team_pokemon_ids:
+                    team_pokemon_ids = team_pokemon_ids['team']
+                else:
+                    # 尝试获取字典中的所有值
+                    team_pokemon_ids = list(team_pokemon_ids.values())
+                    if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
+                        team_pokemon_ids = team_pokemon_ids[0]
+
+            # 确保team_pokemon_ids是列表
+            if not isinstance(team_pokemon_ids, list):
+                # 如果不是列表，尝试转换为列表
+                if isinstance(team_pokemon_ids, (str, int)):
+                    team_pokemon_ids = [team_pokemon_ids]
+                else:
+                    team_pokemon_ids = []
+
+            if not team_pokemon_ids:
+                yield event.plain_result("❌ 您的队伍是空的，无法进行战斗。请先使用 /设置队伍 指令设置您的出场队伍。")
+                return
+        except json.JSONDecodeError:
+            yield event.plain_result("❌ 队伍数据格式错误，请重新设置队伍。")
+            return
+
+        # 开始战斗，传入队伍中的第一只宝可梦
+        result = self.battle_service.start_battle(user_id, wild_pokemon, str(team_pokemon_ids[0]))
+
+        if result["success"]:
+            battle_details = result["battle_details"]
+            user_pokemon = battle_details["user_pokemon"]
+            wild_pokemon_data = battle_details["wild_pokemon"]
+            win_rates = battle_details["win_rates"]
+            battle_result = battle_details["result"]
+            exp_details = battle_details.get("exp_details", {})
+
+            message = "⚔️ 宝可梦战斗开始！\n\n"
+            message += f"👤 我方宝可梦: {user_pokemon['name']} (Lv.{user_pokemon['level']})\n"
+            message += f"野生宝可梦: {wild_pokemon_data['name']} (Lv.{wild_pokemon_data['level']})\n\n"
+
+            message += "📊 战斗胜率分析:\n"
+            message += f"我方胜率: {win_rates['user_win_rate']}%\n"
+            message += f"野生胜率: {win_rates['wild_win_rate']}%\n\n"
+
+            message += f"🎯 战斗结果: {battle_result}\n"
+
+            # 添加经验值信息
+            if exp_details:
+                team_pokemon_results = exp_details.get("team_pokemon_results", [])
+                user_exp_info = exp_details.get("user_exp", {})
+
+                if team_pokemon_results:
+                    message += f"\n📈 经验值获取:\n"
+                    for i, pokemon_result in enumerate(team_pokemon_results):
+                        if pokemon_result.get("success"):
+                            exp_gained = pokemon_result.get("exp_gained", 0)
+                            pokemon_name = pokemon_result.get("pokemon_name", f"宝可梦{i+1}")
+                            message += f"  {pokemon_name} 获得了 {exp_gained} 点经验值\n"
+
+                            level_up_info = pokemon_result.get("level_up_info", {})
+                            if level_up_info.get("should_level_up"):
+                                levels_gained = level_up_info.get("levels_gained", 0)
+                                new_level = level_up_info.get("new_level", 0)
+                                message += f"  🎉 恭喜 {pokemon_name} 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n"
+
+                if user_exp_info.get("success"):
+                    user_exp_gained = user_exp_info.get("exp_gained", 0)
+                    if user_exp_gained > 0:  # 只有在获得经验时才显示
+                        user_levels_gained = user_exp_info.get("levels_gained", 0)
+                        new_user_level = user_exp_info.get("new_level", user.level)
+                        message += f"  训练家获得了 {user_exp_gained} 点经验值"
+                        if user_levels_gained > 0:
+                            message += f"，等级提升 {user_levels_gained} 级，现在是 {new_user_level} 级！\n"
+                        else:
+                            message += "\n"
+
+            # 清除缓存的野生宝可梦信息
+            if hasattr(self.plugin, '_cached_wild_pokemon'):
+                self.plugin._cached_wild_pokemon.pop(user_id, None)
+
+            yield event.plain_result(message)
+        else:
+            yield event.plain_result(f"❌ {result['message']}")
+
+    async def catch_pokemon(self, event: AstrMessageEvent):
+        """处理捕捉野生宝可梦的指令"""
+        user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
+
+        # 检查是否有缓存的野生宝可梦信息
+        wild_pokemon = getattr(self.plugin, '_cached_wild_pokemon', {}).get(user_id)
+        if not wild_pokemon:
+            yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
+            return
+
+        # 解析用户可能传递的道具ID参数
+        message_content = event.message_str
+        command_parts = message_content.split()
+        item_id = None
+
+        if len(command_parts) > 1:
+            # 尝试解析第二个参数作为道具ID
+            try:
+                item_id = int(command_parts[1])
+            except ValueError:
+                # 如果不是数字，提示用户使用道具ID
+                yield event.plain_result("❌ 无效的道具ID格式。请使用命令格式: /捕捉 [道具ID] 或 /捕捉")
+                return
+
+        # 检查用户背包中的道具
+        user_items = self.plugin.user_repo.get_user_items(user_id)
+        pokeball_item = None
+
+        if item_id is not None:
+            # 用户指定了特定的道具ID
+            for item in user_items:
+                if item['item_id'] == item_id and item['type'] == 'Pokeball' and item['quantity'] > 0:
+                    pokeball_item = item
+                    break
+        else:
+            # 用户未指定道具ID，自动寻找第一个可用的精灵球
+            for item in user_items:
+                if item['type'] == 'Pokeball' and item['quantity'] > 0:
+                    pokeball_item = item
+                    break
+
+        if not pokeball_item:
+            if item_id is not None:
+                yield event.plain_result(f"❌ 找不到ID为 {item_id} 的精灵球或该道具不存在，无法进行捕捉！请检查道具ID或先通过签到或其他方式获得精灵球。")
+            else:
+                yield event.plain_result("❌ 您的背包中没有精灵球，无法进行捕捉！请先通过签到或其他方式获得精灵球。")
+            return
+
+        # 计算捕捉成功率
+
+        # 根据精灵球类型调整基础捕捉率
+        ball_multiplier = 1.0  # 普通精灵球
+        if pokeball_item['name'] == '超级球':
+            ball_multiplier = 1.5
+        elif pokeball_item['name'] == '高级球':
+            ball_multiplier = 2.0
+
+        # 基础捕捉率，考虑精灵球类型
+        base_catch_rate = 0.2 * ball_multiplier
+
+        # 根据野生宝可梦的等级调整成功率（等级越高越难捕捉）
+        level_factor = max(0.1, 1.0 - (wild_pokemon['level'] / 100.0))
+
+        # 如果用户有战斗胜率信息，可以将其作为额外因素
+        # 计算一个简化版本的胜率
+        user_win_rate, wild_win_rate = self.plugin.battle_service.calculate_battle_win_rate(
+            {"species_id": wild_pokemon['species_id'], "level": 5, "speed": 50,  # 假设用户派出一只低等级宝可梦
+             "attack": 50, "defense": 50, "sp_attack": 50, "sp_defense": 50},
+            wild_pokemon
+        )
+
+        # 将战斗胜率作为捕捉成功率的修正因子（胜利可能性高则捕捉成功率增加）
+        battle_factor = user_win_rate / 100.0  # 转换为0-1之间的值
+        # 捕捉成功率 = 基础捕捉率 * 等级因素 * 战斗胜率修正
+        catch_success_rate = base_catch_rate * level_factor * (0.5 + 0.5 * battle_factor)
+
+        # 确保成功率在合理范围内
+        # catch_success_rate = max(0.05, min(0.95, catch_success_rate))
+        # 先100%捕捉，后面再改概率
+        catch_success_rate = 1
+
+        # 随机决定捕捉结果
+        is_successful = random.random() < catch_success_rate
+
+        # 扣除一个精灵球
+        self.plugin.user_repo.add_user_item(user_id, pokeball_item['item_id'], -1)
+
+        if is_successful:
+            # 成功捕捉 - 将野生宝可梦添加到用户宝可梦列表中
+            # 首先创建一个基础的宝可梦记录
+            pokemon = self.pokemon_service.create_single_pokemon(wild_pokemon['species_id'], wild_pokemon['level'], wild_pokemon['level'])
+            pokemon_id = self.plugin.user_repo.create_user_pokemon(user_id, wild_pokemon['species_id'])
+
+            # 然后更新宝可梦的等级和属性值为野生宝可梦的当前值
+            # 获取野生宝可梦的属性值
+            nickname = wild_pokemon['name']
+            level = wild_pokemon['level']
+            current_hp = wild_pokemon.get('current_hp', wild_pokemon.get('hp', 0))
+            attack = wild_pokemon.get('attack', 0)
+            defense = wild_pokemon.get('defense', 0)
+            sp_attack = wild_pokemon.get('sp_attack', 0)
+            sp_defense = wild_pokemon.get('sp_defense', 0)
+            speed = wild_pokemon.get('speed', 0)
+            name = wild_pokemon['name']
+            # 更新宝可梦的属性值
+            with self.plugin.user_repo._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE user_pokemon
+                    SET nickname = ?, level = ?, current_hp = ?, attack = ?, defense = ?,
+                        sp_attack = ?, sp_defense = ?, speed = ?
+                    WHERE id = ?
+                """, (name, level, current_hp, attack, defense, sp_attack, sp_defense, speed, pokemon_id))
+                conn.commit()
+
+            # 获取新捕捉的宝可梦信息
+            new_pokemon = self.plugin.user_repo.get_user_pokemon_by_numeric_id(pokemon_id)
+
+            message = f"🎉 捕捉成功！\n\n"
+            message += f"您成功捕捉到了 {wild_pokemon['name']} (Lv.{wild_pokemon['level']})！\n\n"
+            message += f"已添加到您的宝可梦收藏中。\n\n"
+            message += f"宝可梦ID: {new_pokemon['shortcode']}\n\n"
+            message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
+            message += f"剩余精灵球: {pokeball_item['quantity'] - 1}"
+
+            # 清除缓存的野生宝可梦信息
+            if hasattr(self.plugin, '_cached_wild_pokemon'):
+                self.plugin._cached_wild_pokemon.pop(user_id, None)
+        else:
+            message = f"❌ 捕捉失败！\n\n"
+            message += f"{wild_pokemon['name']} 逃脱了！\n\n"
+            message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
+            message += f"捕捉成功率: {catch_success_rate * 100:.1f}%\n\n"
+            message += f"剩余精灵球: {pokeball_item['quantity'] - 1}\n\n"
+            message += "你也可以使用 /逃跑 指令离开这只野生宝可梦。"
+
+        yield event.plain_result(message)
+
+    async def run(self, event: AstrMessageEvent):
+        """处理逃跑指令"""
+        user_id = self.plugin._get_effective_user_id(event)
+        user = self.plugin.user_repo.get_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
+
+        # 检查是否有缓存的野生宝可梦信息
+        wild_pokemon = getattr(self.plugin, '_cached_wild_pokemon', {}).get(user_id)
+
+        if not wild_pokemon:
+            yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
+            return
+
+        # 检查用户是否有设置队伍（用于逃跑成功率计算）
+        user_team_data = self.plugin.team_repo.get_user_team(user_id)
+        if not user_team_data:
+            # 如果没有队伍，默认80%逃跑成功率
+            escape_success_rate = 80
+        else:
+            # 解析队伍数据，获取第一只宝可梦用于逃跑成功率计算
+            import json
+            try:
+                team_pokemon_ids = json.loads(user_team_data) if user_team_data else []
+                if team_pokemon_ids:
+                    # 检查team_pokemon_ids是否为字典（如果是字典格式，则获取值列表）
+                    if isinstance(team_pokemon_ids, dict):
+                        # 如果是字典格式，获取其中的宝可梦IDs列表
+                        if 'pokemon_list' in team_pokemon_ids:
+                            team_pokemon_ids = team_pokemon_ids['pokemon_list']
+                        elif 'team' in team_pokemon_ids:
+                            team_pokemon_ids = team_pokemon_ids['team']
+                        else:
+                            # 尝试获取字典中的所有值
+                            team_pokemon_ids = list(team_pokemon_ids.values())
+                            if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
+                                team_pokemon_ids = team_pokemon_ids[0]
+
+                    # 确保team_pokemon_ids是列表
+                    if not isinstance(team_pokemon_ids, list):
+                        # 如果不是列表，尝试转换为列表
+                        if isinstance(team_pokemon_ids, (str, int)):
+                            team_pokemon_ids = [team_pokemon_ids]
+                        else:
+                            team_pokemon_ids = []
+
+                    if team_pokemon_ids:
+                        # 获取用户的宝可梦信息用于计算逃跑成功率
+                        user_pokemon = self.plugin.user_repo.get_user_pokemon_by_id(str(team_pokemon_ids[0]))
+                        if user_pokemon:
+                            # 基于速度差异计算逃跑成功率
+                            user_speed = user_pokemon.get('speed', 50)
+                            wild_speed = wild_pokemon.get('speed', 50)
+
+                            # 逃跑成功率 = 80% + (用户宝可梦速度 - 野生宝可梦速度) * 0.5%
+                            # 限制在20%到95%之间
+                            speed_diff = user_speed - wild_speed
+                            escape_success_rate = 80 + (speed_diff * 0.5)
+                            escape_success_rate = max(20, min(95, escape_success_rate))
+                        else:
+                            escape_success_rate = 80
+                    else:
+                        escape_success_rate = 80
+                else:
+                    escape_success_rate = 80
+            except json.JSONDecodeError:
+                escape_success_rate = 80
+
+        # 计算逃跑结果（默认80%成功率）
+        escape_success = random.random() * 100 < escape_success_rate
+
+        if escape_success:
+            message = "🏃 您成功逃跑了！\n\n"
+            message += f"野生的 {wild_pokemon['name']} 没有追上来。\n"
+
+            # 清除缓存的野生宝可梦信息
+            if hasattr(self.plugin, '_cached_wild_pokemon'):
+                self.plugin._cached_wild_pokemon.pop(user_id, None)
+        else:
+            message = "😅 逃跑失败了！\n\n"
+            message += f"野生的 {wild_pokemon['name']} 还在盯着你...\n"
+            message += "你可以再次尝试逃跑，或者选择战斗或捕捉！"
+
+        yield event.plain_result(message)
