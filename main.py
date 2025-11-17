@@ -7,12 +7,12 @@ from .core.database.migration import run_migrations
 from .core.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from .core.repositories.sqlite_team_repo import SqliteTeamRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
-from .core.repositories.sqlite_area_repo import SqliteAdventureRepository
+from .core.repositories.sqlite_adventure_repo import SqliteAdventureRepository
 from .core.repositories.sqlite_shop_repo import SqliteShopRepository
 from .core.services.data_setup_service import DataSetupService
 from .core.services.pokemon_service import PokemonService
 from .core.services.team_service import TeamService
-from .core.services.area_service import AreaService
+from .core.services.adventure_service import AdventureService
 from .core.services.battle_service import BattleService
 from .core.services.exp_service import ExpService
 from .handlers.common_handlers import CommonHandlers
@@ -81,7 +81,7 @@ class PokemonPlugin(Star):
         self.user_repo = SqliteUserRepository(db_path)
         self.pokemon_repo = SqlitePokemonRepository(db_path)
         self.team_repo = SqliteTeamRepository(db_path)
-        self.area_repo = SqliteAdventureRepository(db_path)
+        self.adventure_repo = SqliteAdventureRepository(db_path)
         self.shop_repo = SqliteShopRepository(db_path)
 
 
@@ -108,8 +108,8 @@ class PokemonPlugin(Star):
             config=self.game_config
         )
 
-        self.area_service = AreaService(
-            area_repo=self.area_repo,
+        self.adventure_service = AdventureService(
+            adventure_repo=self.adventure_repo,
             pokemon_repo=self.pokemon_repo,
             pokemon_service=self.pokemon_service,
             user_repo=self.user_repo,
@@ -146,7 +146,7 @@ class PokemonPlugin(Star):
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
-        data_setup_service = DataSetupService(self.pokemon_repo, self.area_repo, self.shop_repo)
+        data_setup_service = DataSetupService(self.pokemon_repo, self.adventure_repo, self.shop_repo)
         data_setup_service.setup_initial_data()
 
         # --- Web后台配置 ---

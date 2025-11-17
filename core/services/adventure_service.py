@@ -10,18 +10,18 @@ from ..domain.adventure_models import AdventureArea, AreaPokemon, AdventureResul
 from ..utils import get_now
 
 
-class AreaService:
+class AdventureService:
     """冒险区域相关的业务逻辑服务"""
 
     def __init__(
             self,
-            area_repo: AbstractAdventureRepository,
+            adventure_repo: AbstractAdventureRepository,
             pokemon_repo: AbstractPokemonRepository,
             pokemon_service: PokemonService,
             user_repo: AbstractUserRepository,
             config: Dict[str, Any]
     ):
-        self.area_repo = area_repo
+        self.adventure_repo = adventure_repo
         self.pokemon_repo = pokemon_repo
         self.pokemon_service = pokemon_service
         self.user_repo = user_repo
@@ -34,7 +34,7 @@ class AreaService:
             包含区域列表的字典
         """
         try:
-            areas = self.area_repo.get_all_areas()
+            areas = self.adventure_repo.get_all_areas()
 
             if not areas:
                 return {
@@ -82,7 +82,7 @@ class AreaService:
                 }
 
             # 获取区域信息
-            area = self.area_repo.get_area_by_code(area_code)
+            area = self.adventure_repo.get_area_by_code(area_code)
             if not area:
                 return {
                     "success": False,
@@ -90,7 +90,7 @@ class AreaService:
                 }
 
             # 获取该区域的宝可梦列表
-            area_pokemon_list = self.area_repo.get_area_pokemon_by_area_code(area_code)
+            area_pokemon_list = self.adventure_repo.get_area_pokemon_by_area_code(area_code)
 
             # 获取宝可梦详细信息
             pokemon_details = []
@@ -156,12 +156,12 @@ class AreaService:
                 return error_response("区域代码格式不正确（应为A开头的四位数，如A001）")
 
             # 3. 获取区域信息
-            area = self.area_repo.get_area_by_code(area_code)
+            area = self.adventure_repo.get_area_by_code(area_code)
             if not area:
                 return error_response(f"未找到区域 {area_code}")
 
             # 4. 获取该区域的宝可梦列表
-            area_pokemon_list = self.area_repo.get_area_pokemon_by_area_code(area_code)
+            area_pokemon_list = self.adventure_repo.get_area_pokemon_by_area_code(area_code)
             if not area_pokemon_list:
                 return error_response(f"区域 {area.name} 中暂无野生宝可梦")
 

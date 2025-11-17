@@ -129,10 +129,6 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_pokemon_types(self, species_id: int) -> List[str]: pass
 
-    # 获取宝可梦物种招式
-    @abstractmethod
-    def get_pokemon_species_moves(self, species_id: int) -> List[Dict[str, Any]]: pass
-
 
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""
@@ -166,10 +162,6 @@ class AbstractAdventureRepository(ABC):
     # 获取所有冒险区域
     @abstractmethod
     def get_all_areas(self) -> List[AdventureArea]: pass
-
-    # 根据区域ID获取区域
-    @abstractmethod
-    def get_area_by_id(self, area_id: int) -> Optional[AdventureArea]: pass
 
     # 根据区域编码获取区域
     @abstractmethod

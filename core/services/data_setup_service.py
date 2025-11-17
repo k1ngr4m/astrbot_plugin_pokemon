@@ -19,11 +19,11 @@ class DataSetupService:
 
     def __init__(self,
                  pokemon_repo: AbstractPokemonRepository,
-                 area_repo=AbstractAdventureRepository,
+                 adventure_repo: AbstractAdventureRepository,
                  shop_repo=AbstractShopRepository,
                  ):
         self.pokemon_repo = pokemon_repo
-        self.area_repo = area_repo
+        self.adventure_repo = adventure_repo
         self.shop_repo = shop_repo
 
 
@@ -121,7 +121,7 @@ class DataSetupService:
             )
 
         for area in ADVENTURE_AREAS_DATA:
-            self.area_repo.add_area_template(
+            self.adventure_repo.add_area_template(
                 {
                     "area_code": area[0],
                     "name": area[1],
@@ -134,9 +134,9 @@ class DataSetupService:
         # 填充区域宝可梦关联数据
         for area_pokemon in AREA_POKEMON_DATA:
             # area_pokemon[0]是区域代码，需要先获取区域ID
-            area = self.area_repo.get_area_by_code(area_pokemon[0])
+            area = self.adventure_repo.get_area_by_code(area_pokemon[0])
             if area:
-                self.area_repo.add_area_pokemon_template(
+                self.adventure_repo.add_area_pokemon_template(
                     {
                         "area_id": area.id,
                         "pokemon_species_id": area_pokemon[1],

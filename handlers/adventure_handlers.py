@@ -7,7 +7,7 @@ from ..core.answer.answer_enum import AnswerEnum
 class AdventureHandlers:
     def __init__(self, plugin):
         self.plugin = plugin
-        self.area_service = plugin.area_service
+        self.adventure_service = plugin.adventure_service
         self.battle_service = plugin.battle_service
         self.pokemon_service = plugin.pokemon_service
 
@@ -20,7 +20,7 @@ class AdventureHandlers:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
             return
 
-        result = self.area_service.get_all_areas()
+        result = self.adventure_service.get_all_areas()
 
         if not result["success"]:
             yield event.plain_result(f"❌ {result['message']}")
@@ -124,7 +124,7 @@ class AdventureHandlers:
             yield event.plain_result(f"❌ 区域短码 {area_code} 格式不正确（应为A开头的四位数，如A001）。")
             return
 
-        result = self.area_service.adventure_in_area(user_id, area_code)
+        result = self.adventure_service.adventure_in_area(user_id, area_code)
 
         if result["success"]:
             wild_pokemon = result["wild_pokemon"]

@@ -3,7 +3,7 @@ from typing import Optional, TypedDict, Dict
 
 from dataclasses import dataclass
 
-from pokemon_models import WildPokemonInfo
+from .pokemon_models import WildPokemonInfo
 
 
 @dataclass
