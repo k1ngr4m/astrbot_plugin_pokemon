@@ -1,5 +1,7 @@
 import math
 from typing import Dict, Any, Tuple, List
+
+from ..domain.pokemon_models import WildPokemonInfo
 from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository,
 )
@@ -147,7 +149,7 @@ class BattleService:
         opp_win_rate = 1 - self_win_rate
         return round(self_win_rate * 100, 1), round(opp_win_rate * 100, 1)
 
-    def start_battle(self, user_id: str, wild_pokemon: Dict[str, Any], pokemon_id: str = None) -> Dict[str, Any]:
+    def start_battle(self, user_id: str, wild_pokemon: WildPokemonInfo, pokemon_id: str = None) -> Dict[str, Any]:
         """
         开始一场与野生宝可梦的战斗
         Args:

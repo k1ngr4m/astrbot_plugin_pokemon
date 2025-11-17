@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
-from ..domain.pokemon_models import PokemonTemplate
+from ..domain.pokemon_models import PokemonTemplate, PokemonBaseStats
 
 class SqlitePokemonRepository(AbstractPokemonRepository):
     """物品模板仓储的SQLite实现"""
@@ -25,7 +25,25 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
     def _row_to_pokemon(self, row: sqlite3.Row) -> Optional[PokemonTemplate]:
         if not row:
             return None
-        return PokemonTemplate(**row)
+
+        # 将数据库字段转换为PokemonTemplate所需的格式
+        row_dict = dict(row)
+
+        # 从字典中提取基础属性值并创建PokemonBaseStats对象
+        base_stats = PokemonBaseStats(
+            base_hp=row_dict.pop('base_hp'),
+            base_attack=row_dict.pop('base_attack'),
+            base_defense=row_dict.pop('base_defense'),
+            base_sp_attack=row_dict.pop('base_sp_attack'),
+            base_sp_defense=row_dict.pop('base_sp_defense'),
+            base_speed=row_dict.pop('base_speed')
+        )
+
+        # 使用剩余的字段创建PokemonTemplate对象
+        return PokemonTemplate(
+            base_stats=base_stats,
+            **row_dict
+        )
 
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonTemplate]:
         with self._get_connection() as conn:

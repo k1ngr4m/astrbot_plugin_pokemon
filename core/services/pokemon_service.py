@@ -85,12 +85,12 @@ class PokemonService:
 
         # 4. 获取种族值
         base_stats = {
-            "hp": pokemon_template.base_stats["hp"],
-            "attack": pokemon_template.base_stats["attack"],
-            "defense": pokemon_template.base_stats["defense"],
-            "sp_attack": pokemon_template.base_stats["sp_attack"],
-            "sp_defense": pokemon_template.base_stats["sp_defense"],
-            "speed": pokemon_template.base_stats["speed"]
+            "hp": pokemon_template.base_stats["base_hp"],
+            "attack": pokemon_template.base_stats["base_attack"],
+            "defense": pokemon_template.base_stats["base_defense"],
+            "sp_attack": pokemon_template.base_stats["base_sp_attack"],
+            "sp_defense": pokemon_template.base_stats["base_sp_defense"],
+            "speed": pokemon_template.base_stats["base_speed"]
         }
 
         # 5. 计算最终属性（使用局部函数，避免重复代码）

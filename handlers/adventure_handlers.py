@@ -126,11 +126,11 @@ class AdventureHandlers:
 
         result = self.adventure_service.adventure_in_area(user_id, area_code)
 
-        if result["success"]:
-            wild_pokemon = result["wild_pokemon"]
-            message = f"🌳 在 {result['area']['name']} 中冒险！\n\n"
-            message += f"✨ 遇到了野生的 {wild_pokemon['name']}！\n"
-            message += f"等级: {wild_pokemon['level']}\n"
+        if result.success:
+            wild_pokemon = result.wild_pokemon
+            message = f"🌳 在 {result.area.name} 中冒险！\n\n"
+            message += f"✨ 遇到了野生的 {wild_pokemon.name}！\n"
+            message += f"等级: {wild_pokemon.level}\n"
 
             # 缓存野生宝可梦信息，供战斗使用
             if not hasattr(self.plugin, '_cached_wild_pokemon'):
@@ -148,7 +148,7 @@ class AdventureHandlers:
                         "使用 /逃跑 指令安全离开！")
             yield event.plain_result(message)
         else:
-            yield event.plain_result(f"❌ {result['message']}")
+            yield event.plain_result(result.message)
 
     async def battle(self, event: AstrMessageEvent):
         """处理战斗指令"""
@@ -211,13 +211,13 @@ class AdventureHandlers:
         # 开始战斗，传入队伍中的第一只宝可梦
         result = self.battle_service.start_battle(user_id, wild_pokemon, str(team_pokemon_ids[0]))
 
-        if result["success"]:
-            battle_details = result["battle_details"]
-            user_pokemon = battle_details["user_pokemon"]
-            wild_pokemon_data = battle_details["wild_pokemon"]
-            win_rates = battle_details["win_rates"]
-            battle_result = battle_details["result"]
-            exp_details = battle_details.get("exp_details", {})
+        if result.success:
+            battle_details = result.battle_details
+            user_pokemon = battle_details.user_pokemon
+            wild_pokemon_data = battle_details.wild_pokemon
+            win_rates = battle_details.win_rates
+            battle_result = battle_details.result
+            exp_details = battle_details.exp_details
 
             message = "⚔️ 宝可梦战斗开始！\n\n"
             message += f"👤 我方宝可梦: {user_pokemon['name']} (Lv.{user_pokemon['level']})\n"

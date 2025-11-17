@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from astrbot.api import logger
-from ..domain.pokemon_models import PokemonTemplate
+from ..domain.pokemon_models import PokemonTemplate, PokemonIVs, PokemonEVs, PokemonStats
 from ..domain.user_models import User
 from ..domain.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserRepository
@@ -131,23 +131,23 @@ class SqliteUserRepository(AbstractUserRepository):
             exp = pokemon["exp"]
             gender = pokemon["gender"]
 
-            ivs = pokemon["ivs"]
-            hp_iv = ivs["hp"]
-            attack_iv = ivs["attack"]
-            defense_iv = ivs["defense"]
-            sp_attack_iv = ivs["sp_attack"]
-            sp_defense_iv = ivs["sp_defense"]
-            speed_iv = ivs["speed"]
+            ivs: PokemonIVs = pokemon["ivs"]
+            hp_iv = ivs["hp_iv"]
+            attack_iv = ivs["attack_iv"]
+            defense_iv = ivs["defense_iv"]
+            sp_attack_iv = ivs["sp_attack_iv"]
+            sp_defense_iv = ivs["sp_defense_iv"]
+            speed_iv = ivs["speed_iv"]
 
-            evs = pokemon["evs"]
-            hp_ev = evs["hp"]
-            attack_ev = evs["attack"]
-            defense_ev = evs["defense"]
-            sp_attack_ev = evs["sp_attack"]
-            sp_defense_ev = evs["sp_defense"]
-            speed_ev = evs["speed"]
+            evs: PokemonEVs = pokemon["evs"]
+            hp_ev = evs["hp_ev"]
+            attack_ev = evs["attack_ev"]
+            defense_ev = evs["defense_ev"]
+            sp_attack_ev = evs["sp_attack_ev"]
+            sp_defense_ev = evs["sp_defense_ev"]
+            speed_ev = evs["speed_ev"]
 
-            stats = pokemon["stats"]
+            stats: PokemonStats = pokemon["stats"]
             hp = stats["hp"]
             attack = stats["attack"]
             defense = stats["defense"]

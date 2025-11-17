@@ -8,7 +8,7 @@ from ..repositories.abstract_repository import (
 
 from ..utils import get_now, get_today
 from ..domain.user_models import User
-from ..domain.pokemon_models import UserPokemonInfo
+from ..domain.pokemon_models import UserPokemonInfo, PokemonDetail
 from ..answer.answer_enum import AnswerEnum
 
 class UserService:
@@ -135,18 +135,18 @@ class UserService:
                 "success": False,
                 "message": new_pokemon["message"],
             }
-
+        new_pokemon_data: PokemonDetail = new_pokemon["data"]
         user_pokemon_info = UserPokemonInfo(
-            species_id = new_pokemon["base_pokemon"].id,
-            name = new_pokemon["base_pokemon"].name_cn,
-            gender = new_pokemon["gender"],
-            level = new_pokemon["level"],
-            exp = new_pokemon["exp"],
-            stats = new_pokemon["stats"],
-            ivs = new_pokemon["ivs"],
-            evs = new_pokemon["evs"],
-            is_shiny = new_pokemon["is_shiny"],
-            moves = new_pokemon["moves"],
+            species_id = new_pokemon_data["base_pokemon"].id,
+            name = new_pokemon_data["base_pokemon"].name_cn,
+            gender = new_pokemon_data["gender"],
+            level = new_pokemon_data["level"],
+            exp = new_pokemon_data["exp"],
+            stats = new_pokemon_data["stats"],
+            ivs = new_pokemon_data["ivs"],
+            evs = new_pokemon_data["evs"],
+            is_shiny = new_pokemon_data["is_shiny"],
+            moves = new_pokemon_data["moves"],
         )
 
         # 创建用户宝可梦记录，使用模板数据完善实例
@@ -190,11 +190,11 @@ class UserService:
                 "exp": pokemon["exp"],
                 "gender": pokemon["gender"],
                 "current_hp": pokemon["current_hp"],
-                "attack": pokemon["stats"]["attack"],
-                "defense": pokemon["stats"]["defense"],
-                "sp_attack": pokemon["stats"]["sp_attack"],
-                "sp_defense": pokemon["stats"]["sp_defense"],
-                "speed": pokemon["stats"]["speed"],
+                "attack": pokemon["attack"],
+                "defense": pokemon["defense"],
+                "sp_attack": pokemon["sp_attack"],
+                "sp_defense": pokemon["sp_defense"],
+                "speed": pokemon["speed"],
                 "is_shiny": bool(pokemon["is_shiny"]),
                 "caught_time": pokemon["caught_time"]
             })

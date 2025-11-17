@@ -3,10 +3,11 @@ from itertools import accumulate
 from typing import Dict, Any, List, Optional
 
 from .pokemon_service import PokemonService
+from ..domain.pokemon_models import WildPokemonInfo, PokemonStats, PokemonIVs, PokemonEVs, PokemonMoves
 from ..repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository
 )
-from ..domain.adventure_models import AdventureArea, AreaPokemon, AdventureResult
+from ..domain.adventure_models import AdventureArea, AreaPokemon, AdventureResult, AreaInfo
 from ..utils import get_now
 
 
@@ -137,12 +138,12 @@ class AdventureService:
         """
         # 统一错误返回函数（减少重复代码）
         def error_response(message: str) -> AdventureResult:
-            return {
-                "success": False,
-                "message": message,
-                "wild_pokemon": None,
-                "area": None
-            }
+            return AdventureResult(
+                success=False,
+                message=message,
+                wild_pokemon=None,
+                area=None
+            )
 
         try:
             # 1. 验证用户是否存在
@@ -185,34 +186,58 @@ class AdventureService:
             wild_pokemon_level = random.randint(min_level, max_level)
 
             # 7. 创建野生宝可梦（直接使用返回结果，无需额外处理）
-            wild_pokemon = self.pokemon_service.create_single_pokemon(
+            wild_pokemon_result = self.pokemon_service.create_single_pokemon(
                 species_id=selected_area_pokemon.pokemon_species_id,
                 max_level=wild_pokemon_level,
                 min_level=wild_pokemon_level
             )
+            if not wild_pokemon_result.success:
+                return error_response(wild_pokemon_result.message)
+            wild_pokemon = wild_pokemon_result.data
             # 8. 构造返回结果（直接复用create_single_pokemon的计算结果）
-            return {
-                "success": True,
-                "message": f"在 {area.name} 中遇到了野生的 {wild_pokemon['base_pokemon'].name_cn}！",
-                "wild_pokemon": {
-                    "species_id": wild_pokemon["base_pokemon"].id,
-                    "name": wild_pokemon["base_pokemon"].name_cn,
-                    "level": wild_pokemon_level,
-                    "encounter_rate": selected_area_pokemon.encounter_rate,
-                    "hp": wild_pokemon["stats"]["hp"],
-                    "attack": wild_pokemon["stats"]["attack"],
-                    "defense": wild_pokemon["stats"]["defense"],
-                    "sp_attack": wild_pokemon["stats"]["sp_attack"],
-                    "sp_defense": wild_pokemon["stats"]["sp_defense"],
-                    "speed": wild_pokemon["stats"]["speed"],
-                    "ivs": wild_pokemon["ivs"],
-                    "evs": wild_pokemon["evs"]
-                },
-                "area": {
-                    "area_code": area.area_code,
-                    "name": area.name
-                }
-            }
+            result = AdventureResult(
+                success=True,
+                message=f"在 {area.name} 中遇到了野生的 {wild_pokemon['base_pokemon'].name_cn}！",
+                wild_pokemon=WildPokemonInfo(
+                    species_id=wild_pokemon.base_pokemon.id,
+                    name=wild_pokemon.base_pokemon.name_cn,
+                    gender=wild_pokemon.gender,
+                    level=wild_pokemon_level,
+                    exp=wild_pokemon.exp,
+                    is_shiny=wild_pokemon.is_shiny,
+                    encounter_rate=selected_area_pokemon.encounter_rate,
+                    stats=PokemonStats(
+                        hp=wild_pokemon.stats.hp,
+                        attack=wild_pokemon.stats.attack,
+                        defense=wild_pokemon.stats.defense,
+                        sp_attack=wild_pokemon.stats.sp_attack,
+                        sp_defense=wild_pokemon.stats.sp_defense,
+                        speed=wild_pokemon.stats.speed,
+                    ),
+                    ivs=PokemonIVs(
+                        hp_iv=wild_pokemon.ivs.hp_iv,
+                        attack_iv=wild_pokemon.ivs.attack_iv,
+                        defense_iv=wild_pokemon.ivs.defense_iv,
+                        sp_attack_iv=wild_pokemon.ivs.sp_attack_iv,
+                        sp_defense_iv=wild_pokemon.ivs.sp_defense_iv,
+                        speed_iv=wild_pokemon.ivs.speed_iv,
+                    ),
+                    evs=PokemonEVs(
+                        hp_ev=wild_pokemon.evs.hp_ev,
+                        attack_ev=wild_pokemon.evs.attack_ev,
+                        defense_ev=wild_pokemon.evs.defense_ev,
+                        sp_attack_ev=wild_pokemon.evs.sp_attack_ev,
+                        sp_defense_ev=wild_pokemon.evs.sp_defense_ev,
+                        speed_ev=wild_pokemon.evs.speed_ev,
+                    ),
+                    moves = None
+                ),
+                area=AreaInfo(
+                    area_code=area.area_code,
+                    name=area.name,
+                )
+            )
+            return result
 
         except Exception as e:
             return error_response(f"冒险过程中发生错误: {str(e)}")

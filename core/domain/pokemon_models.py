@@ -12,6 +12,9 @@ class PokemonStats:
     sp_defense: int
     speed: int
 
+    def __getitem__(self, item):
+        return getattr(self, item)
+
 @dataclass
 class PokemonIVs:
     """代表一个宝可梦的个体值"""
@@ -21,6 +24,9 @@ class PokemonIVs:
     sp_attack_iv: int
     sp_defense_iv: int
     speed_iv: int
+
+    def __getitem__(self, item):
+        return getattr(self, item)
 
 @dataclass
 class PokemonEVs:
@@ -32,6 +38,9 @@ class PokemonEVs:
     sp_defense_ev: int
     speed_ev: int
 
+    def __getitem__(self, item):
+        return getattr(self, item)
+
 @dataclass
 class PokemonMoves:
     """代表一个宝可梦的技能"""
@@ -41,8 +50,14 @@ class PokemonMoves:
     move_4: int
 
 @dataclass
-class PokemonBaseStats(PokemonStats):
-    pass
+class PokemonBaseStats:
+    base_hp: int
+    base_attack: int
+    base_defense: int
+    base_sp_attack: int
+    base_sp_defense: int
+    base_speed: int
+
     def __getitem__(self, item):
         return getattr(self, item)
 
@@ -82,6 +97,9 @@ class PokemonDetail:
     evs: PokemonEVs
     moves: PokemonMoves | None
 
+    def __getitem__(self, item):
+        return getattr(self, item)
+
 @dataclass
 class PokemonCreateResult:
     success: bool
@@ -103,6 +121,7 @@ class UserPokemonInfo:
     ivs: PokemonIVs
     evs: PokemonEVs
     moves: PokemonMoves
+    shortcode: Optional[str] = None
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -118,5 +137,5 @@ class WildPokemonInfo:
     stats: PokemonStats
     ivs: PokemonIVs
     evs: PokemonEVs
-    moves: PokemonMoves
+    moves: PokemonMoves | None
     encounter_rate: float
