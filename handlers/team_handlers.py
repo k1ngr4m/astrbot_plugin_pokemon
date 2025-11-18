@@ -22,7 +22,7 @@ class TeamHandlers:
 
         args = event.message_str.split(" ")
         if len(args) < 2:
-            yield event.plain_result("❌ 请输入宝可梦短码列表。用法：设置队伍 <宝可梦短码1> <宝可梦短码2> ...\n\n💡 提示：最多可设置6只宝可梦，第一个为出战宝可梦。使用 我的宝可梦 指令查看您的宝可梦列表和对应的短码。")
+            yield event.plain_result("❌ 请输入宝可梦短码列表。用法：设置队伍 <宝可梦短码1> <宝可梦短码2> ...\n\n💡 提示：最多可设置6只宝可梦。使用 /我的宝可梦 指令查看您的宝可梦列表和对应的短码。")
             return
 
         # 获取用户输入的宝可梦短码列表（跳过命令本身）

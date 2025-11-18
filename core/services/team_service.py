@@ -4,7 +4,7 @@ from ..repositories.abstract_repository import (
 )
 
 from ..utils import get_now, get_today
-from ..domain.user_models import User
+from ..domain.user_models import User, UserTeam
 
 
 class TeamService:
@@ -39,7 +39,7 @@ class TeamService:
 
         # 获取用户所有的宝可梦
         user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
-        user_pokemon_dict = {pokemon.get('shortcode', f"P{pokemon['id']:04d}"): pokemon for pokemon in user_pokemon_list}
+        user_pokemon_dict = {pokemon.shortcode: pokemon for pokemon in user_pokemon_list}
 
         # 检查输入的宝可梦是否都在用户拥有的宝可梦列表中
         for shortcode in pokemon_shortcodes:
@@ -59,45 +59,27 @@ class TeamService:
         if len(pokemon_shortcodes) == 0:
             return {"success": False, "message": "请至少选择1只宝可梦加入队伍"}
 
-        # 构建队伍数据
-        pokemon_list_data = []
+        user_team_pokemon_list = []
         for shortcode in pokemon_shortcodes:
-            # 检查是否是数字ID，如果是则转换为短码格式
-            actual_shortcode = shortcode
-            if shortcode.isdigit():
-                actual_shortcode = f"P{int(shortcode):04d}"
-
-            pokemon_data = self.user_repo.get_user_pokemon_by_shortcode(actual_shortcode)
-            if not pokemon_data:
-                # 尝试用数字ID格式
-                pokemon_data = self.user_repo.get_user_pokemon_by_numeric_id(int(shortcode))
-
-            if not pokemon_data:
-                return {"success": False, "message": f"无法找到宝可梦 {shortcode}"}
-
-            pokemon = {
-                "id": actual_shortcode,  # 保留短码格式
-                "pokemon_data": pokemon_data,
-            }
-            pokemon_list_data.append(pokemon)
-
-        # 第一个为出战宝可梦
-        active_pokemon_shortcode = pokemon_shortcodes[0] if pokemon_shortcodes else None
-        if active_pokemon_shortcode.isdigit():
-            active_pokemon_shortcode = f"P{int(active_pokemon_shortcode):04d}"
+            pokemon_id = self.pokemon_repo.get_user_pokemon_by_shortcode(shortcode).id
+            user_team_pokemon_list.append(pokemon_id)
 
         # 创建队伍配置
-        team_data = {
-            "active_pokemon_id": active_pokemon_shortcode,
-            "team_list": pokemon_list_data,
-            "last_updated": get_now().isoformat()
-        }
+        user_team: UserTeam = UserTeam(
+            user_id=user_id,
+            team_pokemon_ids=user_team_pokemon_list
+        )
 
         # 保存队伍配置
-        self.team_repo.update_user_team(user_id, json.dumps(team_data, ensure_ascii=False))
+        self.team_repo.update_user_team(user_id, user_team)
 
         # 返回成功信息
-        team_names = [pokemon['pokemon_data']['species_name'] for pokemon in pokemon_list_data]
+        team_names = []
+        for pokemon in pokemon_list_data:
+            pokemon_data = pokemon['pokemon_data']
+            # 尝试获取 species_name，如果不存在则使用 name
+            species_name = pokemon_data.get('species_name', pokemon_data.get('name', ''))
+            team_names.append(species_name)
         team_display = ', '.join(team_names)
         active_name = team_names[0] if team_names else ""
 
@@ -124,10 +106,17 @@ class TeamService:
         if not team_str:
             return {"success": True, "message": "您还没有设置队伍", "team": None}
 
-        try:
-            team_data = json.loads(team_str)
-        except json.JSONDecodeError:
-            return {"success": False, "message": "队伍数据格式错误"}
+        print(f"原始队伍字符串: {team_str}")
+
+        # 如果 team_str 已经是字典类型，则直接使用；否则解析JSON字符串
+        if isinstance(team_str, str):
+            try:
+                team_data = json.loads(team_str)
+            except json.JSONDecodeError:
+                return {"success": False, "message": "队伍数据格式错误"}
+        else:
+            # 假设已经是字典格式
+            team_data = team_str
 
         # 如果有活跃的宝可梦，获取详细信息
         if "active_pokemon_id" in team_data:
@@ -136,26 +125,74 @@ class TeamService:
 
             # 查找匹配的宝可梦，支持短码ID和数字ID
             active_pokemon = None
-            if isinstance(active_pokemon_id, str) and active_pokemon_id.startswith('P') and active_pokemon_id[1:].isdigit():
-                # 短码ID匹配
-                active_pokemon = next((p for p in user_pokemon_list if p.get("shortcode") == active_pokemon_id), None)
-            elif isinstance(active_pokemon_id, (int, str)) and str(active_pokemon_id).isdigit():
-                # 数字ID匹配
-                numeric_id = int(active_pokemon_id)
-                active_pokemon = next((p for p in user_pokemon_list if p["id"] == numeric_id), None)
+            for p in user_pokemon_list:
+                # 检查是否为字典或其他对象并适配获取shortcode的方式
+                pokemon_shortcode = None
+                if hasattr(p, 'shortcode'):
+                    pokemon_shortcode = p.shortcode
+                elif hasattr(p, 'get') and callable(getattr(p, 'get')):
+                    pokemon_shortcode = p.get("shortcode")
+                elif isinstance(p, dict):
+                    pokemon_shortcode = p.get("shortcode")
+
+                if isinstance(active_pokemon_id, str) and active_pokemon_id.startswith('P') and active_pokemon_id[1:].isdigit():
+                    # 短码ID匹配
+                    if pokemon_shortcode == active_pokemon_id:
+                        active_pokemon = p
+                        break
+                elif isinstance(active_pokemon_id, (int, str)) and str(active_pokemon_id).isdigit():
+                    # 数字ID匹配
+                    numeric_id = int(active_pokemon_id)
+                    pokemon_id = None
+                    if hasattr(p, 'id'):
+                        pokemon_id = p.id
+                    elif hasattr(p, 'get') and callable(getattr(p, 'get')):
+                        pokemon_id = p.get("id")
+                    elif isinstance(p, dict):
+                        pokemon_id = p.get("id")
+
+                    if pokemon_id == numeric_id:
+                        active_pokemon = p
+                        break
 
             if active_pokemon:
+                # 适配不同类型的对象获取属性
+                def get_attr(obj, attr_name, default=None):
+                    if hasattr(obj, attr_name):
+                        return getattr(obj, attr_name)
+                    elif isinstance(obj, dict):
+                        return obj.get(attr_name, default)
+                    elif hasattr(obj, 'get') and callable(getattr(obj, 'get')):
+                        return obj.get(attr_name, default)
+                    else:
+                        return default
+
+                def get_item(obj, key, default=None):
+                    if isinstance(obj, dict):
+                        return obj.get(key, default)
+                    elif hasattr(obj, '__getitem__'):
+                        try:
+                            return obj[key]
+                        except (KeyError, IndexError, TypeError):
+                            return default
+                    elif hasattr(obj, key):
+                        return getattr(obj, key)
+                    elif hasattr(obj, 'get') and callable(getattr(obj, 'get')):
+                        return obj.get(key, default)
+                    else:
+                        return default
+
                 team_data["active_pokemon_info"] = {
-                    "shortcode": active_pokemon.get("shortcode", f"P{active_pokemon['id']:04d}"),
-                    "species_name": active_pokemon["species_name"],
-                    "nickname": active_pokemon["nickname"] or active_pokemon["species_name"],
-                    "level": active_pokemon["level"],
-                    "current_hp": active_pokemon["current_hp"],
-                    "attack": active_pokemon.get("attack", 0),
-                    "defense": active_pokemon.get("defense", 0),
-                    "sp_attack": active_pokemon.get("sp_attack", 0),
-                    "sp_defense": active_pokemon.get("sp_defense", 0),
-                    "speed": active_pokemon.get("speed", 0)
+                    "shortcode": get_attr(active_pokemon, 'shortcode', f"P{get_item(active_pokemon, 'id', 0):04d}"),
+                    "species_name": get_item(active_pokemon, 'species_name', get_attr(active_pokemon, 'name', '')),
+                    "nickname": get_item(active_pokemon, 'nickname', '') or get_item(active_pokemon, 'species_name', get_attr(active_pokemon, 'name', '')),
+                    "level": get_item(active_pokemon, 'level', get_attr(active_pokemon, 'level', 0)),
+                    "current_hp": get_item(active_pokemon, 'current_hp', get_attr(active_pokemon, 'current_hp', 0)),
+                    "attack": get_attr(active_pokemon, 'attack', get_item(active_pokemon, 'attack', 0)),
+                    "defense": get_attr(active_pokemon, 'defense', get_item(active_pokemon, 'defense', 0)),
+                    "sp_attack": get_attr(active_pokemon, 'sp_attack', get_item(active_pokemon, 'sp_attack', 0)),
+                    "sp_defense": get_attr(active_pokemon, 'sp_defense', get_item(active_pokemon, 'sp_defense', 0)),
+                    "speed": get_attr(active_pokemon, 'speed', get_item(active_pokemon, 'speed', 0))
                 }
 
         return {

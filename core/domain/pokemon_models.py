@@ -1,7 +1,6 @@
+from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
-
-from data.plugins.astrbot_plugin_pokemon.core.domain.adventure_models import AreaInfo
 
 
 @dataclass
@@ -113,6 +112,7 @@ class PokemonCreateResult:
 
 @dataclass
 class UserPokemonInfo:
+    id: int
     species_id: int
     name: str
     gender: str
@@ -123,10 +123,35 @@ class UserPokemonInfo:
     ivs: PokemonIVs
     evs: PokemonEVs
     moves: PokemonMoves
-    shortcode: Optional[str] = None
 
     def __getitem__(self, item):
         return getattr(self, item)
+
+    def to_dict(self):
+        def get_dict(obj):
+            if obj is None:
+                return None
+            if hasattr(obj, '__dict__'):
+                return obj.__dict__
+            elif hasattr(obj, '__dataclass_fields__'):
+                # For dataclass objects
+                return {f: getattr(obj, f) for f in obj.__dataclass_fields__}
+            else:
+                return vars(obj)
+
+        return {
+            "id": self.id,
+            "species_id": self.species_id,
+            "name": self.name,
+            "gender": self.gender,
+            "level": self.level,
+            "exp": self.exp,
+            "is_shiny": self.is_shiny,
+            "stats": get_dict(self.stats),
+            "ivs": get_dict(self.ivs),
+            "evs": get_dict(self.evs),
+            "moves": get_dict(self.moves),
+        }
 
 @dataclass
 class WildPokemonInfo:
@@ -141,4 +166,32 @@ class WildPokemonInfo:
     evs: PokemonEVs
     moves: PokemonMoves | None
     encounter_rate: Optional[float] = None
-    area: Optional[AreaInfo] = None
+    area: Optional['AreaInfo'] = None
+
+    def to_dict(self):
+        def get_dict(obj):
+            if obj is None:
+                return None
+            if hasattr(obj, '__dict__'):
+                return obj.__dict__
+            elif hasattr(obj, '__dataclass_fields__'):
+                # For dataclass objects
+                return {f: getattr(obj, f) for f in obj.__dataclass_fields__}
+            else:
+                return vars(obj)
+
+        area_data = get_dict(self.area)
+        return {
+            "species_id": self.species_id,
+            "name": self.name,
+            "gender": self.gender,
+            "level": self.level,
+            "exp": self.exp,
+            "is_shiny": self.is_shiny,
+            "stats": get_dict(self.stats),
+            "ivs": get_dict(self.ivs),
+            "evs": get_dict(self.evs),
+            "moves": get_dict(self.moves),
+            "encounter_rate": self.encounter_rate,
+            "area": area_data
+        }

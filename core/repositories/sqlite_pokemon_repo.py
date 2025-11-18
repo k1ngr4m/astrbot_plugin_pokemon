@@ -286,3 +286,14 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             """, (user_id,))
             row = cursor.fetchone()
             return WildPokemonInfo(**dict(row)) if row else None
+
+    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[PokemonTemplate]:
+        """根据短码获取宝可梦模板"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM user_pokemon
+                WHERE shortcode = ?
+            """, (shortcode,))
+            row = cursor.fetchone()
+            return PokemonTemplate(**dict(row)) if row else None

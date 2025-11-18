@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
-from ..domain.user_models import User
+from ..domain.user_models import User, UserTeam
 from ..domain.pokemon_models import PokemonCreateResult, PokemonTemplate, UserPokemonInfo, PokemonDetail, \
     WildPokemonInfo
 from ..domain.adventure_models import AdventureArea, AreaPokemon
@@ -55,15 +55,7 @@ class AbstractUserRepository(ABC):
 
     # 根据宝可梦ID获取用户宝可梦记录
     @abstractmethod
-    def get_user_pokemon_by_id(self, pokemon_id: str) -> Optional[UserPokemonInfo]: pass
-
-    # 根据宝可梦短码获取用户宝可梦记录
-    @abstractmethod
-    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[UserPokemonInfo]: pass
-
-    # 根据宝可梦数字ID获取用户宝可梦记录
-    @abstractmethod
-    def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[UserPokemonInfo]: pass
+    def get_user_pokemon_by_id(self, user_id: str, pokemon_id: int) -> Optional[UserPokemonInfo]: pass
 
     # 检查用户今日是否已签到
     @abstractmethod
@@ -125,6 +117,9 @@ class AbstractPokemonRepository(ABC):
                             is_battled: int = None, battle_result: str = None) -> None: pass
 
     # ==========查==========
+    @abstractmethod
+    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[PokemonTemplate]: pass
+
     # 获取宝可梦模板
     @abstractmethod
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonTemplate]: pass
@@ -163,7 +158,7 @@ class AbstractTeamRepository(ABC):
     # ==========改==========
     # 更新用户的队伍配置
     @abstractmethod
-    def update_user_team(self, user_id: str, team_data: str) -> None: pass
+    def update_user_team(self, user_id: str, team_data: UserTeam) -> None: pass
 
 
     # ==========查==========

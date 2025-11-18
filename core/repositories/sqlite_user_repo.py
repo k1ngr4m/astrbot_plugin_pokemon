@@ -230,6 +230,7 @@ class SqliteUserRepository(AbstractUserRepository):
         pokemon_name = row_dict['nickname'] or row_dict.get('species_name', 'Unknown')
 
         return UserPokemonInfo(
+            id=row_dict['id'],
             species_id=row_dict['species_id'],
             name=pokemon_name,
             gender=row_dict['gender'],
@@ -239,8 +240,7 @@ class SqliteUserRepository(AbstractUserRepository):
             stats=stats,
             ivs=ivs,
             evs=evs,
-            moves=row_dict['moves'],  # 假设moves字段已经正确处理
-            shortcode=row_dict.get('shortcode', f"P{row_dict['id']:04d}")
+            moves=row_dict['moves'],
         )
 
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
@@ -268,7 +268,7 @@ class SqliteUserRepository(AbstractUserRepository):
                 result.append(self._row_to_user_pokemon(row))
             return result
 
-    def get_user_pokemon_by_id(self, pokemon_id: str) -> Optional[UserPokemonInfo]:
+    def get_user_pokemon_by_id(self, user_id: str, pokemon_id: int) -> Optional[UserPokemonInfo]:
         """
         通过ID获取用户的宝可梦实例（支持短码ID和数字ID）
         Args:
@@ -276,55 +276,16 @@ class SqliteUserRepository(AbstractUserRepository):
         Returns:
             宝可梦实例信息（如果存在）
         """
-        # 如果ID以P开头，使用短码查询
-        if pokemon_id.startswith('P') and pokemon_id[1:].isdigit():
-            return self.get_user_pokemon_by_shortcode(pokemon_id)
-        # 否则尝试作为数字ID查询
-        elif pokemon_id.isdigit():
-            pokemon_numeric_id = int(pokemon_id)
-            return self.get_user_pokemon_by_numeric_id(pokemon_numeric_id)
-        else:
-            return None
-
-    def get_user_pokemon_by_numeric_id(self, pokemon_numeric_id: int) -> Optional[UserPokemonInfo]:
-        """
-        通过数字ID获取用户的宝可梦实例
-        Args:
-            pokemon_numeric_id: 宝可梦实例数字ID
-        Returns:
-            宝可梦实例信息（如果存在）
-        """
         sql = """
         SELECT up.*, ps.name_cn as species_name, ps.name_en as species_en_name
         FROM user_pokemon up
         JOIN pokemon_species ps ON up.species_id = ps.id
-        WHERE up.id = ?
+        WHERE up.id = ? AND up.user_id = ?
         """
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(sql, (pokemon_numeric_id,))
-            row = cursor.fetchone()
-            return self._row_to_user_pokemon(row) if row else None
-
-    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[UserPokemonInfo]:
-        """
-        通过短码获取用户的宝可梦实例
-        Args:
-            shortcode: 宝可梦短码ID（格式如P001）
-        Returns:
-            宝可梦实例信息（如果存在）
-        """
-        sql = """
-        SELECT up.*, ps.name_cn as species_name, ps.name_en as species_en_name
-        FROM user_pokemon up
-        JOIN pokemon_species ps ON up.species_id = ps.id
-        WHERE up.shortcode = ?
-        """
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (shortcode,))
+            cursor.execute(sql, (pokemon_id, user_id))
             row = cursor.fetchone()
             return self._row_to_user_pokemon(row) if row else None
 

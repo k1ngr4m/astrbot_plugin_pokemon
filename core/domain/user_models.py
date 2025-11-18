@@ -24,4 +24,4 @@ class User:
 class UserTeam:
     """代表一个用户的队伍领域模型"""
     user_id: str
-    team_data: List[UserPokemonInfo] = None
+    team_pokemon_ids: List[int] = None

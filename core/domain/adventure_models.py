@@ -1,9 +1,8 @@
+from __future__ import annotations
 import datetime
 from typing import Optional, TypedDict, Dict
 
 from dataclasses import dataclass
-
-from .pokemon_models import WildPokemonInfo
 
 
 @dataclass
@@ -35,5 +34,5 @@ class AdventureArea:
 class AdventureResult:
     success: bool
     message: str
-    wild_pokemon: WildPokemonInfo | None
-    area: AreaInfo | None
+    wild_pokemon: 'WildPokemonInfo' | None
+    area: 'AreaInfo' | None

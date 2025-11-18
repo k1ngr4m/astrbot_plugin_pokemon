@@ -51,7 +51,7 @@ class SqliteAdventureRepository(AbstractAdventureRepository):
                 return AdventureArea(
                     id=row["id"],
                     area_code=row["area_code"],
-                    name=row["name"],
+                    area_name=row["name"],
                     description=row["description"],
                     min_level=row["min_level"],
                     max_level=row["max_level"]
