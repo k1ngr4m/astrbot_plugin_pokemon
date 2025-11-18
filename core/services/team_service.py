@@ -73,107 +73,33 @@ class TeamService:
         Returns:
             包含用户队伍信息的字典
         """
-        import json
+        user_team = self.team_repo.get_user_team(user_id)
+        if not user_team:
+            return {"success": False, "message": "您还没有设置队伍", "team": None}
 
-        user = self.user_repo.get_by_id(user_id)
-        if not user:
-            return {"success": False, "message": "用户不存在"}
+        team_pokemon_ids = user_team.team_pokemon_ids
+        team_info = []
+        for pokemon_id in team_pokemon_ids:
+            pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+            if not pokemon_info:
+                return {"success": False, "message": f"队伍中包含不存在的宝可梦 {pokemon_id}"}
 
-        team_str = self.team_repo.get_user_team(user_id)
-        if not team_str:
-            return {"success": True, "message": "您还没有设置队伍", "team": None}
+            pokemon_info_data = {
+                "id": pokemon_info.id,
+                "name": pokemon_info.name,
+                "level": pokemon_info.level,
+                "hp": pokemon_info.stats['hp'],
+                "attack": pokemon_info.stats['attack'],
+                "defense": pokemon_info.stats['defense'],
+                "sp_attack": pokemon_info.stats['sp_attack'],
+                "sp_defense": pokemon_info.stats['sp_defense'],
+                "speed": pokemon_info.stats['speed'],
+            }
+            team_info.append(pokemon_info_data)
 
-        print(f"原始队伍字符串: {team_str}")
-
-        # 如果 team_str 已经是字典类型，则直接使用；否则解析JSON字符串
-        if isinstance(team_str, str):
-            try:
-                team_data = json.loads(team_str)
-            except json.JSONDecodeError:
-                return {"success": False, "message": "队伍数据格式错误"}
-        else:
-            # 假设已经是字典格式
-            team_data = team_str
-
-        # 如果有活跃的宝可梦，获取详细信息
-        if "active_pokemon_id" in team_data:
-            active_pokemon_id = team_data["active_pokemon_id"]
-            user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
-
-            # 查找匹配的宝可梦，支持短码ID和数字ID
-            active_pokemon = None
-            for p in user_pokemon_list:
-                # 检查是否为字典或其他对象并适配获取shortcode的方式
-                pokemon_shortcode = None
-                if hasattr(p, 'shortcode'):
-                    pokemon_shortcode = p.shortcode
-                elif hasattr(p, 'get') and callable(getattr(p, 'get')):
-                    pokemon_shortcode = p.get("shortcode")
-                elif isinstance(p, dict):
-                    pokemon_shortcode = p.get("shortcode")
-
-                if isinstance(active_pokemon_id, str) and active_pokemon_id.startswith('P') and active_pokemon_id[1:].isdigit():
-                    # 短码ID匹配
-                    if pokemon_shortcode == active_pokemon_id:
-                        active_pokemon = p
-                        break
-                elif isinstance(active_pokemon_id, (int, str)) and str(active_pokemon_id).isdigit():
-                    # 数字ID匹配
-                    numeric_id = int(active_pokemon_id)
-                    pokemon_id = None
-                    if hasattr(p, 'id'):
-                        pokemon_id = p.id
-                    elif hasattr(p, 'get') and callable(getattr(p, 'get')):
-                        pokemon_id = p.get("id")
-                    elif isinstance(p, dict):
-                        pokemon_id = p.get("id")
-
-                    if pokemon_id == numeric_id:
-                        active_pokemon = p
-                        break
-
-            if active_pokemon:
-                # 适配不同类型的对象获取属性
-                def get_attr(obj, attr_name, default=None):
-                    if hasattr(obj, attr_name):
-                        return getattr(obj, attr_name)
-                    elif isinstance(obj, dict):
-                        return obj.get(attr_name, default)
-                    elif hasattr(obj, 'get') and callable(getattr(obj, 'get')):
-                        return obj.get(attr_name, default)
-                    else:
-                        return default
-
-                def get_item(obj, key, default=None):
-                    if isinstance(obj, dict):
-                        return obj.get(key, default)
-                    elif hasattr(obj, '__getitem__'):
-                        try:
-                            return obj[key]
-                        except (KeyError, IndexError, TypeError):
-                            return default
-                    elif hasattr(obj, key):
-                        return getattr(obj, key)
-                    elif hasattr(obj, 'get') and callable(getattr(obj, 'get')):
-                        return obj.get(key, default)
-                    else:
-                        return default
-
-                team_data["active_pokemon_info"] = {
-                    "shortcode": get_attr(active_pokemon, 'shortcode', f"P{get_item(active_pokemon, 'id', 0):04d}"),
-                    "species_name": get_item(active_pokemon, 'species_name', get_attr(active_pokemon, 'name', '')),
-                    "nickname": get_item(active_pokemon, 'nickname', '') or get_item(active_pokemon, 'species_name', get_attr(active_pokemon, 'name', '')),
-                    "level": get_item(active_pokemon, 'level', get_attr(active_pokemon, 'level', 0)),
-                    "current_hp": get_item(active_pokemon, 'current_hp', get_attr(active_pokemon, 'current_hp', 0)),
-                    "attack": get_attr(active_pokemon, 'attack', get_item(active_pokemon, 'attack', 0)),
-                    "defense": get_attr(active_pokemon, 'defense', get_item(active_pokemon, 'defense', 0)),
-                    "sp_attack": get_attr(active_pokemon, 'sp_attack', get_item(active_pokemon, 'sp_attack', 0)),
-                    "sp_defense": get_attr(active_pokemon, 'sp_defense', get_item(active_pokemon, 'sp_defense', 0)),
-                    "speed": get_attr(active_pokemon, 'speed', get_item(active_pokemon, 'speed', 0))
-                }
 
         return {
             "success": True,
-            "team": team_data,
+            "team": team_info,
             "message": "成功获取队伍信息"
         }
