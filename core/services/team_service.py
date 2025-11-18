@@ -21,48 +21,34 @@ class TeamService:
         self.team_repo = team_repo
         self.config = config
 
-    def set_team_pokemon(self, user_id: str, pokemon_shortcodes: List[str]) -> Dict[str, Any]:
+    def set_team_pokemon(self, user_id: str, pokemon_ids: List[int]) -> Dict[str, Any]:
         """
-        设置用户的队伍配置，指定最多6只宝可梦组成队伍，第一个为出战宝可梦
+        设置用户的队伍配置，指定最多6只宝可梦组成队伍
         Args:
             user_id: 用户ID
-            pokemon_shortcodes: 宝可梦短码列表（如['P001', 'P002', ...]），最多6个，第一个为出战宝可梦
+            pokemon_ids: 宝可梦ID列表（如[123, 456, ...]），最多6个
         Returns:
             包含操作结果的字典
         """
-        import json
-
-        # 首先验证用户是否存在
-        user = self.user_repo.get_by_id(user_id)
-        if not user:
-            return {"success": False, "message": "用户不存在"}
-
         # 获取用户所有的宝可梦
         user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
-        user_pokemon_dict = {pokemon.shortcode: pokemon for pokemon in user_pokemon_list}
+        user_pokemon_dict = {str(pokemon.id): pokemon for pokemon in user_pokemon_list}
 
         # 检查输入的宝可梦是否都在用户拥有的宝可梦列表中
-        for shortcode in pokemon_shortcodes:
-            if shortcode not in user_pokemon_dict:
-                # 检查是否是数字ID格式，如果是则尝试转换为短码
-                if shortcode.isdigit():
-                    temp_shortcode = f"P{int(shortcode):04d}"
-                    if temp_shortcode not in user_pokemon_dict:
-                        return {"success": False, "message": f"宝可梦 {shortcode} 不属于您或不存在"}
-                else:
-                    return {"success": False, "message": f"宝可梦 {shortcode} 不属于您或不存在"}
-
-        # 限制队伍最多6只宝可梦
-        if len(pokemon_shortcodes) > 6:
-            return {"success": False, "message": "队伍最多只能包含6只宝可梦"}
-
-        if len(pokemon_shortcodes) == 0:
-            return {"success": False, "message": "请至少选择1只宝可梦加入队伍"}
+        for id in pokemon_ids:
+            if id not in user_pokemon_dict:
+                temp_id = int(id)
+                if str(temp_id) not in user_pokemon_dict:
+                    return {"success": False, "message": f"宝可梦 {id} 不属于您或不存在"}
 
         user_team_pokemon_list = []
-        for shortcode in pokemon_shortcodes:
-            pokemon_id = self.pokemon_repo.get_user_pokemon_by_shortcode(shortcode).id
+        user_team_pokemon_name_list = []
+        for id in pokemon_ids:
+            pokemon = self.user_repo.get_user_pokemon_by_id(user_id, id)
+            pokemon_id = pokemon.id
+            pokemon_name = pokemon.name
             user_team_pokemon_list.append(pokemon_id)
+            user_team_pokemon_name_list.append(pokemon_name)
 
         # 创建队伍配置
         user_team: UserTeam = UserTeam(
@@ -73,19 +59,10 @@ class TeamService:
         # 保存队伍配置
         self.team_repo.update_user_team(user_id, user_team)
 
-        # 返回成功信息
-        team_names = []
-        for pokemon in pokemon_list_data:
-            pokemon_data = pokemon['pokemon_data']
-            # 尝试获取 species_name，如果不存在则使用 name
-            species_name = pokemon_data.get('species_name', pokemon_data.get('name', ''))
-            team_names.append(species_name)
-        team_display = ', '.join(team_names)
-        active_name = team_names[0] if team_names else ""
 
         return {
             "success": True,
-            "message": f"成功设置队伍！出战宝可梦：{active_name}，队伍成员：[{team_display}]。"
+            "message": f"成功设置队伍！队伍成员：{', '.join(user_team_pokemon_name_list)}。"
         }
 
     def get_user_team(self, user_id: str) -> Dict[str, Any]:

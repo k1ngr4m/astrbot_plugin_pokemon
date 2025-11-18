@@ -280,7 +280,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT * FROM wild_pokemon_encounter_log
-                WHERE user_id = ? AND is_del = 0
+                WHERE user_id = ? AND isdel = 0
                 ORDER BY encounter_time DESC
                 LIMIT 1
             """, (user_id,))

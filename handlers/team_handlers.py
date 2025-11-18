@@ -22,32 +22,32 @@ class TeamHandlers:
 
         args = event.message_str.split(" ")
         if len(args) < 2:
-            yield event.plain_result("❌ 请输入宝可梦短码列表。用法：设置队伍 <宝可梦短码1> <宝可梦短码2> ...\n\n💡 提示：最多可设置6只宝可梦。使用 /我的宝可梦 指令查看您的宝可梦列表和对应的短码。")
+            yield event.plain_result(AnswerEnum.TEAM_SET_USAGE_ERROR.value)
             return
 
-        # 获取用户输入的宝可梦短码列表（跳过命令本身）
-        pokemon_shortcodes = args[1:]
+        # 获取用户输入的宝可梦ID列表（跳过命令本身）
+        pokemon_ids = args[1:]
 
-        if len(pokemon_shortcodes) > 6:
-            yield event.plain_result("❌ 队伍最多只能包含6只宝可梦。")
+        if len(pokemon_ids) > 6:
+            yield event.plain_result(AnswerEnum.TEAM_SET_MAX_POKEMON.value)
             return
 
-        if len(pokemon_shortcodes) == 0:
-            yield event.plain_result("❌ 请至少选择1只宝可梦加入队伍。")
+        if len(pokemon_ids) == 0:
+            yield event.plain_result(AnswerEnum.TEAM_SET_MIN_POKEMON.value)
             return
 
-        # 验证每个短码格式（支持数字ID或P开头的短码）
-        for shortcode in pokemon_shortcodes:
-            if not (shortcode.isdigit() or (shortcode.startswith('P') and shortcode[1:].isdigit())):
-                yield event.plain_result(f"❌ 宝可梦短码 {shortcode} 格式不正确（支持数字ID或P开头的短码如P001）。")
+        # 验证每个ID格式（仅支持数字ID）
+        for id in pokemon_ids:
+            if not id.isdigit():
+                yield event.plain_result(f"❌ 宝可梦ID {id} 格式不正确（仅支持数字ID）。")
                 return
 
-        result = self.team_service.set_team_pokemon(user_id, pokemon_shortcodes)
+        result = self.team_service.set_team_pokemon(user_id, [int(id) for id in pokemon_ids])
 
         if result["success"]:
-            yield event.plain_result(f"✅ {result['message']}")
+            yield event.plain_result(result['message'])
         else:
-            yield event.plain_result(f"❌ {result['message']}")
+            yield event.plain_result(result['message'])
 
     async def view_team(self, event: AstrMessageEvent):
         """查看当前队伍配置"""

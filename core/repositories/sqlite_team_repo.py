@@ -26,7 +26,7 @@ class SqliteTeamRepository(AbstractTeamRepository):
             self._local.connection = conn
         return conn
 
-    def get_user_team(self, user_id: str) -> Dict[str, Any]:
+    def get_user_team(self, user_id: str) -> UserTeam:
         """
         获取用户的队伍配置
         Args:
@@ -40,17 +40,19 @@ class SqliteTeamRepository(AbstractTeamRepository):
             cursor = conn.cursor()
             cursor.execute(sql, (user_id,))
             row = cursor.fetchone()
-
             if not row:
-                return {}
+                return UserTeam(user_id=user_id)
 
             try:
                 # 将 JSON 字符串反序列化为字典
-                return json.loads(row["team"])
+                return UserTeam(**json.loads(row["team"]))
             except (json.JSONDecodeError, TypeError) as e:
                 # 处理 JSON 格式错误或字段为空的情况
                 print(f"解析队伍配置失败：{e}")
-                return {}
+                return UserTeam(
+                    user_id=row["user_id"],
+                    team_pokemon_ids=row["team_pokemon_ids"]
+                )
 
     def update_user_team(self, user_id: str, team_data: UserTeam) -> None:
         """

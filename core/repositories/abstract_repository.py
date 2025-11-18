@@ -164,7 +164,7 @@ class AbstractTeamRepository(ABC):
     # ==========查==========
     # 获取用户的队伍配置
     @abstractmethod
-    def get_user_team(self, user_id: str) -> Dict[str, Any]: pass
+    def get_user_team(self, user_id: str) -> UserTeam: pass
 
 
 class AbstractAdventureRepository(ABC):

@@ -158,7 +158,7 @@ class UserService:
 
         return {
             "success": True,
-            "message": f"成功将 {pokemon_template.name_cn} 初始选择为宝可梦！它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
+            "message": f"成功将 {pokemon_template.name_cn} 初始选择为宝可梦！\n\n它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
         }
 
     def create_init_pokemon(self, species_id: int) -> Dict[str, Any]:
@@ -259,7 +259,7 @@ class UserService:
         message += f"经验: {pokemon_data['exp']}\n\n"
 
         # 实际属性值
-        message += "💪 实际属性值:\n\n"
+        message += "💪 属性值:\n\n"
         message += f"  HP: {pokemon_data['stats']['hp']}\t\n"
         message += f"  攻击: {pokemon_data['stats']['attack']}\t\n"
         message += f"  防御: {pokemon_data['stats']['defense']}\n\n"
