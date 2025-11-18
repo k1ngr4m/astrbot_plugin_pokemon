@@ -4,7 +4,8 @@ from typing import Optional, List, Dict, Any
 
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
-from ..domain.pokemon_models import PokemonTemplate, PokemonBaseStats
+from ..domain.pokemon_models import PokemonTemplate, PokemonBaseStats, PokemonDetail, WildPokemonInfo
+
 
 class SqlitePokemonRepository(AbstractPokemonRepository):
     """物品模板仓储的SQLite实现"""
@@ -162,3 +163,126 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 WHERE id = :id AND user_id = :user_id
             """, {**attributes, 'id': pokemon_id, 'user_id': user_id})
             conn.commit()
+
+    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo) -> None:
+        """添加野生宝可梦遇到记录"""
+        pokemon_species_id = wild_pokemon.species_id
+        pokemon_name = wild_pokemon.name
+        area_code = wild_pokemon.area.area_code
+        area_name = wild_pokemon.area.area_name
+        pokemon_level = wild_pokemon.level
+        is_shiny = wild_pokemon.is_shiny
+        encounter_rate = wild_pokemon.encounter_rate
+        pokemon_stats = wild_pokemon.stats
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO wild_pokemon_encounter_log
+                (user_id, pokemon_species_id, pokemon_name, area_code, area_name,
+                 pokemon_level, is_shiny, encounter_rate, pokemon_stats, isdel)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            """, (
+                user_id, pokemon_species_id, pokemon_name, area_code, area_name,
+                pokemon_level, int(is_shiny), encounter_rate, pokemon_stats
+            ))
+            conn.commit()
+
+    def update_encounter_log(self, log_id: int, is_captured: int = None,
+                            is_battled: int = None, battle_result: str = None) -> None:
+        """更新野生宝可梦遇到记录（如捕捉或战斗结果）"""
+        updates = []
+        params = []
+
+        if is_captured is not None:
+            updates.append("is_captured = ?")
+            params.append(is_captured)
+
+        if is_battled is not None:
+            updates.append("is_battled = ?")
+            params.append(is_battled)
+
+        if battle_result is not None:
+            updates.append("battle_result = ?")
+            params.append(battle_result)
+
+
+        if not updates:
+            return  # 没有需要更新的字段
+        else:
+            updates.append("isdel = ?")
+            params.append(1)
+
+        params.append(log_id)
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            sql = f"UPDATE wild_pokemon_encounter_log SET {', '.join(updates)} WHERE id = ?"
+            cursor.execute(sql, params)
+            conn.commit()
+
+    def get_user_encounters(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        """获取用户遇到的所有野生宝可梦记录"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM wild_pokemon_encounter_log
+                WHERE user_id = ?
+                ORDER BY encounter_time DESC
+                LIMIT ? OFFSET ?
+            """, (user_id, limit, offset))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def get_user_pokemon_encounter_count(self, user_id: str, pokemon_species_id: int) -> int:
+        """获取用户遇到的某个特定物种的次数"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM wild_pokemon_encounter_log
+                WHERE user_id = ? AND pokemon_species_id = ?
+            """, (user_id, pokemon_species_id))
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+
+    def get_user_total_encounters(self, user_id: str) -> int:
+        """统计用户的总遇到次数"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT COUNT(*) as count FROM wild_pokemon_encounter_log
+                WHERE user_id = ?
+            """, (user_id,))
+            row = cursor.fetchone()
+            return row['count'] if row else 0
+
+    def get_latest_encounters(self, limit: int = 10) -> List[Dict[str, Any]]:
+        """获取最新的遇到记录"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM wild_pokemon_encounter_log
+                ORDER BY encounter_time DESC
+                LIMIT ?
+            """, (limit,))
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+
+    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonInfo]:
+        """
+        获取用户当前遇到的野生宝可梦
+        Args:
+            user_id (str): 用户ID
+        Returns:
+            Optional[PokemonDetail]: 野生宝可梦的详细信息，如果不存在则返回None
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM wild_pokemon_encounter_log
+                WHERE user_id = ? AND is_del = 0
+                ORDER BY encounter_time DESC
+                LIMIT 1
+            """, (user_id,))
+            row = cursor.fetchone()
+            return WildPokemonInfo(**dict(row)) if row else None

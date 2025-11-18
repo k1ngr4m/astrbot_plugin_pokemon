@@ -55,11 +55,10 @@ class AdventureHandlers:
             return
 
         # 检查用户是否已经遇到了野生宝可梦
-        if hasattr(self.plugin, '_cached_wild_pokemon'):
-            wild_pokemon = self.plugin._cached_wild_pokemon.get(user_id)
-            if wild_pokemon:
-                yield event.plain_result("❌ 您当前正在冒险中，已经遇到了野生宝可梦。请先处理当前遇到的宝可梦（战斗或捕捉），然后才能重新开始冒险。")
-                return
+        wild_pokemon = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
+        if wild_pokemon:
+            yield event.plain_result(AnswerEnum.USER_ADVENTURE_ALREADY_ENCOUNTERED.value)
+            return
 
         # 检查冒险冷却时间
         import time
@@ -75,12 +74,12 @@ class AdventureHandlers:
         # 检查用户是否有设置队伍
         user_team_data = self.plugin.team_repo.get_user_team(user_id)
         if not user_team_data:
-            yield event.plain_result("❌ 您还没有设置队伍。请先使用 /设置队伍 指令设置您的出场队伍，才能进行冒险。")
+            yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
             return
 
         args = event.message_str.split(" ")
         if len(args) < 2:
-            yield event.plain_result("❌ 请输入要冒险的区域短码。用法：冒险 <区域短码>\n\n💡 提示：使用 查看区域 指令查看所有可冒险的区域。")
+            yield event.plain_result(AnswerEnum.USER_ADVENTURE_AREA_NOT_SPECIFIED.value)
             return
 
         area_code = args[1].upper()  # 转换为大写
@@ -97,11 +96,6 @@ class AdventureHandlers:
             message = f"🌳 在 {result.area.name} 中冒险！\n\n"
             message += f"✨ 遇到了野生的 {wild_pokemon.name}！\n"
             message += f"等级: {wild_pokemon.level}\n"
-
-            # 缓存野生宝可梦信息，供战斗使用
-            if not hasattr(self.plugin, '_cached_wild_pokemon'):
-                self.plugin._cached_wild_pokemon = {}
-            self.plugin._cached_wild_pokemon[user_id] = wild_pokemon
 
             # 记录冒险时间到数据库，用于冷却时间控制
             import time
@@ -126,16 +120,16 @@ class AdventureHandlers:
             return
 
         # 检查是否有缓存的野生宝可梦信息
-        wild_pokemon = getattr(self.plugin, '_cached_wild_pokemon', {}).get(user_id)
+        wild_pokemon = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
 
         if not wild_pokemon:
-            yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
+            yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
             return
 
         # 检查用户是否有设置队伍
         user_team_data = self.plugin.team_repo.get_user_team(user_id)
         if not user_team_data:
-            yield event.plain_result("❌ 您还没有设置队伍。请先使用 /设置队伍 指令设置您的出场队伍。")
+            yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
             return
 
         wild_pokemon_info = WildPokemonInfo(
@@ -152,7 +146,7 @@ class AdventureHandlers:
         )
 
         user_team_list = user_team_data.get("team_list", [])
-        # 开始战斗，传入队伍中的第一只宝可梦
+        # 开始战斗，传入玩家的队伍
         result = self.battle_service.start_battle(user_id, wild_pokemon_info, user_team_list)
         print(f"战斗结果: {result}")
         if result["success"]:
@@ -203,13 +197,30 @@ class AdventureHandlers:
                         else:
                             message += "\n"
 
-            # 清除缓存的野生宝可梦信息
-            if hasattr(self.plugin, '_cached_wild_pokemon'):
-                self.plugin._cached_wild_pokemon.pop(user_id, None)
+            # 更新野生宝可梦遇到日志 - 标记为已战斗
+            try:
+                # 获取最近的野生宝可梦遇到记录
+                recent_encounters = self.plugin.wild_pokemon_encounter_repo.get_user_encounters(user_id, limit=5)
+                encounter_log_id = None
+                for encounter in recent_encounters:
+                    if (encounter['pokemon_species_id'] == wild_pokemon_info.species_id and
+                        encounter['pokemon_level'] == wild_pokemon_info.level and
+                        encounter['is_battled'] == 0):  # 未战斗的记录
+                        encounter_log_id = encounter['id']
+                        break
+                if encounter_log_id:
+                    battle_outcome = "win" if "success" in battle_result else "lose"
+                    self.plugin.wild_pokemon_encounter_repo.update_encounter_log(
+                        log_id=encounter_log_id,
+                        is_battled=1,
+                        battle_result=battle_outcome
+                    )
+            except Exception as e:
+                print(f"更新野生宝可梦遇到日志（战斗）时出错: {e}")
 
             yield event.plain_result(message)
         else:
-            yield event.plain_result(f"❌ {result['message']}")
+            yield event.plain_result(result['message'])
 
     async def catch_pokemon(self, event: AstrMessageEvent):
         """处理捕捉野生宝可梦的指令"""
@@ -318,6 +329,25 @@ class AdventureHandlers:
             message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
             message += f"剩余精灵球: {pokeball_item['quantity'] - 1}"
 
+            # 更新野生宝可梦遇到日志 - 标记为已捕捉
+            try:
+                # 获取最近的野生宝可梦遇到记录（未被捕捉的记录）
+                recent_encounters = self.plugin.wild_pokemon_encounter_repo.get_user_encounters(user_id, limit=5)
+                encounter_log_id = None
+                for encounter in recent_encounters:
+                    if (encounter['pokemon_species_id'] == wild_pokemon.species_id and
+                        encounter['pokemon_level'] == wild_pokemon.level and
+                        encounter['is_captured'] == 0):  # 未捕捉的记录
+                        encounter_log_id = encounter['id']
+                        break
+                if encounter_log_id:
+                    self.plugin.wild_pokemon_encounter_repo.update_encounter_log(
+                        log_id=encounter_log_id,
+                        is_captured=1
+                    )
+            except Exception as e:
+                print(f"更新野生宝可梦遇到日志（捕捉）时出错: {e}")
+
             # 清除缓存的野生宝可梦信息
             if hasattr(self.plugin, '_cached_wild_pokemon'):
                 self.plugin._cached_wild_pokemon.pop(user_id, None)
@@ -328,6 +358,25 @@ class AdventureHandlers:
             message += f"捕捉成功率: {catch_success_rate * 100:.1f}%\n\n"
             message += f"剩余精灵球: {pokeball_item['quantity'] - 1}\n\n"
             message += "你也可以使用 /逃跑 指令离开这只野生宝可梦。"
+
+            # 更新野生宝可梦遇到日志 - 捕捉失败（仍然标记为已交互）
+            try:
+                # 获取最近的野生宝可梦遇到记录（未被捕捉的记录）
+                recent_encounters = self.plugin.wild_pokemon_encounter_repo.get_user_encounters(user_id, limit=5)
+                encounter_log_id = None
+                for encounter in recent_encounters:
+                    if (encounter['pokemon_species_id'] == wild_pokemon.species_id and
+                        encounter['pokemon_level'] == wild_pokemon.level and
+                        encounter['is_captured'] == 0):  # 未捕捉的记录
+                        encounter_log_id = encounter['id']
+                        break
+                if encounter_log_id:
+                    self.plugin.wild_pokemon_encounter_repo.update_encounter_log(
+                        log_id=encounter_log_id,
+                        is_captured=0  # 捕捉失败
+                    )
+            except Exception as e:
+                print(f"更新野生宝可梦遇到日志（捕捉失败）时出错: {e}")
 
         yield event.plain_result(message)
 

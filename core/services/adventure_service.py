@@ -152,8 +152,10 @@ class AdventureService:
                 return error_response("用户不存在")
 
             # 2. 验证区域代码格式（简化正则式判断，更易读）
-            if not (isinstance(area_code, str) and area_code.startswith("A") and len(area_code) == 4 and area_code[
-                                                                                                         1:].isdigit()):
+            if not (isinstance(area_code, str)
+                    and area_code.startswith("A")
+                    and len(area_code) == 4
+                    and area_code[1:].isdigit()):
                 return error_response("区域代码格式不正确（应为A开头的四位数，如A001）")
 
             # 3. 获取区域信息
@@ -164,7 +166,7 @@ class AdventureService:
             # 4. 获取该区域的宝可梦列表
             area_pokemon_list = self.adventure_repo.get_area_pokemon_by_area_code(area_code)
             if not area_pokemon_list:
-                return error_response(f"区域 {area.name} 中暂无野生宝可梦")
+                return error_response(f"区域 {area.area_name}) 中暂无野生宝可梦")
 
             # 5. 权重随机选择宝可梦（使用itertools.accumulate简化累加逻辑）
             encounter_rates = [ap.encounter_rate for ap in area_pokemon_list]
@@ -194,11 +196,8 @@ class AdventureService:
             if not wild_pokemon_result.success:
                 return error_response(wild_pokemon_result.message)
             wild_pokemon = wild_pokemon_result.data
-            # 8. 构造返回结果（直接复用create_single_pokemon的计算结果）
-            result = AdventureResult(
-                success=True,
-                message=f"在 {area.name} 中遇到了野生的 {wild_pokemon['base_pokemon'].name_cn}！",
-                wild_pokemon=WildPokemonInfo(
+
+            wild_pokemon_info = WildPokemonInfo(
                     species_id=wild_pokemon.base_pokemon.id,
                     name=wild_pokemon.base_pokemon.name_cn,
                     gender=wild_pokemon.gender,
@@ -230,11 +229,25 @@ class AdventureService:
                         sp_defense_ev=wild_pokemon.evs.sp_defense_ev,
                         speed_ev=wild_pokemon.evs.speed_ev,
                     ),
-                    moves = None
-                ),
+                    moves = None,
+                    area=AreaInfo(
+                        area_code=area.area_code,
+                        area_name=area.area_name,
+                        )
+            )
+            self.pokemon_repo.add_user_encountered_wild_pokemon(
+                user_id=user_id,
+                wild_pokemon = wild_pokemon_info
+                )
+
+            # 8. 构造返回结果（直接复用create_single_pokemon的计算结果）
+            result = AdventureResult(
+                success=True,
+                message=f"在 {area.area_name} 中遇到了野生的 {wild_pokemon_info.name}！",
+                wild_pokemon=wild_pokemon_info,
                 area=AreaInfo(
                     area_code=area.area_code,
-                    name=area.name,
+                    area_name=area.area_name,
                 )
             )
             return result

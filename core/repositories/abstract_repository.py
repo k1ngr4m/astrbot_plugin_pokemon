@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 from ..domain.user_models import User
-from ..domain.pokemon_models import PokemonCreateResult, PokemonTemplate, UserPokemonInfo
+from ..domain.pokemon_models import PokemonCreateResult, PokemonTemplate, UserPokemonInfo, PokemonDetail, \
+    WildPokemonInfo
 from ..domain.adventure_models import AdventureArea, AreaPokemon
 from ..domain.shop_models import Shop, ShopItem
 
@@ -105,6 +106,9 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def add_pokemon_species_move_template(self, species_move_data: Dict[str, Any]) -> None: pass
 
+    # 添加野生宝可梦遇到记录
+    @abstractmethod
+    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo) -> None: pass
 
     # ==========改==========
     # 更新宝可梦经验
@@ -115,6 +119,10 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def update_pokemon_attributes(self, attributes: Dict[str, int], pokemon_id: int, user_id: str) -> None: pass
 
+    # 更新野生宝可梦遇到记录（如捕捉或战斗结果）
+    @abstractmethod
+    def update_encounter_log(self, log_id: int, is_captured: int = None,
+                            is_battled: int = None, battle_result: str = None) -> None: pass
 
     # ==========查==========
     # 获取宝可梦模板
@@ -129,6 +137,25 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_pokemon_types(self, species_id: int) -> List[str]: pass
 
+    # 获取用户正在遭遇的野生宝可梦
+    @abstractmethod
+    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonInfo]: pass
+
+    # 获取用户遇到的所有野生宝可梦记录
+    @abstractmethod
+    def get_user_encounters(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]: pass
+
+    # 获取用户遇到的某个特定物种的次数
+    @abstractmethod
+    def get_user_pokemon_encounter_count(self, user_id: str, pokemon_species_id: int) -> int: pass
+
+    # 统计用户的总遇到次数
+    @abstractmethod
+    def get_user_total_encounters(self, user_id: str) -> int: pass
+
+    # 获取最新的遇到记录
+    @abstractmethod
+    def get_latest_encounters(self, limit: int = 10) -> List[Dict[str, Any]]: pass
 
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""
@@ -207,5 +234,3 @@ class AbstractShopRepository(ABC):
     # 根据商店物品ID获取商店物品
     @abstractmethod
     def get_a_shop_item_by_id(self, shop_item_id: int, shop_id: int) -> Optional[Dict[str, Any]]: pass
-
-

@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from data.plugins.astrbot_plugin_pokemon.core.domain.adventure_models import AreaInfo
+
 
 @dataclass
 class PokemonStats:
@@ -139,3 +141,4 @@ class WildPokemonInfo:
     evs: PokemonEVs
     moves: PokemonMoves | None
     encounter_rate: Optional[float] = None
+    area: Optional[AreaInfo] = None

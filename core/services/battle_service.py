@@ -6,6 +6,8 @@ from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository,
 )
 
+from .exp_service import ExpService
+
 class BattleService:
     """
     封装宝可梦战斗相关的业务逻辑
@@ -18,11 +20,8 @@ class BattleService:
         pokemon_repo: AbstractPokemonRepository,
         team_repo,
         config: Dict[str, Any],
-        exp_service = None
+        exp_service = ExpService
     ):
-        from typing import TYPE_CHECKING
-        if TYPE_CHECKING:
-            from .exp_service import ExpService
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.team_repo = team_repo
