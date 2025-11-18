@@ -48,7 +48,7 @@ class AdventureService:
             for area in areas:
                 formatted_areas.append({
                     "area_code": area.area_code,
-                    "name": area.name,
+                    "area_name": area.area_name,
                     "description": area.description or "暂无描述",
                     "min_level": area.min_level,
                     "max_level": area.max_level

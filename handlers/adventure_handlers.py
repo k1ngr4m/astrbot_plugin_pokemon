@@ -25,7 +25,7 @@ class AdventureHandlers:
         result = self.adventure_service.get_all_areas()
 
         if not result["success"]:
-            yield event.plain_result(f"❌ {result['message']}")
+            yield event.plain_result(result["message"])
             return
 
         if not result["areas"]:
@@ -35,13 +35,13 @@ class AdventureHandlers:
         # 组织显示信息
         message = f"🗺️ {result['message']}：\n\n"
         for i, area in enumerate(result["areas"], 1):
-            message += f"{i}. {area['name']}\n"
-            message += f"   短码: {area['area_code']} | 等级: {area['min_level']}-{area['max_level']}\n"
+            message += f"{i}. {area['area_name']}\n"
+            message += f"   ID: {area['area_code']} | 等级: {area['min_level']}-{area['max_level']}\n"
             if area['description'] != "暂无描述":
                 message += f"   描述: {area['description']}\n"
             message += "\n"
 
-        message += "💡 使用 冒险 <区域短码> 指令进入冒险！"
+        message += "💡 使用 冒险 <区域ID> 指令进入冒险！"
 
         yield event.plain_result(message.strip())
 

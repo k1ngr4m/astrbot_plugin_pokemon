@@ -258,7 +258,7 @@ def up(cursor: sqlite3.Cursor):
         CREATE TABLE IF NOT EXISTS adventure_areas (
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- 区域ID
             area_code TEXT UNIQUE NOT NULL,       -- 区域短码（A开头的三位数，如A001）
-            name TEXT NOT NULL,                   -- 区域名称
+            area_name TEXT NOT NULL,              -- 区域名称
             description TEXT,                     -- 区域描述
             min_level INTEGER DEFAULT 1,          -- 最低推荐等级
             max_level INTEGER DEFAULT 100,        -- 最高推荐等级
