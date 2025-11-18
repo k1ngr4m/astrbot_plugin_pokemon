@@ -137,6 +137,7 @@ class UserService:
             }
         new_pokemon_data: PokemonDetail = new_pokemon["data"]
         user_pokemon_info = UserPokemonInfo(
+            id = 0,
             species_id = new_pokemon_data["base_pokemon"].id,
             name = new_pokemon_data["base_pokemon"].name_cn,
             gender = new_pokemon_data["gender"],
@@ -253,37 +254,36 @@ class UserService:
         }.get(pokemon_data["gender"], "")
 
         message = f"🔍 宝可梦详细信息：\n\n"
-        message += f"{shiny_str}{pokemon_data['nickname']} {gender_str}\n\n"
-        message += f"短码: {pokemon_data['shortcode']}\n\n"
-        message += f"种族: {pokemon_data['species_name']} ({pokemon_data['species_en_name']})\n\n"
-        message += f"等级: {pokemon_data['level']}\n\n"
-        message += f"HP: {pokemon_data['current_hp']}\n\n"
+        message += f"{shiny_str}{pokemon_data['name']} {gender_str}\n\n"
+        message += f"等级: {pokemon_data['level']}\n"
+        message += f"经验: {pokemon_data['exp']}\n\n"
 
         # 实际属性值
         message += "💪 实际属性值:\n\n"
-        message += f"  攻击: {pokemon_data['attack']}\n\n"
-        message += f"  防御: {pokemon_data['defense']}\n\n"
-        message += f"  特攻: {pokemon_data['sp_attack']}\n\n"
-        message += f"  特防: {pokemon_data['sp_defense']}\n\n"
-        message += f"  速度: {pokemon_data['speed']}\n\n"
+        message += f"  HP: {pokemon_data['stats']['hp']}\t\n"
+        message += f"  攻击: {pokemon_data['stats']['attack']}\t\n"
+        message += f"  防御: {pokemon_data['stats']['defense']}\n\n"
+        message += f"  特攻: {pokemon_data['stats']['sp_attack']}\t\n"
+        message += f"  特防: {pokemon_data['stats']['sp_defense']}\t\n"
+        message += f"  速度: {pokemon_data['stats']['speed']}\n\n"
 
         # 个体值 (IV)
         message += "📊 个体值 (IV):\n\n"
-        message += f"  HP: {pokemon_data['hp_iv']}/31\n\n"
-        message += f"  攻击: {pokemon_data['attack_iv']}/31\n\n"
-        message += f"  防御: {pokemon_data['defense_iv']}/31\n\n"
-        message += f"  特攻: {pokemon_data['sp_attack_iv']}/31\n\n"
-        message += f"  特防: {pokemon_data['sp_defense_iv']}/31\n"
-        message += f"  速度: {pokemon_data['speed_iv']}/31\n\n"
+        message += f"  HP: {pokemon_data['ivs']['hp_iv']}/31\t\n"
+        message += f"  攻击: {pokemon_data['ivs']['attack_iv']}/31\t\n"
+        message += f"  防御: {pokemon_data['ivs']['defense_iv']}/31\n\n"
+        message += f"  特攻: {pokemon_data['ivs']['sp_attack_iv']}/31\t\n"
+        message += f"  特防: {pokemon_data['ivs']['sp_defense_iv']}/31\t\n"
+        message += f"  速度: {pokemon_data['ivs']['speed_iv']}/31\n\n"
 
         # 努力值 (EV)
         message += "📈 努力值 (EV):\n\n"
-        message += f"  HP: {pokemon_data['hp_ev']}\n\n"
-        message += f"  攻击: {pokemon_data['attack_ev']}\n\n"
-        message += f"  防御: {pokemon_data['defense_ev']}\n\n"
-        message += f"  特攻: {pokemon_data['sp_attack_ev']}\n\n"
-        message += f"  特防: {pokemon_data['sp_defense_ev']}\n\n"
-        message += f"  速度: {pokemon_data['speed_ev']}\n\n"
+        message += f"  HP: {pokemon_data['evs']['hp_ev']}\t\n"
+        message += f"  攻击: {pokemon_data['evs']['attack_ev']}\t\n"
+        message += f"  防御: {pokemon_data['evs']['defense_ev']}\n\n"
+        message += f"  特攻: {pokemon_data['evs']['sp_attack_ev']}\t\n"
+        message += f"  特防: {pokemon_data['evs']['sp_defense_ev']}\t\n"
+        message += f"  速度: {pokemon_data['evs']['speed_ev']}\n\n"
 
         message += f"捕获时间: {pokemon_data['caught_time']}"
 

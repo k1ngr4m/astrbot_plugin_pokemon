@@ -241,6 +241,7 @@ class SqliteUserRepository(AbstractUserRepository):
             ivs=ivs,
             evs=evs,
             moves=row_dict['moves'],
+            caught_time=row_dict['caught_time'],
         )
 
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
@@ -270,9 +271,9 @@ class SqliteUserRepository(AbstractUserRepository):
 
     def get_user_pokemon_by_id(self, user_id: str, pokemon_id: int) -> Optional[UserPokemonInfo]:
         """
-        通过ID获取用户的宝可梦实例（支持短码ID和数字ID）
+        通过ID获取用户的宝可梦实例
         Args:
-            pokemon_id: 宝可梦实例ID（可以是P开头的短码或数字）
+            pokemon_id: 宝可梦实例ID
         Returns:
             宝可梦实例信息（如果存在）
         """

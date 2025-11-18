@@ -123,6 +123,7 @@ class UserPokemonInfo:
     ivs: PokemonIVs
     evs: PokemonEVs
     moves: PokemonMoves
+    caught_time: Optional[str] = None
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -151,6 +152,7 @@ class UserPokemonInfo:
             "ivs": get_dict(self.ivs),
             "evs": get_dict(self.evs),
             "moves": get_dict(self.moves),
+            "caught_time": self.caught_time,
         }
 
 @dataclass
