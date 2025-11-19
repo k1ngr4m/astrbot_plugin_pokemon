@@ -164,9 +164,6 @@ class BattleService:
             # 计算战斗胜率
             user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
 
-            #todo: 调试用， always win
-            user_win_rate = 100
-            wild_win_rate = 0
             # 随机决定战斗结果
             import random
             result = "success" if random.random() * 100 < user_win_rate else "fail"

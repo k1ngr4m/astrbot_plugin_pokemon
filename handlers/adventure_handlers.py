@@ -141,7 +141,7 @@ class AdventureHandlers:
             user_pokemon = battle_details["user_pokemon"]
             wild_pokemon_data = battle_details["wild_pokemon"]
             win_rates = battle_details["win_rates"]
-            battle_result = battle_details["result"]
+            battle_result = "胜利" if battle_details["result"] == "success" else "失败"
             exp_details = battle_details["exp_details"]
 
             message = "⚔️ 宝可梦战斗开始！\n\n"
