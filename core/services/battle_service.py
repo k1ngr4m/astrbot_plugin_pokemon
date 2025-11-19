@@ -2,6 +2,7 @@ import math
 from typing import Dict, Any, Tuple, List
 
 from ..domain.pokemon_models import WildPokemonInfo, UserPokemonInfo
+from ..domain.user_models import UserTeam
 from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository,
 )
@@ -83,12 +84,8 @@ class BattleService:
             Tuple[float, float]: (攻击方胜率%, 防御方胜率%)
         """
         # 获取宝可梦的属性类型
-        print(f"user_pokemon: {user_pokemon}")
-        print(f"wild_pokemon: {wild_pokemon}")
         user_pokemon_types = self.pokemon_repo.get_pokemon_types(user_pokemon.species_id)
         wild_pokemon_types = self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id)
-        print(f"user_pokemon_types: {user_pokemon_types}")
-        print(f"wild_pokemon_types: {wild_pokemon_types}")
         # 如果获取不到类型数据，使用默认的普通属性
         if not user_pokemon_types:
             user_pokemon_types = ['normal']
@@ -164,12 +161,8 @@ class BattleService:
         try:
             user_pokemon_id = user_team_list[0]
             user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
-            print("战斗前")
             # 计算战斗胜率
             user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
-            print("战斗后")
-            print(f"user_win_rate: {user_win_rate}")
-            print(f"wild_win_rate: {wild_win_rate}")
             # 随机决定战斗结果
             import random
             result = "success" if random.random() * 100 < user_win_rate else "fail"
@@ -182,42 +175,13 @@ class BattleService:
                 user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon_info.level, result)
 
                 # 获取用户队伍中的所有宝可梦
-                user_team_data = self.team_repo.get_user_team(user_id)
+                user_team_data:UserTeam = self.team_repo.get_user_team(user_id)
                 team_pokemon_results = []
-                print(f"user_team_data: {user_team_data}")
-                print(f"type(user_team_data): {type(user_team_data)}")
-                if user_team_data:
-                    # user_team_data 已经是字典，不需要再解析JSON
-                    # 检查user_team_data是否为字典（如果是字典格式，则获取值列表）
-                    if isinstance(user_team_data, dict):
-                        # 如果是字典格式，获取其中的宝可梦IDs列表
-                        if 'pokemon_list' in user_team_data:
-                            team_pokemon_ids = user_team_data['pokemon_list']
-                        elif 'team' in user_team_data:
-                            team_pokemon_ids = user_team_data['team']
-                        elif 'team_list' in user_team_data:
-                            team_pokemon_ids = user_team_data['team_list']
-                        else:
-                            # 尝试获取字典中的所有值
-                            team_pokemon_ids = list(user_team_data.values())
-                            if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
-                                team_pokemon_ids = team_pokemon_ids[0]
-                    else:
-                        # 如果不是字典，说明数据格式有问题
-                        team_pokemon_ids = []
-
-                    # 确保team_pokemon_ids是列表
-                    if not isinstance(team_pokemon_ids, list):
-                        # 如果不是列表，尝试转换为列表
-                        if isinstance(team_pokemon_ids, (str, int)):
-                            team_pokemon_ids = [team_pokemon_ids]
-                        else:
-                            team_pokemon_ids = []
-
-                    # 更新队伍中所有宝可梦的经验值
-                    if team_pokemon_ids:
-                        team_pokemon_results = self.exp_service.update_team_pokemon_after_battle(
-                            user_id, team_pokemon_ids, pokemon_exp_gained)
+                team_pokemon_ids=user_team_data.team_pokemon_ids
+                # 更新队伍中所有宝可梦的经验值
+                if team_pokemon_ids:
+                    team_pokemon_results = self.exp_service.update_team_pokemon_after_battle(
+                        user_id, team_pokemon_ids, pokemon_exp_gained)
 
                 # 更新用户经验值（如果用户获得经验）
                 user_update_result = {"success": True, "exp_gained": 0}

@@ -84,17 +84,17 @@ class ExpService:
             "required_exp_for_next": self.get_required_exp_for_level(new_level + 1) if new_level < 100 else 0
         }
 
-    def update_pokemon_after_battle(self, user_id: str, pokemon_id: str, exp_gained: int) -> Dict[str, Any]:
+    def update_pokemon_after_battle(self, user_id: str, pokemon_id: int, exp_gained: int) -> Dict[str, Any]:
         """
         战斗后更新宝可梦的经验值和等级
         """
         # 获取用户宝可梦信息
-        pokemon_data = self.user_repo.get_user_pokemon_by_id(pokemon_id)
+        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
         if not pokemon_data:
             return {"success": False, "message": "宝可梦不存在"}
 
-        current_level = pokemon_data['level']
-        current_exp = pokemon_data.get('exp', 0)  # 使用现有的经验值
+        current_level = pokemon_data.level
+        current_exp = pokemon_data.exp
         new_total_exp = current_exp + exp_gained
 
         # 检查是否升级
@@ -102,22 +102,21 @@ class ExpService:
 
         # 使用宝可梦的数字ID，而不是短码ID
         # 从数据库返回的数据中获取数字ID
-        pokemon_numeric_id = pokemon_data.get('id')
-        if not isinstance(pokemon_numeric_id, int):
-            return {"success": False, "message": f"无法获取宝可梦的数字ID: {pokemon_numeric_id}"}
+        pokemon_id = pokemon_data.id
+
 
         # 更新宝可梦数据
-        self.pokemon_repo.update_pokemon_exp(level_up_info["new_level"], level_up_info["new_exp"], pokemon_numeric_id, user_id)
+        self.pokemon_repo.update_pokemon_exp(level_up_info["new_level"], level_up_info["new_exp"], pokemon_id, user_id)
 
         # 如果有升级，更新属性
         if level_up_info.get("levels_gained", 0) > 0:
-            self._calculate_and_update_pokemon_stats(pokemon_numeric_id, pokemon_data['species_id'], level_up_info["new_level"], user_id)
+            self._calculate_and_update_pokemon_stats(pokemon_id, pokemon_data.species_id, level_up_info["new_level"], user_id)
 
         return {
             "success": True,
             "exp_gained": exp_gained,
             "level_up_info": level_up_info,
-            "pokemon_name": pokemon_data.get('nickname', '未知宝可梦')
+            "pokemon_name": pokemon_data.name or '未知宝可梦'
         }
 
     def _calculate_and_update_pokemon_stats(self, pokemon_id: int, species_id: int, new_level: int, user_id: str) -> bool:
@@ -132,7 +131,7 @@ class ExpService:
                 return False
 
             # 获取宝可梦的IV和EV值
-            pokemon_data = self.user_repo.get_user_pokemon_by_numeric_id(pokemon_id)
+            pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
             if not pokemon_data:
                 return False
 
@@ -145,20 +144,20 @@ class ExpService:
             base_speed = getattr(species_data, 'base_speed', 0)
 
             # 获取IV值
-            hp_iv = pokemon_data.get('hp_iv', 0)
-            attack_iv = pokemon_data.get('attack_iv', 0)
-            defense_iv = pokemon_data.get('defense_iv', 0)
-            sp_attack_iv = pokemon_data.get('sp_attack_iv', 0)
-            sp_defense_iv = pokemon_data.get('sp_defense_iv', 0)
-            speed_iv = pokemon_data.get('speed_iv', 0)
+            hp_iv = pokemon_data.ivs.hp_iv
+            attack_iv = pokemon_data.ivs.attack_iv
+            defense_iv = pokemon_data.ivs.defense_iv
+            sp_attack_iv = pokemon_data.ivs.sp_attack_iv
+            sp_defense_iv = pokemon_data.ivs.sp_defense_iv
+            speed_iv = pokemon_data.ivs.speed_iv
 
             # 获取EV值
-            hp_ev = pokemon_data.get('hp_ev', 0)
-            attack_ev = pokemon_data.get('attack_ev', 0)
-            defense_ev = pokemon_data.get('defense_ev', 0)
-            sp_attack_ev = pokemon_data.get('sp_attack_ev', 0)
-            sp_defense_ev = pokemon_data.get('sp_defense_ev', 0)
-            speed_ev = pokemon_data.get('speed_ev', 0)
+            hp_ev = pokemon_data.evs.hp_ev
+            attack_ev = pokemon_data.evs.attack_ev
+            defense_ev = pokemon_data.evs.defense_ev
+            sp_attack_ev = pokemon_data.evs.sp_attack_ev
+            sp_defense_ev = pokemon_data.evs.sp_defense_ev
+            speed_ev = pokemon_data.evs.speed_ev
 
             # 根据公式计算新属性值
             # HP: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 等级 + 10
@@ -194,7 +193,7 @@ class ExpService:
         """
         results = []
         for pokemon_id in team_pokemon_ids:
-            result = self.update_pokemon_after_battle(user_id, str(pokemon_id), exp_gained)
+            result = self.update_pokemon_after_battle(user_id, int(pokemon_id), exp_gained)
             results.append(result)
         return results
 

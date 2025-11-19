@@ -279,6 +279,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
         Returns:
             Optional[PokemonDetail]: 野生宝可梦的详细信息，如果不存在则返回None
         """
+        import json
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -290,4 +291,29 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             row = cursor.fetchone()
             if row is None:
                 return None
-            return WildPokemonEncounterLog(**dict(row))
+
+            row_dict = dict(row)
+            # 反序列化pokemon_info JSON字符串
+            if row_dict.get('pokemon_info'):
+                try:
+                    pokemon_info_data = json.loads(row_dict['pokemon_info'])
+                    # 从字典创建WildPokemonInfo对象
+                    from ..domain.pokemon_models import PokemonStats, PokemonIVs, PokemonEVs
+                    pokemon_info_obj = WildPokemonInfo(
+                        species_id=pokemon_info_data['species_id'],
+                        name=pokemon_info_data['name'],
+                        gender=pokemon_info_data['gender'],
+                        level=pokemon_info_data['level'],
+                        exp=pokemon_info_data['exp'],
+                        is_shiny=pokemon_info_data['is_shiny'],
+                        stats=PokemonStats(**pokemon_info_data['stats']),
+                        ivs=PokemonIVs(**pokemon_info_data['ivs']),
+                        evs=PokemonEVs(**pokemon_info_data['evs']),
+                        moves=pokemon_info_data['moves']
+                    )
+                    row_dict['pokemon_info'] = pokemon_info_obj
+                except (json.JSONDecodeError, KeyError):
+                    # 如果解析失败，保持原始值
+                    pass
+
+            return WildPokemonEncounterLog(**row_dict)
