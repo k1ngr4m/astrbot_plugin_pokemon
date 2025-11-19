@@ -44,7 +44,7 @@ class ExpService:
         base_exp = 50
 
         # 如果胜利，获得经验值；如果失败，不获得经验值
-        if battle_result == "胜利":
+        if battle_result == "success":
             exp_gained = (base_exp * wild_pokemon_level) // 7
             return max(1, exp_gained)  # 确保至少获得1点经验
         else:

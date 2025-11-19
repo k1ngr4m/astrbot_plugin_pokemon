@@ -163,6 +163,10 @@ class BattleService:
             user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
             # 计算战斗胜率
             user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
+
+            #todo: 调试用， always win
+            user_win_rate = 100
+            wild_win_rate = 0
             # 随机决定战斗结果
             import random
             result = "success" if random.random() * 100 < user_win_rate else "fail"
@@ -172,8 +176,7 @@ class BattleService:
             if self.exp_service and result == "success":
                 # 计算宝可梦获得的经验值
                 pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_info.level, result)
-                user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon_info.level, result)
-
+                # user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon_info.level, result)
                 # 获取用户队伍中的所有宝可梦
                 user_team_data:UserTeam = self.team_repo.get_user_team(user_id)
                 team_pokemon_results = []
@@ -184,13 +187,13 @@ class BattleService:
                         user_id, team_pokemon_ids, pokemon_exp_gained)
 
                 # 更新用户经验值（如果用户获得经验）
-                user_update_result = {"success": True, "exp_gained": 0}
-                if user_exp_gained > 0:
-                    user_update_result = self.exp_service.update_user_after_battle(user_id, user_exp_gained)
+                # user_update_result = {"success": True, "exp_gained": 0}
+                # if user_exp_gained > 0:
+                #     user_update_result = self.exp_service.update_user_after_battle(user_id, user_exp_gained)
 
                 exp_details = {
                     "pokemon_exp": team_pokemon_results[0] if team_pokemon_results else {"success": False, "message": "未找到队伍中的宝可梦"},
-                    "user_exp": user_update_result,
+                    # "user_exp": user_update_result,
                     "team_pokemon_results": team_pokemon_results
                 }
             elif self.exp_service and result != "success":
@@ -231,7 +234,6 @@ class BattleService:
                     "exp_details": exp_details
                 }
             }
-
             return battle_result
 
         except Exception as e:
