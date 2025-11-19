@@ -1,6 +1,7 @@
 import sqlite3
 from astrbot.api import logger
 
+
 def up(cursor: sqlite3.Cursor):
     """
     应用此迁移：创建项目所需的全部初始表和索引（SQLite版本）
@@ -351,38 +352,55 @@ def up(cursor: sqlite3.Cursor):
     logger.info("✅ 商店系统表创建完成")
 
     cursor.execute("""
+        CREATE TABLE IF NOT EXISTS wild_pokemon (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            species_id INTEGER NOT NULL,             -- 野生宝可梦物种ID
+            name TEXT NOT NULL,                       -- 野生宝可梦名称
+            gender TEXT NOT NULL,                     -- 野生宝可梦性别
+            level INTEGER NOT NULL,                   -- 野生宝可梦等级
+            exp INTEGER NOT NULL DEFAULT 0,           -- 野生宝可梦经验值
+            is_shiny INTEGER DEFAULT 0,               -- 是否为异色宝可梦 (0=普通, 1=异色)
+            stats TEXT,                               -- 野生宝可梦属性 (JSON格式)
+            ivs TEXT,                                 -- 野生宝可梦IV (JSON格式)
+            evs TEXT,                                 -- 野生宝可梦EV (JSON格式)
+            moves TEXT,                               -- 野生宝可梦招式 (JSON格式)
+            FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
+            UNIQUE(species_id)
+        );
+    """)
+
+
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS wild_pokemon_encounter_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,                    -- 遇到宝可梦的用户ID
-            pokemon_species_id INTEGER NOT NULL,      -- 遇到的宝可梦物种ID
-            pokemon_name TEXT NOT NULL,               -- 宝可梦名称
-            area_code TEXT,                           -- 遇到的区域代码
-            area_name TEXT,                           -- 遇到的区域名称
-            pokemon_level INTEGER NOT NULL,           -- 遇到的宝可梦等级
+            pokemon_species_id INTEGER NOT NULL,           -- 遇到的野生宝可梦ID
+            pokemon_name TEXT NOT NULL,                           -- 遇到的野生宝可梦名称
+            pokemon_level INTEGER NOT NULL,                           -- 野生宝可梦等级
+            pokemon_info TEXT,                           -- 野生宝可梦详细信息 (JSON格式)
+            area_code TEXT NOT NULL,                        -- 遇到的区域编码
+            area_name TEXT NOT NULL,                           -- 遇到的区域名称
             encounter_time TEXT DEFAULT CURRENT_TIMESTAMP, -- 遇到时间
             is_captured INTEGER DEFAULT 0,            -- 是否被捕捉 (0=未捕捉, 1=已捕捉)
             is_battled INTEGER DEFAULT 0,             -- 是否进行了战斗 (0=未战斗, 1=已战斗)
             battle_result TEXT,                       -- 战斗结果 (win/lose/escaped)
             is_shiny INTEGER DEFAULT 0,               -- 是否为异色宝可梦 (0=普通, 1=异色)
             encounter_rate REAL,                      -- 遇到概率
-            pokemon_stats TEXT,                       -- 宝可梦属性 (JSON格式)
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             isdel INTEGER DEFAULT 0,                 -- 是否删除 (0=未删除, 1=已删除)
             FOREIGN KEY (user_id) REFERENCES users(user_id),
-            FOREIGN KEY (pokemon_species_id) REFERENCES pokemon_species(id)
+            FOREIGN KEY (pokemon_species_id) REFERENCES wild_pokemon(species_id) ON DELETE CASCADE,
+            FOREIGN KEY (area_code) REFERENCES adventure_areas(area_code) ON DELETE CASCADE,
+            UNIQUE(user_id, pokemon_species_id, area_code, encounter_time)
         );
     """)
 
     # 为野生宝可梦遇到日志表创建索引
     try:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_wild_pokemon_encounter_user_id ON wild_pokemon_encounter_log(user_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_wild_pokemon_encounter_species_id ON wild_pokemon_encounter_log(pokemon_species_id)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_wild_pokemon_encounter_area_code ON wild_pokemon_encounter_log(area_code)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_wild_pokemon_encounter_time ON wild_pokemon_encounter_log(encounter_time)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_wild_pokemon_encounter_is_captured ON wild_pokemon_encounter_log(is_captured)")
     except sqlite3.Error as e:
         logger.error(f"❌ 创建野生宝可梦遇到日志索引时出错: {e}")
-
-    logger.info("✅ 野生宝可梦遇到日志表创建完成")
 
     logger.info("✅ 数据库初始结构创建完成 (SQLite)")

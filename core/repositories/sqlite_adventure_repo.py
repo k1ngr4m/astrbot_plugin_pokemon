@@ -51,7 +51,7 @@ class SqliteAdventureRepository(AbstractAdventureRepository):
                 return AdventureArea(
                     id=row["id"],
                     area_code=row["area_code"],
-                    area_name=row["name"],
+                    area_name=row["area_name"],
                     description=row["description"],
                     min_level=row["min_level"],
                     max_level=row["max_level"]
@@ -111,8 +111,8 @@ class SqliteAdventureRepository(AbstractAdventureRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR IGNORE INTO adventure_areas 
-                    (area_code, name, description, min_level, max_level)
-                VALUES (:area_code, :name, :description, :min_level, :max_level)
+                    (area_code, area_name, description, min_level, max_level)
+                VALUES (:area_code, :area_name, :description, :min_level, :max_level)
             """, {**data})
             conn.commit()
 

@@ -4,7 +4,9 @@ from typing import Optional, List, Dict, Any
 
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
-from ..domain.pokemon_models import PokemonTemplate, PokemonBaseStats, PokemonDetail, WildPokemonInfo
+from ..domain.adventure_models import AreaInfo
+from ..domain.pokemon_models import PokemonTemplate, PokemonBaseStats, PokemonDetail, WildPokemonInfo, \
+    WildPokemonEncounterLog
 
 
 class SqlitePokemonRepository(AbstractPokemonRepository):
@@ -164,27 +166,27 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             """, {**attributes, 'id': pokemon_id, 'user_id': user_id})
             conn.commit()
 
-    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo) -> None:
+    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo, area_info: AreaInfo, encounter_rate: float) -> None:
         """添加野生宝可梦遇到记录"""
         pokemon_species_id = wild_pokemon.species_id
         pokemon_name = wild_pokemon.name
-        area_code = wild_pokemon.area.area_code
-        area_name = wild_pokemon.area.area_name
+        area_code = area_info.area_code
+        area_name = area_info.area_name
         pokemon_level = wild_pokemon.level
         is_shiny = wild_pokemon.is_shiny
-        encounter_rate = wild_pokemon.encounter_rate
-        pokemon_stats = wild_pokemon.stats
+        encounter_rate = encounter_rate
+        pokemon_info = wild_pokemon.model_dump_json()
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO wild_pokemon_encounter_log
-                (user_id, pokemon_species_id, pokemon_name, area_code, area_name,
-                 pokemon_level, is_shiny, encounter_rate, pokemon_stats, isdel)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                (user_id, pokemon_species_id, pokemon_name, pokemon_level, pokemon_info, 
+                 area_code, area_name, is_shiny, encounter_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
-                user_id, pokemon_species_id, pokemon_name, area_code, area_name,
-                pokemon_level, int(is_shiny), encounter_rate, pokemon_stats
+                user_id, pokemon_species_id, pokemon_name, pokemon_level, pokemon_info,
+                area_code, area_name, is_shiny, encounter_rate
             ))
             conn.commit()
 
@@ -268,7 +270,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
-    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonInfo]:
+    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonEncounterLog]:
         """
         获取用户当前遇到的野生宝可梦
         Args:
@@ -285,15 +287,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 LIMIT 1
             """, (user_id,))
             row = cursor.fetchone()
-            return WildPokemonInfo(**dict(row)) if row else None
-
-    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[PokemonTemplate]:
-        """根据短码获取宝可梦模板"""
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT * FROM user_pokemon
-                WHERE shortcode = ?
-            """, (shortcode,))
-            row = cursor.fetchone()
-            return PokemonTemplate(**dict(row)) if row else None
+            if row is None:
+                return None
+            return WildPokemonEncounterLog(**dict(row))

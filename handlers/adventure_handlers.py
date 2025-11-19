@@ -93,7 +93,7 @@ class AdventureHandlers:
 
         if result.success:
             wild_pokemon = result.wild_pokemon
-            message = f"🌳 在 {result.area.name} 中冒险！\n\n"
+            message = f"🌳 在 {result.area.area_name} 中冒险！\n\n"
             message += f"✨ 遇到了野生的 {wild_pokemon.name}！\n"
             message += f"等级: {wild_pokemon.level}\n"
 
@@ -133,12 +133,12 @@ class AdventureHandlers:
             return
 
         wild_pokemon_info = WildPokemonInfo(
-            species_id= wild_pokemon.species_id,
-            name=wild_pokemon.name,
-            gender=wild_pokemon.gender,
-            level=wild_pokemon.level,
-            exp=wild_pokemon.exp,
-            stats=wild_pokemon.stats,
+            species_id= wild_pokemon.pokemon_species_id,
+            name=wild_pokemon.pokemon_name,
+            gender=wild_pokemon.pokemon_gender,
+            level=wild_pokemon.pokemon_level,
+            exp=wild_pokemon.pokemon_exp,
+            stats=wild_pokemon.pokemon_stats,
             ivs=wild_pokemon.ivs,
             evs=wild_pokemon.evs,
             is_shiny=wild_pokemon.is_shiny,

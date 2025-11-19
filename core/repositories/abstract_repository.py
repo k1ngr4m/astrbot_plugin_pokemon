@@ -2,8 +2,8 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 from ..domain.user_models import User, UserTeam
 from ..domain.pokemon_models import PokemonCreateResult, PokemonTemplate, UserPokemonInfo, PokemonDetail, \
-    WildPokemonInfo
-from ..domain.adventure_models import AdventureArea, AreaPokemon
+    WildPokemonInfo, WildPokemonEncounterLog
+from ..domain.adventure_models import AdventureArea, AreaPokemon, AreaInfo
 from ..domain.shop_models import Shop, ShopItem
 
 class AbstractUserRepository(ABC):
@@ -100,7 +100,7 @@ class AbstractPokemonRepository(ABC):
 
     # 添加野生宝可梦遇到记录
     @abstractmethod
-    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo) -> None: pass
+    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo, area_info: AreaInfo, encounter_rate: float) -> None: pass
 
     # ==========改==========
     # 更新宝可梦经验
@@ -117,9 +117,6 @@ class AbstractPokemonRepository(ABC):
                             is_battled: int = None, battle_result: str = None) -> None: pass
 
     # ==========查==========
-    @abstractmethod
-    def get_user_pokemon_by_shortcode(self, shortcode: str) -> Optional[PokemonTemplate]: pass
-
     # 获取宝可梦模板
     @abstractmethod
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonTemplate]: pass
@@ -134,7 +131,7 @@ class AbstractPokemonRepository(ABC):
 
     # 获取用户正在遭遇的野生宝可梦
     @abstractmethod
-    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonInfo]: pass
+    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonEncounterLog]: pass
 
     # 获取用户遇到的所有野生宝可梦记录
     @abstractmethod

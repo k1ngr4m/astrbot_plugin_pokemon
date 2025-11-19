@@ -66,67 +66,6 @@ class AdventureService:
                 "message": f"获取区域列表失败: {str(e)}"
             }
 
-    def get_area_detail(self, area_code: str) -> Dict[str, Any]:
-        """
-        获取特定区域的详细信息，包括该区域可遇见的宝可梦
-        Args:
-            area_code: 区域代码
-        Returns:
-            包含区域详细信息的字典
-        """
-        try:
-            # 验证区域代码格式
-            if not (area_code.startswith('A') and len(area_code) == 4 and area_code[1:].isdigit()):
-                return {
-                    "success": False,
-                    "message": "区域代码格式不正确（应为A开头的四位数，如A001）"
-                }
-
-            # 获取区域信息
-            area = self.adventure_repo.get_area_by_code(area_code)
-            if not area:
-                return {
-                    "success": False,
-                    "message": f"未找到区域 {area_code}"
-                }
-
-            # 获取该区域的宝可梦列表
-            area_pokemon_list = self.adventure_repo.get_area_pokemon_by_area_code(area_code)
-
-            # 获取宝可梦详细信息
-            pokemon_details = []
-            for area_pokemon in area_pokemon_list:
-                pokemon_template = self.pokemon_repo.get_pokemon_by_id(area_pokemon.pokemon_species_id)
-                if pokemon_template:
-                    pokemon_details.append({
-                        "species_id": pokemon_template.id,
-                        "name": pokemon_template.name_cn,
-                        "encounter_rate": area_pokemon.encounter_rate,
-                        "min_level": area_pokemon.min_level,
-                        "max_level": area_pokemon.max_level
-                    })
-
-            # 按遇见概率排序
-            pokemon_details.sort(key=lambda x: x["encounter_rate"], reverse=True)
-
-            return {
-                "success": True,
-                "area": {
-                    "area_code": area.area_code,
-                    "name": area.name,
-                    "description": area.description or "暂无描述",
-                    "min_level": area.min_level,
-                    "max_level": area.max_level
-                },
-                "pokemon_list": pokemon_details,
-                "pokemon_count": len(pokemon_details)
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"获取区域详情失败: {str(e)}"
-            }
-
     def adventure_in_area(self, user_id: str, area_code: str) -> AdventureResult:
         """
         在指定区域进行冒险，随机刷新一只野生宝可梦
@@ -144,30 +83,15 @@ class AdventureService:
                 wild_pokemon=None,
                 area=None
             )
-
         try:
-            # 1. 验证用户是否存在
-            user = self.user_repo.get_by_id(user_id)
-            if not user:
-                return error_response("用户不存在")
-
-            # 2. 验证区域代码格式（简化正则式判断，更易读）
-            if not (isinstance(area_code, str)
-                    and area_code.startswith("A")
-                    and len(area_code) == 4
-                    and area_code[1:].isdigit()):
-                return error_response("区域代码格式不正确（应为A开头的四位数，如A001）")
-
             # 3. 获取区域信息
             area = self.adventure_repo.get_area_by_code(area_code)
             if not area:
                 return error_response(f"未找到区域 {area_code}")
-
             # 4. 获取该区域的宝可梦列表
             area_pokemon_list = self.adventure_repo.get_area_pokemon_by_area_code(area_code)
             if not area_pokemon_list:
                 return error_response(f"区域 {area.area_name}) 中暂无野生宝可梦")
-
             # 5. 权重随机选择宝可梦（使用itertools.accumulate简化累加逻辑）
             encounter_rates = [ap.encounter_rate for ap in area_pokemon_list]
             total_rate = sum(encounter_rates)
@@ -186,7 +110,6 @@ class AdventureService:
             min_level = selected_area_pokemon.min_level
             max_level = selected_area_pokemon.max_level
             wild_pokemon_level = random.randint(min_level, max_level)
-
             # 7. 创建野生宝可梦（直接使用返回结果，无需额外处理）
             wild_pokemon_result = self.pokemon_service.create_single_pokemon(
                 species_id=selected_area_pokemon.pokemon_species_id,
@@ -196,7 +119,6 @@ class AdventureService:
             if not wild_pokemon_result.success:
                 return error_response(wild_pokemon_result.message)
             wild_pokemon = wild_pokemon_result.data
-
             wild_pokemon_info = WildPokemonInfo(
                     species_id=wild_pokemon.base_pokemon.id,
                     name=wild_pokemon.base_pokemon.name_cn,
@@ -204,7 +126,6 @@ class AdventureService:
                     level=wild_pokemon_level,
                     exp=wild_pokemon.exp,
                     is_shiny=wild_pokemon.is_shiny,
-                    encounter_rate=selected_area_pokemon.encounter_rate,
                     stats=PokemonStats(
                         hp=wild_pokemon.stats.hp,
                         attack=wild_pokemon.stats.attack,
@@ -230,15 +151,18 @@ class AdventureService:
                         speed_ev=wild_pokemon.evs.speed_ev,
                     ),
                     moves = None,
-                    area=AreaInfo(
-                        area_code=area.area_code,
-                        area_name=area.area_name,
-                        )
             )
             self.pokemon_repo.add_user_encountered_wild_pokemon(
                 user_id=user_id,
-                wild_pokemon = wild_pokemon_info
-                )
+                wild_pokemon = wild_pokemon_info,
+                area_info = AreaInfo(
+                    area_code=area.area_code,
+                    area_name=area.area_name,
+                ),
+                encounter_rate=selected_area_pokemon.encounter_rate,
+            )
+
+
 
             # 8. 构造返回结果（直接复用create_single_pokemon的计算结果）
             result = AdventureResult(

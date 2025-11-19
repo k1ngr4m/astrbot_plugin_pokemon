@@ -1,4 +1,6 @@
 from __future__ import annotations
+
+import json
 from dataclasses import dataclass
 from typing import Optional
 
@@ -15,6 +17,11 @@ class PokemonStats:
 
     def __getitem__(self, item):
         return getattr(self, item)
+
+    def model_dump_json(self):
+        # 返回string字符串
+        return json.dumps(self.__dict__)
+
 
 @dataclass
 class PokemonIVs:
@@ -167,8 +174,6 @@ class WildPokemonInfo:
     ivs: PokemonIVs
     evs: PokemonEVs
     moves: PokemonMoves | None
-    encounter_rate: Optional[float] = None
-    area: Optional['AreaInfo'] = None
 
     def to_dict(self):
         def get_dict(obj):
@@ -182,7 +187,6 @@ class WildPokemonInfo:
             else:
                 return vars(obj)
 
-        area_data = get_dict(self.area)
         return {
             "species_id": self.species_id,
             "name": self.name,
@@ -194,6 +198,28 @@ class WildPokemonInfo:
             "ivs": get_dict(self.ivs),
             "evs": get_dict(self.evs),
             "moves": get_dict(self.moves),
-            "encounter_rate": self.encounter_rate,
-            "area": area_data
         }
+
+    def model_dump_json(self):
+        return self.to_dict()
+
+
+@dataclass
+class WildPokemonEncounterLog:
+    id: int
+    user_id: str
+    pokemon_species_id: int
+    pokemon_name: str
+    pokemon_level: int
+    pokemon_info: WildPokemonInfo
+    area_code: str
+    area_name: str
+    encounter_time: Optional[str] = None
+    is_captured: Optional[int] = None
+    is_battled: Optional[int] = None
+    battle_result: Optional[str] = None
+    is_shiny: Optional[int] = None
+    encounter_rate: Optional[float] = None
+    created_at: Optional[str] = None
+    isdel: Optional[int] = 0
+

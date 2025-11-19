@@ -124,7 +124,7 @@ class DataSetupService:
             self.adventure_repo.add_area_template(
                 {
                     "area_code": area[0],
-                    "name": area[1],
+                    "area_name": area[1],
                     "description": area[2],
                     "min_level": area[3],
                     "max_level": area[4],

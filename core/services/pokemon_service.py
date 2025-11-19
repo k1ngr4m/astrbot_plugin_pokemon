@@ -6,7 +6,7 @@ from ..repositories.abstract_repository import (
 
 from ..utils import get_now, get_today
 from ..domain.pokemon_models import PokemonTemplate, PokemonCreateResult, PokemonDetail, PokemonStats, PokemonIVs, \
-    PokemonEVs
+    PokemonEVs, WildPokemonInfo
 from ..domain.user_models import User
 
 
@@ -145,17 +145,17 @@ class PokemonService:
         )
         return result
 
-    def get_user_encountered_wild_pokemon(self, user_id: str) -> PokemonDetail:
+    def get_user_encountered_wild_pokemon(self, user_id: str) -> WildPokemonInfo:
         """
         获取用户当前遇到的野生宝可梦
         Args:
             user_id (str): 用户ID
         Returns:
-            PokemonDetail: 野生宝可梦的详细信息
+            WildPokemonInfo: 野生宝可梦的详细信息
         """
         return self.pokemon_repo.get_user_encountered_wild_pokemon(user_id)
 
-    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: PokemonDetail):
+    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo):
         """
         添加用户当前遇到的野生宝可梦
         Args:
