@@ -7,7 +7,7 @@ from ..repositories.abstract_repository import (
 
 from ..utils import get_now, get_today
 from ..domain.pokemon_models import PokemonTemplate, PokemonCreateResult, PokemonDetail, PokemonStats, PokemonIVs, \
-    PokemonEVs, WildPokemonInfo
+    PokemonEVs, WildPokemonInfo, PokemonMoves
 from ..domain.user_models import User
 
 
@@ -70,7 +70,7 @@ class PokemonService:
         gender = random.choice(["M", "F", "N"])
         level = random.randint(min_level, max_level)
         exp = 0
-        moves = "[]"
+        moves = None
         is_shiny = 1 if random.randint(1, self.SHINY_PROBABILITY_DENOMINATOR) == 1 else 0
 
         # 3. 生成IV和EV（使用局部函数简化）
@@ -141,7 +141,7 @@ class PokemonService:
                     sp_defense_ev=evs["sp_defense"],
                     speed_ev=evs["speed"],
                 ),
-                moves= None
+                moves= moves
             )
         )
         return result
