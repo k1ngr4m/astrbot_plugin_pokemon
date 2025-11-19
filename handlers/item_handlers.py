@@ -2,6 +2,7 @@ from astrbot.api.event import AstrMessageEvent
 from typing import TYPE_CHECKING
 
 from ..core.answer.answer_enum import AnswerEnum
+from ..core.utils import userid_to_base32
 
 if TYPE_CHECKING:
     from ..main import PokemonPlugin
@@ -13,7 +14,7 @@ class ItemHandlers:
 
     async def view_items(self, event: AstrMessageEvent):
         """查看用户道具命令处理器"""
-        user_id = self.plugin._get_effective_user_id(event)
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_by_id(user_id)
 
         if not user:

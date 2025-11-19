@@ -19,6 +19,7 @@ class User:
     created_at: datetime
     init_selected: Optional[int] = None
     last_adventure_time: Optional[int] = None
+    origin_id: Optional[str] = None
 
 @dataclass
 class UserTeam:

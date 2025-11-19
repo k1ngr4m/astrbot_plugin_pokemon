@@ -6,7 +6,7 @@ from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository,
 )
 
-from ..utils import get_now, get_today
+from ..utils import get_now, get_today, userid_to_base32
 from ..domain.user_models import User
 from ..domain.pokemon_models import UserPokemonInfo, PokemonDetail
 from ..answer.answer_enum import AnswerEnum
@@ -34,6 +34,8 @@ class UserService:
         Returns:
             一个包含成功状态和消息的字典。
         """
+        origin_id = user_id
+        user_id = userid_to_base32(user_id)
         if self.user_repo.check_exists(user_id):
             return {"success": False, "message": AnswerEnum.USER_ALREADY_REGISTERED.value}
 
@@ -47,6 +49,7 @@ class UserService:
             created_at = get_now(),
             init_selected = None,
             last_adventure_time = None,
+            origin_id = origin_id
         )
         self.user_repo.create_user(new_user)
 

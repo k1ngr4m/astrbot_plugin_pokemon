@@ -4,6 +4,7 @@ from astrbot.api.event import AstrMessageEvent, MessageEventResult
 from ..core.answer.answer_enum import AnswerEnum
 from ..core.domain.pokemon_models import WildPokemonInfo, UserPokemonInfo
 from ..core.domain.user_models import UserTeam
+from ..core.utils import userid_to_base32
 
 
 class AdventureHandlers:
@@ -16,7 +17,7 @@ class AdventureHandlers:
 
     async def view_areas(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
-        user_id = self.plugin._get_effective_user_id(event)
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_by_id(user_id)
 
         if not user:
@@ -48,7 +49,7 @@ class AdventureHandlers:
 
     async def adventure(self, event: AstrMessageEvent):
         """进入指定区域冒险"""
-        user_id = self.plugin._get_effective_user_id(event)
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_by_id(user_id)
 
         if not user:
@@ -113,7 +114,7 @@ class AdventureHandlers:
 
     async def battle(self, event: AstrMessageEvent):
         """处理战斗指令"""
-        user_id = self.plugin._get_effective_user_id(event)
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_by_id(user_id)
 
         if not user:
@@ -211,7 +212,7 @@ class AdventureHandlers:
 
     async def catch_pokemon(self, event: AstrMessageEvent):
         """处理捕捉野生宝可梦的指令"""
-        user_id = self.plugin._get_effective_user_id(event)
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_by_id(user_id)
 
         if not user:
@@ -379,7 +380,7 @@ class AdventureHandlers:
 
     async def run(self, event: AstrMessageEvent):
         """处理逃跑指令"""
-        user_id = self.plugin._get_effective_user_id(event)
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_by_id(user_id)
 
         if not user:

@@ -21,7 +21,8 @@ def up(cursor: sqlite3.Cursor):
             coins INTEGER DEFAULT 200,          -- 玩家金币
             created_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 玩家创建时间
             init_selected TINYINT(1) DEFAULT 0, -- 是否已选择初始宝可梦
-            last_adventure_time REAL DEFAULT NULL
+            last_adventure_time REAL DEFAULT NULL,
+            origin_id TEXT DEFAULT NULL          -- 原始玩家ID
         );
     """)
 
