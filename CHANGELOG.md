@@ -6,7 +6,7 @@
 - 更新user_id统一为base32
 
 ### 🐛 修复 (Bug Fixes)
-- 
+- 修复battle_result始终为lose的bug
 
 ### 📝 其他变更
 - 

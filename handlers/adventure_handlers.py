@@ -197,7 +197,7 @@ class AdventureHandlers:
                         encounter_log_id = encounter['id']
                         break
                 if encounter_log_id:
-                    battle_outcome = "win" if "success" in battle_result else "lose"
+                    battle_outcome = "win" if "胜利" in battle_result else "lose"
                     self.plugin.pokemon_repo.update_encounter_log(
                         log_id=encounter_log_id,
                         is_battled=1,
