@@ -2,7 +2,7 @@ import random
 from typing import Dict, Any, List
 from astrbot.api.event import AstrMessageEvent, MessageEventResult
 from ..core.answer.answer_enum import AnswerEnum
-from ..core.domain.pokemon_models import WildPokemonInfo
+from ..core.domain.pokemon_models import WildPokemonInfo, UserPokemonInfo
 from ..core.domain.user_models import UserTeam
 
 
@@ -219,7 +219,7 @@ class AdventureHandlers:
             return
 
         # 检查是否有遇到的野生宝可梦信息（使用PokemonService方法）
-        wild_pokemon = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
+        wild_pokemon: WildPokemonInfo = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
         if not wild_pokemon:
             yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
             return
@@ -304,15 +304,28 @@ class AdventureHandlers:
         if is_successful:
             # 成功捕捉 - 将野生宝可梦添加到用户宝可梦列表中
             # 首先创建一个基础的宝可梦记录
-            pokemon_id = self.plugin.user_repo.create_user_pokemon(user_id, wild_pokemon)
+            user_pokemon_info: UserPokemonInfo = UserPokemonInfo(
+                id=0,
+                species_id=wild_pokemon.species_id,
+                name=wild_pokemon.name,
+                level=wild_pokemon.level,
+                exp=wild_pokemon.exp,
+                gender=wild_pokemon.gender,
+                stats=wild_pokemon.stats,
+                ivs=wild_pokemon.ivs,
+                evs=wild_pokemon.evs,
+                is_shiny=wild_pokemon.is_shiny,
+                moves=wild_pokemon.moves,
+            )
+            pokemon_id = self.plugin.user_repo.create_user_pokemon(user_id, user_pokemon_info)
 
             # 获取新捕捉的宝可梦信息
-            new_pokemon = self.plugin.user_repo.get_user_pokemon_by_numeric_id(pokemon_id)
+            new_pokemon:UserPokemonInfo = self.plugin.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
 
             message = f"🎉 捕捉成功！\n\n"
             message += f"您成功捕捉到了 {wild_pokemon.name} (Lv.{wild_pokemon.level})！\n\n"
             message += f"已添加到您的宝可梦收藏中。\n\n"
-            message += f"宝可梦ID: {new_pokemon.shortcode}\n\n"
+            message += f"宝可梦ID: {new_pokemon.id}\n\n"
             message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
             message += f"剩余精灵球: {pokeball_item['quantity'] - 1}"
 
