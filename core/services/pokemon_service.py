@@ -1,5 +1,6 @@
+import json
 import random
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from ..repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
 )
@@ -145,7 +146,7 @@ class PokemonService:
         )
         return result
 
-    def get_user_encountered_wild_pokemon(self, user_id: str) -> WildPokemonInfo:
+    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonInfo]:
         """
         获取用户当前遇到的野生宝可梦
         Args:
@@ -153,7 +154,12 @@ class PokemonService:
         Returns:
             WildPokemonInfo: 野生宝可梦的详细信息
         """
-        return self.pokemon_repo.get_user_encountered_wild_pokemon(user_id)
+        encountered_wild_pokemon = self.pokemon_repo.get_user_encountered_wild_pokemon(user_id)
+        if not encountered_wild_pokemon:
+            return None
+
+        pokemon_info: WildPokemonInfo = encountered_wild_pokemon.pokemon_info
+        return pokemon_info
 
     def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo):
         """

@@ -83,9 +83,12 @@ class BattleService:
             Tuple[float, float]: (攻击方胜率%, 防御方胜率%)
         """
         # 获取宝可梦的属性类型
+        print(f"user_pokemon: {user_pokemon}")
+        print(f"wild_pokemon: {wild_pokemon}")
         user_pokemon_types = self.pokemon_repo.get_pokemon_types(user_pokemon.species_id)
         wild_pokemon_types = self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id)
-
+        print(f"user_pokemon_types: {user_pokemon_types}")
+        print(f"wild_pokemon_types: {wild_pokemon_types}")
         # 如果获取不到类型数据，使用默认的普通属性
         if not user_pokemon_types:
             user_pokemon_types = ['normal']
@@ -148,23 +151,25 @@ class BattleService:
         opp_win_rate = 1 - self_win_rate
         return round(self_win_rate * 100, 1), round(opp_win_rate * 100, 1)
 
-    def start_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo, user_team_list: List[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def start_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo, user_team_list: List[int] = None) -> Dict[str, Any]:
         """
         开始一场与野生宝可梦的战斗
         Args:
             user_id: 用户ID
             wild_pokemon_info: 野生宝可梦数据
-            user_team_list: 用户队伍配置（字典列表）
+            user_team_list: 用户队伍中的宝可梦ID列表
         Returns:
             包含战斗结果的字典
         """
         try:
-            user_pokemon_id = user_team_list[0].get('id',"")
-            user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_pokemon_id)
-
+            user_pokemon_id = user_team_list[0]
+            user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
+            print("战斗前")
             # 计算战斗胜率
             user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
-
+            print("战斗后")
+            print(f"user_win_rate: {user_win_rate}")
+            print(f"wild_win_rate: {wild_win_rate}")
             # 随机决定战斗结果
             import random
             result = "success" if random.random() * 100 < user_win_rate else "fail"
@@ -179,7 +184,8 @@ class BattleService:
                 # 获取用户队伍中的所有宝可梦
                 user_team_data = self.team_repo.get_user_team(user_id)
                 team_pokemon_results = []
-
+                print(f"user_team_data: {user_team_data}")
+                print(f"type(user_team_data): {type(user_team_data)}")
                 if user_team_data:
                     # user_team_data 已经是字典，不需要再解析JSON
                     # 检查user_team_data是否为字典（如果是字典格式，则获取值列表）

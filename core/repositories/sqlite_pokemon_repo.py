@@ -175,7 +175,8 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
         pokemon_level = wild_pokemon.level
         is_shiny = wild_pokemon.is_shiny
         encounter_rate = encounter_rate
-        pokemon_info = wild_pokemon.model_dump_json()
+        import json
+        pokemon_info = json.dumps(wild_pokemon.model_dump_json(), ensure_ascii=False)
 
         with self._get_connection() as conn:
             cursor = conn.cursor()
