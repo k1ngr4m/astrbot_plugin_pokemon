@@ -1,19 +1,28 @@
+
 from dataclasses import dataclass
+from datetime import datetime
+
 
 @dataclass
 class Shop:
     """代表一个商店领域模型"""
     id: int
-    shop_code: str
     name: str
     description: str
+    shop_type: str
+    is_active: int
+    created_at: datetime
+    updated_at: datetime
 
     def to_dict(self):
         return {
             "id": self.id,
-            "shop_code": self.shop_code,
             "name": self.name,
-            "description": self.description
+            "description": self.description,
+            "shop_type": self.shop_type,
+            "is_active": self.is_active,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at
         }
 
 

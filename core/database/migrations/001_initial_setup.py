@@ -315,16 +315,21 @@ def up(cursor: sqlite3.Cursor):
 
     logger.info("✅ 签到记录表创建完成")
 
-    # --- 1. 商店表 ---
-    cursor.execute("""
+    # 1. 创建 shops 表
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS shops (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,     -- 商店ID
-            shop_code TEXT UNIQUE NOT NULL,           -- 商店短码（S开头后跟3位数字，如S001）
-            name TEXT NOT NULL,                       -- 商店名称
-            description TEXT,                         -- 商店描述
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        );
-    """)
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            description TEXT,
+            shop_type TEXT NOT NULL DEFAULT 'normal' CHECK (shop_type IN ('normal','premium','limited')),
+            is_active INTEGER DEFAULT 1 NOT NULL,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME
+        )
+        """
+    )
+
 
     # --- 2. 商店商品表 ---
     cursor.execute("""
@@ -343,7 +348,8 @@ def up(cursor: sqlite3.Cursor):
     """)
 
     # 为商店表创建索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_shops_code ON shops(shop_code)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_shops_id ON shops(id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_shops_type ON shops(shop_type)")
 
     # 为商店商品表创建索引
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_shop_items_shop_id ON shop_items(shop_id)")

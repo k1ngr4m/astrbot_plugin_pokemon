@@ -9,6 +9,15 @@ class ShopService:
         self.user_repo = user_repo
         self.shop_repo = shop_repo
 
+    def get_active_shops(self) -> List[Dict[str, Any]]:
+        """
+        获取所有当前活跃的商店
+        Returns:
+            活跃商店列表
+        """
+        shops = self.shop_repo.get_active_shops()
+        return [shop.to_dict() for shop in shops]
+
     def get_shop_by_code(self, shop_code: str) -> Dict[str, Any]:
         """
         根据商店短码获取商店信息和商品列表

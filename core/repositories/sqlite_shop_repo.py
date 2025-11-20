@@ -44,6 +44,25 @@ class SqliteShopRepository(AbstractShopRepository):
             """, {**shop_item})
             conn.commit()
 
+    def get_active_shops(self) -> List[Shop]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+                SELECT shop_id, item_id, price, stock, is_active
+                FROM shop_items
+                WHERE is_active = 1
+            """)
+        rows = cursor.fetchall()
+        return [Shop(
+            id=row["shop_id"],
+            name=row["name"],
+            description=row["description"],
+            shop_type=row["shop_type"],
+            is_active=row["is_active"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"]
+        ) for row in rows]
+    
     def get_shop_by_code(self, shop_code: str) -> Optional[Shop]:
         """根据商店代码获取商店信息"""
         with self._get_connection() as conn:

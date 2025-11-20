@@ -13,7 +13,7 @@ class ShopHandlers:
         self.shop_service = plugin.shop_service
 
     async def view_shop(self, event: AstrMessageEvent):
-        """查看商店命令处理器"""
+        """宝可梦商店查看命令处理器"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_by_id(user_id)
 
@@ -23,7 +23,10 @@ class ShopHandlers:
 
         args = event.message_str.split(" ")
         if len(args) < 2:
-            yield event.plain_result("❌ 请输入商店短码！\n用法：商店 [商店短码]\n例如：商店 S001")
+            shops=self.shop_service.get_active_shops()
+            shop_list = "\n".join([f"{shop['shop_code']} - {shop['name']}" for shop in shops])
+
+            yield event.plain_result(f"❌ 请输入商店短码！\n\n可用商店：\n{shop_list}\n\n用法：宝可梦商店 [商店短码]\n例如：宝可梦商店 S001")
             return
 
         shop_code = args[1].upper()  # 支持小写输入

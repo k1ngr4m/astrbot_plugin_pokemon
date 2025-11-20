@@ -250,13 +250,13 @@ class PokemonPlugin(Star):
         async for r in self.item_handlers.view_items(event):
             yield r
 
-    @filter.command("商店")
+    @filter.command("宝可梦商店")
     async def view_shop(self, event: AstrMessageEvent):
         """查看商店中的所有商品"""
         async for r in self.shop_handlers.view_shop(event):
             yield r
 
-    @filter.command("商店购买")
+    @filter.command("宝可梦商店购买")
     async def purchase_item(self, event: AstrMessageEvent):
         """购买商店中的商品"""
         async for r in self.shop_handlers.purchase_item(event):

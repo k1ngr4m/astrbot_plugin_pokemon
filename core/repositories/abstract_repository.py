@@ -214,6 +214,9 @@ class AbstractShopRepository(ABC):
 
 
     # ==========查==========
+    # 获取所有活跃商店
+    @abstractmethod
+    def get_active_shops(self) -> List[Shop]: pass
     # 根据商店编码获取商店
     @abstractmethod
     def get_shop_by_code(self, shop_code: str) -> Optional[Shop]: pass

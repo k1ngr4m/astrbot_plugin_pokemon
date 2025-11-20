@@ -5,7 +5,7 @@ from ..repositories.abstract_repository import (
 )
 from ..database.data.initial_data import (
     POKEMON_SPECIES_DATA, POKEMON_TYPES_DATA, POKEMON_SPECIES_TYPES_DATA, POKEMON_EVOLUTION_DATA, ITEM_DATA,
-    POKEMON_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA, SHOP_DATA, SHOP_ITEM_DATA,
+    POKEMON_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA,
 )
 from ..domain.adventure_models import AdventureArea, AreaPokemon
 from ..domain.shop_models import Shop, ShopItem
@@ -146,26 +146,3 @@ class DataSetupService:
                     }
                 )
 
-        # 填充商店数据
-        for shop in SHOP_DATA:
-            self.shop_repo.add_shop_template(
-                {
-                    "shop_code": shop[0],
-                    "name": shop[1],
-                    "description": shop[2],
-                }
-            )
-
-        # 填充商店商品数据
-        for shop_item in SHOP_ITEM_DATA:
-            shop = self.shop_repo.get_shop_by_code(shop_item[0])
-            if shop:
-                self.shop_repo.add_shop_item_template(
-                    {
-                        "shop_id": shop.id,
-                        "item_id": shop_item[1],
-                        "price": shop_item[2],
-                        "stock": shop_item[3],
-                        "is_active": shop_item[4],
-                    }
-                )
