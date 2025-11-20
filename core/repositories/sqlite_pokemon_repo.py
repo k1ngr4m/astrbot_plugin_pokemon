@@ -192,7 +192,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             conn.commit()
 
     def update_encounter_log(self, log_id: int, is_captured: int = None,
-                            is_battled: int = None, battle_result: str = None) -> None:
+                            is_battled: int = None, battle_result: str = None, isdel: int = None) -> None:
         """更新野生宝可梦遇到记录（如捕捉或战斗结果）"""
         updates = []
         params = []
@@ -209,6 +209,9 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             updates.append("battle_result = ?")
             params.append(battle_result)
 
+        if isdel is not None:
+            updates.append("isdel = ?")
+            params.append(isdel)
 
         if not updates:
             return  # 没有需要更新的字段

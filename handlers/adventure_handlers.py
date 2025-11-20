@@ -222,7 +222,7 @@ class AdventureHandlers:
         # 检查是否有遇到的野生宝可梦信息（使用PokemonService方法）
         wild_pokemon: WildPokemonInfo = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
         if not wild_pokemon:
-            yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
+            yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
             return
 
         # 解析用户可能传递的道具ID参数
@@ -391,71 +391,10 @@ class AdventureHandlers:
         wild_pokemon = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
 
         if not wild_pokemon:
-            yield event.plain_result("❌ 您当前没有遇到野生宝可梦。请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。")
+            yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
             return
 
-        # 检查用户是否有设置队伍（用于逃跑成功率计算）
-        user_team_data = self.plugin.team_repo.get_user_team(user_id)
-        if not user_team_data:
-            # 如果没有队伍，默认80%逃跑成功率
-            escape_success_rate = 80
-        else:
-            # 解析队伍数据，获取第一只宝可梦用于逃跑成功率计算
-            import json
-            try:
-                team_pokemon_ids = json.loads(user_team_data) if user_team_data else []
-                if team_pokemon_ids:
-                    # 检查team_pokemon_ids是否为字典（如果是字典格式，则获取值列表）
-                    if isinstance(team_pokemon_ids, dict):
-                        # 如果是字典格式，获取其中的宝可梦IDs列表
-                        if 'pokemon_list' in team_pokemon_ids:
-                            team_pokemon_ids = team_pokemon_ids['pokemon_list']
-                        elif 'team' in team_pokemon_ids:
-                            team_pokemon_ids = team_pokemon_ids['team']
-                        else:
-                            # 尝试获取字典中的所有值
-                            team_pokemon_ids = list(team_pokemon_ids.values())
-                            if team_pokemon_ids and isinstance(team_pokemon_ids[0], list):
-                                team_pokemon_ids = team_pokemon_ids[0]
-
-                    # 确保team_pokemon_ids是列表
-                    if not isinstance(team_pokemon_ids, list):
-                        # 如果不是列表，尝试转换为列表
-                        if isinstance(team_pokemon_ids, (str, int)):
-                            team_pokemon_ids = [team_pokemon_ids]
-                        else:
-                            team_pokemon_ids = []
-
-                    if team_pokemon_ids:
-                        # 获取用户的宝可梦信息用于计算逃跑成功率
-                        user_pokemon = self.plugin.user_repo.get_user_pokemon_by_id(str(team_pokemon_ids[0]))
-                        if user_pokemon:
-                            # 基于速度差异计算逃跑成功率
-                            user_speed = getattr(user_pokemon, 'stats', None)
-                            if user_speed and hasattr(user_speed, 'speed'):
-                                user_speed = user_speed.speed
-                            else:
-                                user_speed = 50
-
-                            wild_speed = getattr(wild_pokemon, 'stats', None)
-                            if wild_speed and hasattr(wild_speed, 'speed'):
-                                wild_speed = wild_speed.speed
-                            else:
-                                wild_speed = 50
-
-                            # 逃跑成功率 = 80% + (用户宝可梦速度 - 野生宝可梦速度) * 0.5%
-                            # 限制在20%到95%之间
-                            speed_diff = user_speed - wild_speed
-                            escape_success_rate = 80 + (speed_diff * 0.5)
-                            escape_success_rate = max(20, min(95, escape_success_rate))
-                        else:
-                            escape_success_rate = 80
-                    else:
-                        escape_success_rate = 80
-                else:
-                    escape_success_rate = 80
-            except json.JSONDecodeError:
-                escape_success_rate = 80
+        escape_success_rate = 80
 
         # 计算逃跑结果（默认80%成功率）
         escape_success = random.random() * 100 < escape_success_rate
@@ -463,6 +402,25 @@ class AdventureHandlers:
         if escape_success:
             message = "🏃 您成功逃跑了！\n\n"
             message += f"野生的 {wild_pokemon.name} 没有追上来。\n"
+
+            # 更新野生宝可梦遇到日志 - 标记为已逃跑
+            try:
+                # 获取最近的野生宝可梦遇到记录（未被捕捉的记录）
+                recent_encounters = self.plugin.pokemon_repo.get_user_encounters(user_id, limit=5)
+                encounter_log_id = None
+                for encounter in recent_encounters:
+                    if (encounter['pokemon_species_id'] == wild_pokemon.species_id and
+                        encounter['pokemon_level'] == wild_pokemon.level and
+                        encounter['is_captured'] == 0):  # 未捕捉的记录
+                        encounter_log_id = encounter['id']
+                        break
+                if encounter_log_id:
+                    self.plugin.pokemon_repo.update_encounter_log(
+                        log_id=encounter_log_id,
+                        isdel=1  # 标记为已删除
+                    )
+            except Exception as e:
+                print(f"更新野生宝可梦遇到日志（逃跑）时出错: {e}")
 
         else:
             message = "😅 逃跑失败了！\n\n"
