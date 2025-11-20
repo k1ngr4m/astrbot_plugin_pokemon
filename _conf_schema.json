@@ -37,7 +37,7 @@
         "description": "冒险的冷却时间",
         "type": "int",
         "hint": "每次冒险后的冷却时间，单位为秒",
-        "default": 60
+        "default": 10
       }
     }
   }

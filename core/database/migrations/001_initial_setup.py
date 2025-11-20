@@ -19,10 +19,12 @@ def up(cursor: sqlite3.Cursor):
             level INTEGER DEFAULT 1,            -- 玩家等级
             exp INTEGER DEFAULT 0,              -- 玩家经验值
             coins INTEGER DEFAULT 200,          -- 玩家金币
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 玩家创建时间
             init_selected TINYINT(1) DEFAULT 0, -- 是否已选择初始宝可梦
             last_adventure_time REAL DEFAULT NULL,
-            origin_id TEXT DEFAULT NULL          -- 原始玩家ID
+            origin_id TEXT DEFAULT NULL,          -- 原始玩家ID
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 玩家创建时间
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0      -- 是否已删除
         );
     """)
 
@@ -41,7 +43,8 @@ def up(cursor: sqlite3.Cursor):
             base_speed INTEGER,
             height REAL,                          -- 身高（米）
             weight REAL,                          -- 体重（千克）
-            description TEXT                      -- 图鉴描述
+            description TEXT,                      -- 图鉴描述
+            isdel TINYINT(10) DEFAULT 0      -- 是否已删除
         );
     """)
 
@@ -96,6 +99,9 @@ def up(cursor: sqlite3.Cursor):
             moves TEXT,                           -- 技能列表（JSON字符串）
             caught_time TEXT DEFAULT CURRENT_TIMESTAMP,
             shortcode TEXT,                       -- 短码ID（格式为P+4位数字）
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (species_id) REFERENCES pokemon_species(id)
         );
@@ -119,7 +125,8 @@ def up(cursor: sqlite3.Cursor):
             power INTEGER,
             accuracy INTEGER,
             pp INTEGER,
-            description TEXT,
+            description TEXT,                     -- 技能描述
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (type_id) REFERENCES pokemon_types(id)
         );
     """)
@@ -145,7 +152,10 @@ def up(cursor: sqlite3.Cursor):
             rarity INTEGER NOT NULL DEFAULT 1,
             price INTEGER NOT NULL DEFAULT 0,
             type TEXT CHECK(type IN ('Healing','Pokeball','Battle','Evolution','Misc')) NOT NULL,
-            description TEXT                      -- 道具说明
+            description TEXT,                      -- 道具说明
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0         -- 是否已删除
         );
     """)
 
@@ -154,7 +164,10 @@ def up(cursor: sqlite3.Cursor):
             user_id TEXT NOT NULL,                -- 玩家ID
             item_id INTEGER NOT NULL,             -- 道具ID
             quantity INTEGER DEFAULT 0,           -- 数量
-            shortcode TEXT,                       -- 短码
+            shortcode TEXT,                       -- 短码ID（格式为I+4位数字）
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             PRIMARY KEY (user_id, item_id),
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (item_id) REFERENCES items(id)
@@ -166,6 +179,9 @@ def up(cursor: sqlite3.Cursor):
         CREATE TABLE IF NOT EXISTS user_team (
             user_id TEXT PRIMARY KEY,             -- 玩家ID
             team TEXT,                            -- 队伍配置（JSON字符串）
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
     """)
@@ -181,6 +197,9 @@ def up(cursor: sqlite3.Cursor):
             battle_log TEXT,                      -- 战斗日志（JSON或文本）
             start_time TEXT,                      -- 开始时间
             end_time TEXT,                        -- 结束时间
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (user1_id) REFERENCES users(user_id),
             FOREIGN KEY (user2_id) REFERENCES users(user_id)
         );
@@ -195,6 +214,7 @@ def up(cursor: sqlite3.Cursor):
             move_id INTEGER NOT NULL,             -- 技能ID
             learn_method TEXT CHECK(learn_method IN ('LevelUp','EggMove','TM','HM','Tutor','Initial')) NOT NULL,
             learn_value TEXT NOT NULL,            -- 学习条件（等级/道具编号/无）
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             PRIMARY KEY (species_id, move_id, learn_method), -- 复合唯一键
             FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
             FOREIGN KEY (move_id) REFERENCES pokemon_moves(id) ON DELETE CASCADE
@@ -264,7 +284,9 @@ def up(cursor: sqlite3.Cursor):
             description TEXT,                     -- 区域描述
             min_level INTEGER DEFAULT 1,          -- 最低推荐等级
             max_level INTEGER DEFAULT 100,        -- 最高推荐等级
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
     """)
 
@@ -277,6 +299,9 @@ def up(cursor: sqlite3.Cursor):
             encounter_rate REAL DEFAULT 10.0,     -- 遇见概率（百分比）
             min_level INTEGER DEFAULT 1,          -- 最低等级
             max_level INTEGER DEFAULT 10,         -- 最高等级
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (area_id) REFERENCES adventure_areas(id) ON DELETE CASCADE,
             FOREIGN KEY (pokemon_species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
             UNIQUE(area_id, pokemon_species_id)
@@ -302,6 +327,7 @@ def up(cursor: sqlite3.Cursor):
             item_reward_id INTEGER DEFAULT 1,  -- 获得的道具ID，默认为普通精灵球
             item_quantity INTEGER DEFAULT 1,  -- 道具数量
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (item_reward_id) REFERENCES items(id),
             UNIQUE(user_id, checkin_date)  -- 确保每个用户每天只能签到一次
@@ -325,7 +351,8 @@ def up(cursor: sqlite3.Cursor):
             shop_type TEXT NOT NULL DEFAULT 'normal' CHECK (shop_type IN ('normal','premium','limited')),
             is_active INTEGER DEFAULT 1 NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0         -- 是否已删除
         )
         """
     )
@@ -341,6 +368,8 @@ def up(cursor: sqlite3.Cursor):
             stock INTEGER NOT NULL DEFAULT -1,        -- 库存（-1表示无限库存）
             is_active INTEGER NOT NULL DEFAULT 1,     -- 是否上架（0/1）
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
             FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,
             UNIQUE(shop_id, item_id)                  -- 确保商店内同一道具只出现一次
@@ -371,8 +400,9 @@ def up(cursor: sqlite3.Cursor):
             ivs TEXT,                                 -- 野生宝可梦IV (JSON格式)
             evs TEXT,                                 -- 野生宝可梦EV (JSON格式)
             moves TEXT,                               -- 野生宝可梦招式 (JSON格式)
-            FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
-            UNIQUE(species_id)
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE
         );
     """)
 
@@ -394,7 +424,8 @@ def up(cursor: sqlite3.Cursor):
             is_shiny INTEGER DEFAULT 0,               -- 是否为异色宝可梦 (0=普通, 1=异色)
             encounter_rate REAL,                      -- 遇到概率
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            isdel INTEGER DEFAULT 0,                 -- 是否删除 (0=未删除, 1=已删除)
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            isdel TINYINT(10) DEFAULT 0,                 -- 是否删除 (0=未删除, 1=已删除)
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (pokemon_species_id) REFERENCES wild_pokemon(species_id) ON DELETE CASCADE,
             FOREIGN KEY (area_code) REFERENCES adventure_areas(area_code) ON DELETE CASCADE,

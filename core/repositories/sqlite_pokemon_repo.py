@@ -31,7 +31,9 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
 
         # 将数据库字段转换为PokemonTemplate所需的格式
         row_dict = dict(row)
-
+        row_dict.pop('created_at', None)
+        row_dict.pop('updated_at', None)
+        row_dict.pop('isdel', None)
         # 从字典中提取基础属性值并创建PokemonBaseStats对象
         base_stats = PokemonBaseStats(
             base_hp=row_dict.pop('base_hp'),
@@ -318,5 +320,8 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 except (json.JSONDecodeError, KeyError):
                     # 如果解析失败，保持原始值
                     pass
-
+            # 移除数据库字段
+            row_dict.pop('created_at', None)
+            row_dict.pop('updated_at', None)
+            row_dict.pop('isdel', None)
             return WildPokemonEncounterLog(**row_dict)

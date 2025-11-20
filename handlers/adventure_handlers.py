@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from astrbot.api.event import AstrMessageEvent, MessageEventResult
 from ..core.answer.answer_enum import AnswerEnum
 from ..core.domain.pokemon_models import WildPokemonInfo, UserPokemonInfo
-from ..core.domain.user_models import UserTeam
+from ..core.domain.user_models import UserTeam, UserItems
 from ..core.utils import userid_to_base32
 
 
@@ -240,19 +240,19 @@ class AdventureHandlers:
                 return
 
         # 检查用户背包中的道具
-        user_items = self.plugin.user_repo.get_user_items(user_id)
+        user_items:UserItems = self.plugin.user_repo.get_user_items(user_id)
         pokeball_item = None
-
+        user_item_list = user_items.items
         if item_id is not None:
             # 用户指定了特定的道具ID
-            for item in user_items:
-                if item['item_id'] == item_id and item['type'] == 'Pokeball' and item['quantity'] > 0:
+            for item in user_item_list:
+                if item.item_id == item_id and item.type == 'Pokeball' and item.quantity > 0:
                     pokeball_item = item
                     break
         else:
             # 用户未指定道具ID，自动寻找第一个可用的精灵球
-            for item in user_items:
-                if item['type'] == 'Pokeball' and item['quantity'] > 0:
+            for item in user_item_list:
+                if item.type == 'Pokeball' and item.quantity > 0:
                     pokeball_item = item
                     break
 
@@ -267,9 +267,9 @@ class AdventureHandlers:
 
         # 根据精灵球类型调整基础捕捉率
         ball_multiplier = 1.0  # 普通精灵球
-        if pokeball_item['name'] == '超级球':
+        if pokeball_item.name == '超级球':
             ball_multiplier = 1.5
-        elif pokeball_item['name'] == '高级球':
+        elif pokeball_item.name == '高级球':
             ball_multiplier = 2.0
 
         # 基础捕捉率，考虑精灵球类型
@@ -300,7 +300,7 @@ class AdventureHandlers:
         is_successful = random.random() < catch_success_rate
 
         # 扣除一个精灵球
-        self.plugin.user_repo.add_user_item(user_id, pokeball_item['item_id'], -1)
+        self.plugin.user_repo.add_user_item(user_id, pokeball_item.item_id, -1)
 
         if is_successful:
             # 成功捕捉 - 将野生宝可梦添加到用户宝可梦列表中
@@ -327,8 +327,8 @@ class AdventureHandlers:
             message += f"您成功捕捉到了 {wild_pokemon.name} (Lv.{wild_pokemon.level})！\n\n"
             message += f"已添加到您的宝可梦收藏中。\n\n"
             message += f"宝可梦ID: {new_pokemon.id}\n\n"
-            message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
-            message += f"剩余精灵球: {pokeball_item['quantity'] - 1}"
+            message += f"使用的精灵球: [{pokeball_item.item_id}] {pokeball_item.name}\n\n"
+            message += f"剩余精灵球: {pokeball_item.quantity - 1}"
 
             # 更新野生宝可梦遇到日志 - 标记为已捕捉
             try:
@@ -336,10 +336,10 @@ class AdventureHandlers:
                 recent_encounters = self.plugin.pokemon_repo.get_user_encounters(user_id, limit=5)
                 encounter_log_id = None
                 for encounter in recent_encounters:
-                    if (encounter['pokemon_species_id'] == wild_pokemon.species_id and
-                        encounter['pokemon_level'] == wild_pokemon.level and
-                        encounter['is_captured'] == 0):  # 未捕捉的记录
-                        encounter_log_id = encounter['id']
+                    if (encounter.pokemon_species_id == wild_pokemon.species_id and
+                        encounter.pokemon_level == wild_pokemon.level and
+                        encounter.is_captured == 0):  # 未捕捉的记录
+                        encounter_log_id = encounter.id
                         break
                 if encounter_log_id:
                     self.plugin.pokemon_repo.update_encounter_log(
@@ -352,9 +352,9 @@ class AdventureHandlers:
         else:
             message = f"❌ 捕捉失败！\n\n"
             message += f"{wild_pokemon.name} 逃脱了！\n\n"
-            message += f"使用的精灵球: [{pokeball_item['item_id']}] {pokeball_item['name']}\n\n"
+            message += f"使用的精灵球: [{pokeball_item.item_id}] {pokeball_item.name}\n\n"
             message += f"捕捉成功率: {catch_success_rate * 100:.1f}%\n\n"
-            message += f"剩余精灵球: {pokeball_item['quantity'] - 1}\n\n"
+            message += f"剩余精灵球: {pokeball_item.quantity - 1}\n\n"
             message += "你也可以使用 /逃跑 指令离开这只野生宝可梦。"
 
             # 更新野生宝可梦遇到日志 - 捕捉失败（仍然标记为已交互）
@@ -363,10 +363,10 @@ class AdventureHandlers:
                 recent_encounters = self.plugin.pokemon_repo.get_user_encounters(user_id, limit=5)
                 encounter_log_id = None
                 for encounter in recent_encounters:
-                    if (encounter['pokemon_species_id'] == wild_pokemon.species_id and
-                        encounter['pokemon_level'] == wild_pokemon.level and
-                        encounter['is_captured'] == 0):  # 未捕捉的记录
-                        encounter_log_id = encounter['id']
+                    if (encounter.pokemon_species_id == wild_pokemon.species_id and
+                        encounter.pokemon_level == wild_pokemon.level and
+                        encounter.is_captured == 0):  # 未捕捉的记录
+                        encounter_log_id = encounter.id
                         break
                 if encounter_log_id:
                     self.plugin.pokemon_repo.update_encounter_log(

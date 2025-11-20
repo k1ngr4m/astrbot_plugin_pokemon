@@ -66,7 +66,7 @@ class PokemonPlugin(Star):
                 "initial_coins": user_config.get("initial_coins", 200)
             },
             "adventure": {
-                "cooldown": adventure_config.get("cooldown", 60)
+                "cooldown": adventure_config.get("cooldown_seconds", 10)
             }
         }
 
