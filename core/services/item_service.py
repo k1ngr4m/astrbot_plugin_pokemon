@@ -1,4 +1,7 @@
 from typing import Dict, List, Any
+
+from ..answer.answer_enum import AnswerEnum
+from ..domain.user_models import UserItems
 from ..repositories.abstract_repository import AbstractUserRepository
 
 
@@ -16,21 +19,13 @@ class ItemService:
         Returns:
             包含用户道具信息的字典
         """
-        # 检查用户是否存在
-        user = self.user_repo.get_by_id(user_id)
-        if not user:
-            return {
-                "success": False,
-                "message": "❌ 用户不存在，请先注册！"
-            }
-
         # 获取用户道具
-        user_items = self.user_repo.get_user_items(user_id)
+        user_items: UserItems = self.user_repo.get_user_items(user_id)
 
         if not user_items:
             return {
                 "success": True,
-                "message": "🎒 您的背包是空的，快去签到或冒险获得道具吧！",
+                "message": AnswerEnum.USER_ITEMS_EMPTY.value,
                 "items": []
             }
 
@@ -38,17 +33,17 @@ class ItemService:
         items_by_type = {}
         total_items = 0
 
-        for item in user_items:
-            item_type = item["type"]
+        for item in user_items.items:
+            item_type = item.type
             if item_type not in items_by_type:
                 items_by_type[item_type] = []
             items_by_type[item_type].append(item)
-            total_items += item["quantity"]
+            total_items += item.quantity
 
         return {
             "success": True,
             "message": f"🎒 您的背包 (共{total_items}件物品)",
-            "items": user_items,
+            "items": user_items.items,
             "items_by_type": items_by_type,
             "total_count": total_items
         }
@@ -84,9 +79,9 @@ class ItemService:
             formatted_text += f"🔸 {type_name}:\n"
 
             for item in items:
-                formatted_text += f"  • [{item['item_id']}] {item['name']} x{item['quantity']}\n"
-                if item['description']:
-                    formatted_text += f"    {item['description']}\n"
+                formatted_text += f"  • [{item.item_id}] {item.name} x{item.quantity}\n"
+                if item.description:
+                    formatted_text += f"    {item.description}\n"
             formatted_text += "\n"
 
         return formatted_text.strip()

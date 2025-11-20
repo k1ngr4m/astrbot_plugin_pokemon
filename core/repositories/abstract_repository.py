@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
-from ..domain.user_models import User, UserTeam
+from ..domain.user_models import User, UserTeam, UserItems
 from ..domain.pokemon_models import PokemonCreateResult, PokemonTemplate, UserPokemonInfo, PokemonDetail, \
     WildPokemonInfo, WildPokemonEncounterLog
 from ..domain.adventure_models import AdventureArea, AreaPokemon, AreaInfo
@@ -63,7 +63,7 @@ class AbstractUserRepository(ABC):
 
     # 获取用户的所有物品
     @abstractmethod
-    def get_user_items(self, user_id: str) -> list: pass
+    def get_user_items(self, user_id: str) -> UserItems: pass
 
 
 class AbstractPokemonRepository(ABC):

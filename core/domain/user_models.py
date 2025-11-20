@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional, TypedDict, Dict, List
+from typing import Optional, TypedDict, Dict, List, Any
 
 from dataclasses import dataclass
 
@@ -26,3 +26,19 @@ class UserTeam:
     """代表一个用户的队伍领域模型"""
     user_id: str
     team_pokemon_ids: List[int] = None
+
+@dataclass
+class UserItemInfo:
+    """代表一个用户的道具信息领域模型"""
+    item_id: str
+    quantity: int
+    name: str
+    type: int
+    description: str
+    rarity: int
+
+@dataclass
+class UserItems:
+    """代表一个用户的道具领域模型"""
+    user_id: str
+    items: List[UserItemInfo] = None

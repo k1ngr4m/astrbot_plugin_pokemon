@@ -7,7 +7,7 @@ from datetime import datetime
 
 from astrbot.api import logger
 from ..domain.pokemon_models import PokemonTemplate, PokemonIVs, PokemonEVs, PokemonStats
-from ..domain.user_models import User
+from ..domain.user_models import User, UserItems, UserItemInfo
 from ..domain.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserRepository
 
@@ -384,7 +384,7 @@ class SqliteUserRepository(AbstractUserRepository):
                 """, (user_id, item_id, quantity))
             conn.commit()
 
-    def get_user_items(self, user_id: str) -> list:
+    def get_user_items(self, user_id: str) -> UserItems:
         """
         获取用户的所有物品
         Args:
@@ -399,23 +399,25 @@ class SqliteUserRepository(AbstractUserRepository):
             SELECT ui.item_id, ui.quantity, i.name, i.type, i.description, i.rarity
             FROM user_items ui
             JOIN items i ON ui.item_id = i.id
-            WHERE ui.user_id = ?
+            WHERE ui.user_id = ? and ui.quantity > 0
             ORDER BY i.type, i.rarity DESC, i.name
             """
             cursor.execute(sql, (user_id,))
             rows = cursor.fetchall()
-
-            user_items = []
+            items_list = []
             for row in rows:
-                user_items.append({
-                    "item_id": row[0],
-                    "quantity": row[1],
-                    "name": row[2],
-                    "type": row[3],
-                    "description": row[4],
-                    "rarity": row[5]
-                })
-
+                items_list.append(UserItemInfo(
+                        item_id=row[0],
+                        quantity=row[1],
+                        name=row[2],
+                        type=row[3],
+                        description=row[4],
+                        rarity=row[5]
+                ))
+            user_items: UserItems = UserItems(
+                user_id=user_id,
+                items=items_list
+            )
             return user_items
 
     def update_user_last_adventure_time(self, user_id: str, last_adventure_time: float) -> None:
