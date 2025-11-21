@@ -53,3 +53,5 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_shop_items_shop_id ON shop_items(shop_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_shop_items_item_id ON shop_items(item_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_shop_items_active ON shop_items(is_active)")
+
+    logger.info("✅ 003_initial_shop_table完成")

@@ -14,7 +14,7 @@ def up(cursor: sqlite3.Cursor):
     # --- 1. 宝可梦种族定义（图鉴） ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_species (
-            id INTEGER PRIMARY KEY,               -- 种族ID
+            id INTEGER PRIMARY KEY AUTOINCREMENT, -- 种族ID
             name_en TEXT NOT NULL,                -- 英文名
             name_zh TEXT,                         -- 中文名
             generation_id INTEGER,                   -- 世代编号
@@ -31,6 +31,7 @@ def up(cursor: sqlite3.Cursor):
             capture_rate INTEGER,
             growth_rate_id INTEGER,
             description TEXT,                      -- 图鉴描述
+            orders INTEGER,
             isdel TINYINT(10) DEFAULT 0            -- 是否已删除
         );
     """)
@@ -38,17 +39,7 @@ def up(cursor: sqlite3.Cursor):
     # pokemon_species表索引
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_name ON pokemon_species(name_zh, name_en)")
 
-    # --- 2. 宝可梦升级速率组 ---
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pokemon_growth_rates (
-            id INTEGER PRIMARY KEY,
-            name TEXT NOT NULL,
-            formula TEXT NOT NULL,
-            isdel TINYINT(10) DEFAULT 0            -- 是否已删除
-        );
-    """)
-
-    # --- 3. 宝可梦属性类型 ---
+    # --- 2. 宝可梦属性类型 ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- 属性ID
@@ -58,7 +49,7 @@ def up(cursor: sqlite3.Cursor):
         );
     """)
 
-    # --- 4. 宝可梦技能定义（不完全，有点复杂，先放着） ---
+    # --- 3. 宝可梦技能定义（不完全，有点复杂，先放着） ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_moves (
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- 技能ID
@@ -73,11 +64,12 @@ def up(cursor: sqlite3.Cursor):
             FOREIGN KEY (type_id) REFERENCES pokemon_types(id)
         );
     """)
+
     # pokemon_moves表索引
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_name ON pokemon_moves(name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(type_id)")
 
-    # --- 5. 道具系统（后面可能也要重构） ---
+    # --- 4. 道具系统（后面可能也要重构） ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- 道具ID
@@ -96,15 +88,15 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(type)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_rarity ON items(rarity)")
 
-    # --- 6. 宝可梦种族与属性对应关系 ---
+    # --- 5. 宝可梦种族与属性对应关系 ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_species_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT, -- 关联ID
             species_id INTEGER NOT NULL,          -- 种族ID
-            type_id INTEGER NOT NULL,             -- 属性ID
-            PRIMARY KEY (species_id, type_id),
+            type_id INTEGER NOT NULL,             -- 属性ID            
+            isdel TINYINT(10) DEFAULT 0,            -- 是否已删除
             FOREIGN KEY (species_id) REFERENCES pokemon_species(id),
-            FOREIGN KEY (type_id) REFERENCES pokemon_types(id),
-            isdel TINYINT(10) DEFAULT 0            -- 是否已删除
+            FOREIGN KEY (type_id) REFERENCES pokemon_types(id)
         );
     """)
 
@@ -112,10 +104,10 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_types_species_id ON pokemon_species_types(species_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_types_type_id ON pokemon_species_types(type_id)")
 
-    # --- 7. 宝可梦种族进化关系 ---
+    # --- 6. 宝可梦种族进化关系 ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_evolutions (
-            id INTEGER PRIMARY KEY,                           -- 进化记录ID
+            id INTEGER PRIMARY KEY AUTOINCREMENT, -- 进化记录ID
             pre_species_id INTEGER,                           -- 进化前宝可梦ID，外键关联pokemon_species.id
             evolved_species_id INTEGER NOT NULL,              -- 进化后宝可梦ID，外键关联pokemon_species.id
             evolution_trigger_id INTEGER,                     -- 进化触发类型ID
@@ -147,7 +139,7 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("""CREATE INDEX idx_pokemon_evolution_evolved_species_id ON pokemon_evolutions(evolved_species_id);""")
     cursor.execute("""CREATE INDEX idx_pokemon_evolution_evolution_trigger_id ON pokemon_evolutions(evolution_trigger_id);""")
 
-    # 8. 宝可梦种族-技能学习关系表（待重构）
+    # 7. 宝可梦种族-技能学习关系表（待重构）
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_species_moves (
             species_id INTEGER NOT NULL,          -- 宝可梦种族ID
@@ -165,7 +157,7 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_moves_species_id ON pokemon_species_moves(species_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_moves_move_id ON pokemon_species_moves(move_id)")
 
-    # --- 11. 冒险地点 ---
+    # --- 8. 冒险地点 ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS locations (
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- 区域ID
@@ -179,7 +171,7 @@ def up(cursor: sqlite3.Cursor):
         );
     """)
 
-    # --- 12. 地点宝可梦关联表 ---
+    # --- 9. 地点宝可梦关联表 ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_location (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -198,7 +190,6 @@ def up(cursor: sqlite3.Cursor):
     """)
 
     # 为地点宝可梦关联表创建索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_locations_code ON locations(location_code)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_location_location_id ON pokemon_location(location_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_location_species_id ON pokemon_location(pokemon_species_id)")
 
@@ -248,12 +239,8 @@ def up(cursor: sqlite3.Cursor):
         CREATE TABLE IF NOT EXISTS wild_pokemon_encounter_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id TEXT NOT NULL,                    -- 遇到宝可梦的用户ID
-            pokemon_species_id INTEGER NOT NULL,           -- 遇到的野生宝可梦ID
-            pokemon_name TEXT NOT NULL,                           -- 遇到的野生宝可梦名称
-            pokemon_level INTEGER NOT NULL,                           -- 野生宝可梦等级
-            pokemon_info TEXT,                           -- 野生宝可梦详细信息 (JSON格式)
-            area_code TEXT NOT NULL,                        -- 遇到的区域编码
-            area_name TEXT NOT NULL,                           -- 遇到的区域名称
+            wild_pokemon_id INTEGER NOT NULL,
+            location_id INTEGER NOT NULL,                        -- 遇到的区域ID
             encounter_time TEXT DEFAULT CURRENT_TIMESTAMP, -- 遇到时间
             is_captured INTEGER DEFAULT 0,            -- 是否被捕捉 (0=未捕捉, 1=已捕捉)
             is_battled INTEGER DEFAULT 0,             -- 是否进行了战斗 (0=未战斗, 1=已战斗)
@@ -263,9 +250,9 @@ def up(cursor: sqlite3.Cursor):
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             isdel TINYINT(10) DEFAULT 0,                 -- 是否删除 (0=未删除, 1=已删除)
             FOREIGN KEY (user_id) REFERENCES users(user_id),
-            FOREIGN KEY (pokemon_species_id) REFERENCES wild_pokemon(species_id) ON DELETE CASCADE,
-            FOREIGN KEY (area_code) REFERENCES adventure_areas(area_code) ON DELETE CASCADE,
-            UNIQUE(user_id, pokemon_species_id, area_code, encounter_time)
+            FOREIGN KEY (wild_pokemon_id) REFERENCES wild_pokemon(id) ON DELETE CASCADE,
+            FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE,
+            UNIQUE(user_id, wild_pokemon_id, location_id, encounter_time)
         );
     """)
 
@@ -274,4 +261,4 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_wild_pokemon_encounter_is_captured ON wild_pokemon_encounter_log(is_captured)")
 
 
-    logger.info("✅ 数据库初始结构创建完成 (SQLite)")
+    logger.info("✅ 001_initial_pokemon_table完成")

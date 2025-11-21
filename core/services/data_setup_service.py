@@ -1,35 +1,46 @@
+import os
+import pandas as pd
+from typing import List, Dict, Any
+
 from ..repositories.abstract_repository import (
     AbstractPokemonRepository,
     AbstractAdventureRepository,
     AbstractShopRepository,
 )
-from ..database.data.initial_data import (
-    POKEMON_SPECIES_DATA, POKEMON_TYPES_DATA, POKEMON_SPECIES_TYPES_DATA, POKEMON_EVOLUTION_DATA, ITEM_DATA,
-    POKEMON_MOVES_DATA, ADVENTURE_AREAS_DATA, AREA_POKEMON_DATA,
-)
-from ..domain.adventure_models import AdventureArea, AreaPokemon
-from ..domain.shop_models import Shop, ShopItem
-from ..database.data.pokemon_moves_data import (
-    POKEMON_SPECIES_MOVES_DATA,
-)
 from astrbot.api import logger
 
+
 class DataSetupService:
-    """负责在首次启动时初始化游戏基础数据。"""
+    """负责在首次启动时初始化游戏基础数据，从v3 CSV文件读取数据。"""
 
     def __init__(self,
                  pokemon_repo: AbstractPokemonRepository,
                  adventure_repo: AbstractAdventureRepository,
                  shop_repo=AbstractShopRepository,
+                 data_path: str = None
                  ):
         self.pokemon_repo = pokemon_repo
         self.adventure_repo = adventure_repo
         self.shop_repo = shop_repo
+        # 如果未指定路径，则使用相对于插件根目录的路径
+        if data_path is None:
+            plugin_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            self.data_path = os.path.join(plugin_root_dir,"astrbot_plugin_pokemon", "core", "database", "data", "v3")
+        else:
+            self.data_path = data_path
 
+    def _read_csv_data(self, filename: str) -> pd.DataFrame:
+        """读取CSV文件数据"""
+        file_path = os.path.join(self.data_path, filename)
+        if not os.path.exists(file_path):
+            logger.warning(f"CSV文件不存在: {file_path}")
+            return pd.DataFrame()
+        return pd.read_csv(file_path)
 
     def setup_initial_data(self):
         """
         检查核心数据表是否为空，如果为空则进行数据填充。
+        从v3目录中的CSV文件读取数据并填充到数据库。
         这是一个幂等操作（idempotent），可以安全地多次调用而不会重复插入数据。
         """
         try:
@@ -41,108 +52,92 @@ class DataSetupService:
             # 如果表不存在等数据库错误，也需要继续执行创建和插入
             logger.error(f"检查数据时发生错误 (可能是表不存在，将继续初始化): {e}")
 
-        logger.info("检测到数据库为空或核心数据不完整，正在初始化游戏数据...")
+        logger.info("检测到数据库为空或核心数据不完整，正在从v3目录初始化游戏数据...")
 
-        # 填充Pokemon类型数据
-        for type in POKEMON_TYPES_DATA:
-            self.pokemon_repo.add_pokemon_type_template(
-                {
-                    "name": type[0],
-                }
-            )
+        # 读取v3目录中的CSV数据
+        pokemon_species_df = self._read_csv_data("pokemon_species.csv")
+        pokemon_types_df = self._read_csv_data("pokemon_types.csv")
+        pokemon_species_types_df = self._read_csv_data("pokemon_species_types.csv")
+        pokemon_evolution_df = self._read_csv_data("pokemon_evolution.csv")
+        # 注意：初始数据中的其他数据（如技能、物品、冒险区域等）可能仍需要从其他来源获取
+        # 我们假设这些数据仍然在initial_data.py中，或者需要创建对应的CSV文件
+
         # 填充Pokemon数据
-        for pokemon in POKEMON_SPECIES_DATA:
-            self.pokemon_repo.add_pokemon_template(
-                {
-                    "id": pokemon[0],
-                    "name_en": pokemon[1],
-                    "name_cn": pokemon[2],
-                    "generation": pokemon[3],
-                    "base_hp": pokemon[4],
-                    "base_attack": pokemon[5],
-                    "base_defense": pokemon[6],
-                    "base_sp_attack": pokemon[7],
-                    "base_sp_defense": pokemon[8],
-                    "base_speed": pokemon[9],
-                    "height": pokemon[10],
-                    "weight": pokemon[11],
-                    "description": pokemon[12],
-                }
-            )
-        # 填充Pokemon类型关联数据
-        for species_type in POKEMON_SPECIES_TYPES_DATA:
-            self.pokemon_repo.add_pokemon_species_type_template(
-                {
-                    "species_id": species_type[0],
-                    "type_id": species_type[1],
-                }
-            )
-        for evaluation in POKEMON_EVOLUTION_DATA:
-            self.pokemon_repo.add_pokemon_evolution_template(
-                {
-                    "from_species_id": evaluation[0],
-                    "to_species_id": evaluation[1],
-                    "method": evaluation[2],
-                    "condition_value": evaluation[3],
-                }
-            )
-        for item in ITEM_DATA:
-            self.pokemon_repo.add_item_template(
-                {
-                    "id": item[0],
-                    "name": item[1],
-                    "rarity": item[2],
-                    "price": item[3],
-                    "type": item[4],
-                    "description": item[5],
-                }
-            )
-        for moves in POKEMON_MOVES_DATA:
-            self.pokemon_repo.add_pokemon_move_template(
-                {
-                    "id": moves[0],
-                    "name": moves[1],
-                    "type_id": moves[2],
-                    "category": moves[3],
-                    "power": moves[4],
-                    "accuracy": moves[5],
-                    "pp": moves[6],
-                    "description": moves[7],
-                }
-            )
-        for species_moves in POKEMON_SPECIES_MOVES_DATA:
-            self.pokemon_repo.add_pokemon_species_move_template(
-                {
-                    "species_id": species_moves[0],
-                    "move_id": species_moves[1],
-                    "learn_method": species_moves[2],
-                    "learn_value": species_moves[3],
-                }
-            )
-
-        for area in ADVENTURE_AREAS_DATA:
-            self.adventure_repo.add_area_template(
-                {
-                    "area_code": area[0],
-                    "area_name": area[1],
-                    "description": area[2],
-                    "min_level": area[3],
-                    "max_level": area[4],
-                }
-            )
-
-        # 填充区域宝可梦关联数据
-        for area_pokemon in AREA_POKEMON_DATA:
-            # area_pokemon[0]是区域代码，需要先获取区域ID
-            area = self.adventure_repo.get_area_by_code(area_pokemon[0])
-            if area:
-                self.adventure_repo.add_area_pokemon_template(
+        if not pokemon_species_df.empty:
+            for _, pokemon_row in pokemon_species_df.iterrows():
+                self.pokemon_repo.add_pokemon_template(
                     {
-                        "area_id": area.id,
-                        "pokemon_species_id": area_pokemon[1],
-                        "encounter_rate": area_pokemon[2],
-                        "min_level": area_pokemon[3],
-                        "max_level": area_pokemon[4],
+                        "id": pokemon_row['id'],
+                        "name_en": pokemon_row['name_en'],
+                        "name_zh": pokemon_row['name_zh'],
+                        "generation_id": pokemon_row['generation_id'],
+                        "base_hp": pokemon_row['base_hp'],
+                        "base_attack": pokemon_row['base_attack'],
+                        "base_defense": pokemon_row['base_defense'],
+                        "base_sp_attack": pokemon_row['base_sp_attack'],
+                        "base_sp_defense": pokemon_row['base_sp_defense'],
+                        "base_speed": pokemon_row['base_speed'],
+                        "height": pokemon_row['height'],
+                        "weight": pokemon_row['weight'],
+                        "base_experience": pokemon_row['base_experience'],
+                        "gender_rate": pokemon_row['gender_rate'],
+                        "capture_rate": pokemon_row['capture_rate'],
+                        "growth_rate_id": pokemon_row['growth_rate_id'],
+                        "description": pokemon_row['description'],
+                        "orders": pokemon_row['order'] if 'order' in pokemon_species_df.columns else pokemon_row['id']
                     }
                 )
+
+        # 填充Pokemon类型数据
+        if not pokemon_types_df.empty:
+            for _, type_row in pokemon_types_df.iterrows():
+                self.pokemon_repo.add_pokemon_type_template(
+                    {
+                        "id": type_row['id'],
+                        "name_en": type_row['name_en'],  # 英文名称
+                        "name_zh": type_row['name_zh'],  # 中文名称
+                    }
+                )
+
+        # 填充Pokemon类型关联数据
+        if not pokemon_species_types_df.empty:
+            for _, species_type_row in pokemon_species_types_df.iterrows():
+                self.pokemon_repo.add_pokemon_species_type_template(
+                    {
+                        "species_id": int(species_type_row['pokemon_id']),
+                        "type_id": int(species_type_row['type_id']),
+                    }
+                )
+
+        # 填充Pokemon进化数据
+        if not pokemon_evolution_df.empty:
+            for _, evolution_row in pokemon_evolution_df.iterrows():
+                # 直接使用CSV中的字段映射到数据库字段
+                evolution_data = {
+                    "id": evolution_row['id'],
+                    "pre_species_id": evolution_row['pre_species_id'],
+                    "evolved_species_id": evolution_row['evolved_species_id'],
+                    "evolution_trigger_id": evolution_row.get('evolution_trigger_id', 0),
+                    "trigger_item_id": evolution_row.get('trigger_item_id', 0),
+                    "minimum_level": evolution_row.get('minimum_level', 0),
+                    "gender_id": evolution_row.get('gender_id', 0),
+                    "location_id": evolution_row.get('location_id', 0),
+                    "held_item_id": evolution_row.get('held_item_id', 0),
+                    "time_of_day": evolution_row.get('time_of_day', ''),
+                    "known_move_id": evolution_row.get('known_move_id', 0),
+                    "known_move_type_id": evolution_row.get('known_move_type_id', 0),
+                    "minimum_happiness": evolution_row.get('minimum_happiness', 0),
+                    "minimum_beauty": evolution_row.get('minimum_beauty', 0),
+                    "minimum_affection": evolution_row.get('minimum_affection', 0),
+                    "relative_physical_stats": evolution_row.get('relative_physical_stats', 0),
+                    "party_species_id": evolution_row.get('party_species_id', 0),
+                    "party_type_id": evolution_row.get('party_type_id', 0),
+                    "trade_species_id": evolution_row.get('trade_species_id', 0),
+                    "needs_overworld_rain": evolution_row.get('needs_overworld_rain', 0),
+                    "turn_upside_down": evolution_row.get('turn_upside_down', 0),
+                    "region_id": evolution_row.get('region_id', 0),
+                    "base_form_id": evolution_row.get('base_form_id', 0)
+                }
+
+                self.pokemon_repo.add_pokemon_evolution_template(evolution_data)
 

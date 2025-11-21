@@ -1,5 +1,6 @@
 import sqlite3
 import threading
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 # 导入抽象基类和领域模型
@@ -68,13 +69,15 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR IGNORE INTO pokemon_species
-                (id, name_en, name_cn, generation, base_hp, base_attack,
+                (id, name_en, name_zh, generation_id, base_hp, base_attack,
                  base_defense, base_sp_attack, base_sp_defense, base_speed,
-                height, weight, description)
-                VALUES (:id, :name_en, :name_cn, :generation, :base_hp,
+                height, weight, base_experience, gender_rate, capture_rate, 
+                 growth_rate_id, description, orders)
+                VALUES (:id, :name_en, :name_zh, :generation_id, :base_hp,
                         :base_attack, :base_defense, :base_sp_attack,
                         :base_sp_defense, :base_speed, :height, :weight,
-                        :description)
+                        :base_experience, :gender_rate, :capture_rate, 
+                        :growth_rate_id, :description, :orders)
             """, {**data})
             conn.commit()
 
@@ -83,9 +86,12 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR IGNORE INTO pokemon_types
-                (name)
-                VALUES (:name)
-            """, {**data})
+                (name_en, name_zh)
+                VALUES (:name_en, :name_zh)
+            """, {
+                'name_en': data.get('name_en', data.get('name', '')),
+                'name_zh': data.get('name_zh', data.get('name', ''))
+            })
             conn.commit()
 
     def add_pokemon_species_type_template(self, data: Dict[str, Any]) -> None:
@@ -103,9 +109,40 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR IGNORE INTO pokemon_evolutions
-                (from_species_id, to_species_id, method, condition_value)
-                VALUES (:from_species_id, :to_species_id, :method, :condition_value)
-            """, {**data})
+                (pre_species_id, evolved_species_id, evolution_trigger_id, trigger_item_id,
+                 minimum_level, gender_id, held_item_id, time_of_day, known_move_id,
+                 minimum_happiness, minimum_beauty, minimum_affection,
+                 relative_physical_stats, party_species_id, trade_species_id,
+                 needs_overworld_rain)
+                VALUES (:pre_species_id, :evolved_species_id, :evolution_trigger_id, :trigger_item_id,
+                        :minimum_level, :gender_id, :held_item_id, :time_of_day, :known_move_id,
+                        :minimum_happiness, :minimum_beauty, :minimum_affection,
+                        :relative_physical_stats, :party_species_id, :trade_species_id,
+                        :needs_overworld_rain)
+            """, {
+                'pre_species_id': data.get('from_species_id', data.get('pre_species_id')),
+                'evolved_species_id': data.get('to_species_id', data.get('evolved_species_id')),
+                'evolution_trigger_id': data.get('evolution_trigger_id', data.get('method', 0)),
+                'trigger_item_id': data.get('trigger_item_id', data.get('condition_value', 0)),
+                'minimum_level': data.get('minimum_level', data.get('level', 0)),
+                'gender_id': data.get('gender_id', 0),
+                'location_id': data.get('location_id', 0),
+                'held_item_id': data.get('held_item_id', 0),
+                'time_of_day': data.get('time_of_day', ''),
+                'known_move_id': data.get('known_move_id', 0),
+                'known_move_type_id': data.get('known_move_type_id', 0),
+                'minimum_happiness': data.get('minimum_happiness', 0),
+                'minimum_beauty': data.get('minimum_beauty', 0),
+                'minimum_affection': data.get('minimum_affection', 0),
+                'relative_physical_stats': data.get('relative_physical_stats', 0),
+                'party_species_id': data.get('party_species_id', 0),
+                'party_type_id': data.get('party_type_id', 0),
+                'trade_species_id': data.get('trade_species_id', 0),
+                'needs_overworld_rain': data.get('needs_overworld_rain', 0),
+                'turn_upside_down': data.get('turn_upside_down', 0),
+                'region_id': data.get('region_id', 0),
+                'base_form_id': data.get('base_form_id', 0)
+            })
             conn.commit()
 
     def add_item_template(self, data: Dict[str, Any]) -> None:
@@ -142,7 +179,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT t.name FROM pokemon_types t
+                SELECT t.name_zh FROM pokemon_types t
                 JOIN pokemon_species_types st ON t.id = st.type_id
                 WHERE st.species_id = ?
             """, (species_id,))
@@ -163,32 +200,23 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE user_pokemon
-                SET current_hp = :current_hp, attack = :attack, defense = :defense, sp_attack = :sp_attack, sp_defense = :sp_defense, speed = :speed
+                SET hp = :hp, attack = :attack, defense = :defense, sp_attack = :sp_attack, sp_defense = :sp_defense, speed = :speed
                 WHERE id = :id AND user_id = :user_id
             """, {**attributes, 'id': pokemon_id, 'user_id': user_id})
             conn.commit()
 
-    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo, area_info: AreaInfo, encounter_rate: float) -> None:
+    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon_id: int, location_id: int, encounter_rate: float) -> None:
         """添加野生宝可梦遇到记录"""
-        pokemon_species_id = wild_pokemon.species_id
-        pokemon_name = wild_pokemon.name
-        area_code = area_info.area_code
-        area_name = area_info.area_name
-        pokemon_level = wild_pokemon.level
-        encounter_rate = encounter_rate
-        import json
-        pokemon_info = json.dumps(wild_pokemon.model_dump_json(), ensure_ascii=False)
-
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO wild_pokemon_encounter_log
-                (user_id, pokemon_species_id, pokemon_name, pokemon_level, pokemon_info, 
-                 area_code, area_name, encounter_rate)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (user_id, wild_pokemon_id, location_id, encounter_time,
+                 encounter_rate)
+                VALUES (?, ?, ?, ?, ?)
             """, (
-                user_id, pokemon_species_id, pokemon_name, pokemon_level, pokemon_info,
-                area_code, area_name, encounter_rate
+                user_id, wild_pokemon_id, location_id, datetime.now(),
+                encounter_rate
             ))
             conn.commit()
 
@@ -241,14 +269,14 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
-    def get_user_pokemon_encounter_count(self, user_id: str, pokemon_species_id: int) -> int:
+    def get_user_pokemon_encounter_count(self, user_id: str, wild_pokemon_id: int) -> int:
         """获取用户遇到的某个特定物种的次数"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT COUNT(*) as count FROM wild_pokemon_encounter_log
-                WHERE user_id = ? AND pokemon_species_id = ?
-            """, (user_id, pokemon_species_id))
+                WHERE user_id = ? AND wild_pokemon_id = ?
+            """, (user_id, wild_pokemon_id))
             row = cursor.fetchone()
             return row['count'] if row else 0
 

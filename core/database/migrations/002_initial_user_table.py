@@ -165,3 +165,5 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_checkins_user_id ON user_checkins(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_checkins_date ON user_checkins(checkin_date)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_checkins_user_date ON user_checkins(user_id, checkin_date)")
+
+    logger.info("✅ 002_initial_user_table完成")

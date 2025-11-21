@@ -100,7 +100,7 @@ class AbstractPokemonRepository(ABC):
 
     # 添加野生宝可梦遇到记录
     @abstractmethod
-    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo, area_info: AreaInfo, encounter_rate: float) -> None: pass
+    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon_id: int, location_id: int, encounter_rate: float) -> None: pass
 
     # ==========改==========
     # 更新宝可梦经验
