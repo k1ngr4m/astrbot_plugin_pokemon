@@ -175,7 +175,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
         area_code = area_info.area_code
         area_name = area_info.area_name
         pokemon_level = wild_pokemon.level
-        is_shiny = wild_pokemon.is_shiny
         encounter_rate = encounter_rate
         import json
         pokemon_info = json.dumps(wild_pokemon.model_dump_json(), ensure_ascii=False)
@@ -185,11 +184,11 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor.execute("""
                 INSERT INTO wild_pokemon_encounter_log
                 (user_id, pokemon_species_id, pokemon_name, pokemon_level, pokemon_info, 
-                 area_code, area_name, is_shiny, encounter_rate)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 area_code, area_name, encounter_rate)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 user_id, pokemon_species_id, pokemon_name, pokemon_level, pokemon_info,
-                area_code, area_name, is_shiny, encounter_rate
+                area_code, area_name, encounter_rate
             ))
             conn.commit()
 
@@ -310,7 +309,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                         gender=pokemon_info_data['gender'],
                         level=pokemon_info_data['level'],
                         exp=pokemon_info_data['exp'],
-                        is_shiny=pokemon_info_data['is_shiny'],
                         stats=PokemonStats(**pokemon_info_data['stats']),
                         ivs=PokemonIVs(**pokemon_info_data['ivs']),
                         evs=PokemonEVs(**pokemon_info_data['evs']),

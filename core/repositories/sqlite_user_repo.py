@@ -115,13 +115,13 @@ class SqliteUserRepository(AbstractUserRepository):
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 current_hp, attack, defense, sp_attack, sp_defense, speed,
-                is_shiny, moves, caught_time, shortcode
+                moves, caught_time, shortcode
             )
             VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
-                ?, ?, CURRENT_TIMESTAMP, ?
+                ?, CURRENT_TIMESTAMP, ?
             )
             """
 
@@ -155,7 +155,6 @@ class SqliteUserRepository(AbstractUserRepository):
             sp_defense = stats["sp_defense"]
             speed = stats["speed"]
 
-            is_shiny = pokemon["is_shiny"]
             moves = pokemon["moves"]
             # 获取新记录的ID（先插入然后获取ID用于生成短码）
             cursor.execute(sql, (
@@ -163,7 +162,7 @@ class SqliteUserRepository(AbstractUserRepository):
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                is_shiny, moves, f"P{0:04d}"
+                moves, f"P{0:04d}"
             ))
             new_id = cursor.lastrowid
             conn.commit()
@@ -236,7 +235,6 @@ class SqliteUserRepository(AbstractUserRepository):
             gender=row_dict['gender'],
             level=row_dict['level'],
             exp=row_dict['exp'],
-            is_shiny=row_dict['is_shiny'],
             stats=stats,
             ivs=ivs,
             evs=evs,

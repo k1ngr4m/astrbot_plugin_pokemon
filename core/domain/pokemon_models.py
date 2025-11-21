@@ -99,7 +99,6 @@ class PokemonDetail:
     gender: str
     level: int
     exp: int
-    is_shiny: int
     stats: PokemonStats
     ivs: PokemonIVs
     evs: PokemonEVs
@@ -125,7 +124,6 @@ class UserPokemonInfo:
     gender: str
     level: int
     exp: int
-    is_shiny: int
     stats: PokemonStats
     ivs: PokemonIVs
     evs: PokemonEVs
@@ -154,7 +152,6 @@ class UserPokemonInfo:
             "gender": self.gender,
             "level": self.level,
             "exp": self.exp,
-            "is_shiny": self.is_shiny,
             "stats": get_dict(self.stats),
             "ivs": get_dict(self.ivs),
             "evs": get_dict(self.evs),
@@ -169,7 +166,6 @@ class WildPokemonInfo:
     gender: str
     level: int
     exp: int
-    is_shiny: int
     stats: PokemonStats
     ivs: PokemonIVs
     evs: PokemonEVs
@@ -193,7 +189,6 @@ class WildPokemonInfo:
             "gender": self.gender,
             "level": self.level,
             "exp": self.exp,
-            "is_shiny": self.is_shiny,
             "stats": get_dict(self.stats),
             "ivs": get_dict(self.ivs),
             "evs": get_dict(self.evs),
@@ -218,7 +213,6 @@ class WildPokemonEncounterLog:
     is_captured: Optional[int] = None
     is_battled: Optional[int] = None
     battle_result: Optional[str] = None
-    is_shiny: Optional[int] = None
     encounter_rate: Optional[float] = None
     created_at: Optional[str] = None
     isdel: Optional[int] = 0

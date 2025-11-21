@@ -14,7 +14,6 @@ from ..domain.user_models import User
 class PokemonService:
     """封装与宝可梦相关的业务逻辑"""
 
-    SHINY_PROBABILITY_DENOMINATOR = 4096  # 异色概率分母
     HP_FORMULA_CONSTANT = 10  # HP计算公式常量
     NON_HP_FORMULA_CONSTANT = 5  # 非HP属性计算公式常量
 
@@ -71,7 +70,6 @@ class PokemonService:
         level = random.randint(min_level, max_level)
         exp = 0
         moves = None
-        is_shiny = 1 if random.randint(1, self.SHINY_PROBABILITY_DENOMINATOR) == 1 else 0
 
         # 3. 生成IV和EV（使用局部函数简化）
         ivs = {
@@ -116,7 +114,6 @@ class PokemonService:
                 gender=gender,
                 level=level,
                 exp=exp,
-                is_shiny=is_shiny,
                 stats= PokemonStats(
                     hp=stats["hp"],
                     attack=stats["attack"],

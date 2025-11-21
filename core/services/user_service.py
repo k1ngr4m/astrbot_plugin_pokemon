@@ -149,7 +149,6 @@ class UserService:
             stats = new_pokemon_data["stats"],
             ivs = new_pokemon_data["ivs"],
             evs = new_pokemon_data["evs"],
-            is_shiny = new_pokemon_data["is_shiny"],
             moves = new_pokemon_data["moves"],
         )
 
@@ -206,7 +205,6 @@ class UserService:
         # 初始技能为空数组
         moves = '[]'
 
-        is_shiny = 0
 
         pokemon = {
             'base_pokemon': base_pokemon,
@@ -226,7 +224,6 @@ class UserService:
             'level': level,
             'exp': exp,
             'moves': moves,
-            'is_shiny': is_shiny,
         }
 
         return pokemon
@@ -249,7 +246,6 @@ class UserService:
             }
 
         # 显示详细信息
-        shiny_str = "✨" if pokemon_data["is_shiny"] else ""
         gender_str = {
             "M": "♂️",
             "F": "♀️",
@@ -257,7 +253,7 @@ class UserService:
         }.get(pokemon_data["gender"], "")
 
         message = f"🔍 宝可梦详细信息：\n\n"
-        message += f"{shiny_str}{pokemon_data['name']} {gender_str}\n\n"
+        message += f"{pokemon_data['name']} {gender_str}\n\n"
         message += f"等级: {pokemon_data['level']}\n"
         message += f"经验: {pokemon_data['exp']}\n\n"
 
@@ -328,20 +324,18 @@ class UserService:
                 "sp_attack": pokemon["stats"]["sp_attack"],
                 "sp_defense": pokemon["stats"]["sp_defense"],
                 "speed": pokemon["stats"]["speed"],
-                "is_shiny": pokemon["is_shiny"],
             })
 
         # 组织显示信息
         message = f"🌟 您拥有 {len(formatted_pokemon)} 只宝可梦：\n\n"
         for i, pokemon in enumerate(formatted_pokemon, 1):
-            shiny_str = "✨" if pokemon["is_shiny"] else ""
             gender_str = {
                 "M": "♂️",
                 "F": "♀️",
                 "N": "⚲"
             }.get(pokemon["gender"], "")
 
-            message += f"{i}. {shiny_str}{pokemon['name']} {gender_str}\n"
+            message += f"{i}. {pokemon['name']} {gender_str}\n"
             message += f"   ID：{pokemon['id']} | 等级: {pokemon['level']} | HP: {pokemon['hp']}\n"
 
         message += f"\n您可以使用 /我的宝可梦 <宝可梦ID> 来查看特定宝可梦的详细信息。"

@@ -125,7 +125,6 @@ class AdventureService:
                     gender=wild_pokemon.gender,
                     level=wild_pokemon_level,
                     exp=wild_pokemon.exp,
-                    is_shiny=wild_pokemon.is_shiny,
                     stats=PokemonStats(
                         hp=wild_pokemon.stats.hp,
                         attack=wild_pokemon.stats.attack,

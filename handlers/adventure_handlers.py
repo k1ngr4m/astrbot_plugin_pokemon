@@ -315,7 +315,6 @@ class AdventureHandlers:
                 stats=wild_pokemon.stats,
                 ivs=wild_pokemon.ivs,
                 evs=wild_pokemon.evs,
-                is_shiny=wild_pokemon.is_shiny,
                 moves=wild_pokemon.moves,
             )
             pokemon_id = self.plugin.user_repo.create_user_pokemon(user_id, user_pokemon_info)
