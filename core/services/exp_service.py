@@ -34,14 +34,14 @@ class ExpService:
             return 1
         return self.get_required_exp_for_level(current_level + 1) - self.get_required_exp_for_level(current_level)
 
-    def calculate_pokemon_exp_gain(self, wild_pokemon_level: int, battle_result: str) -> int:
+    def calculate_pokemon_exp_gain(self, wild_pokemon_id: int, wild_pokemon_level: int, battle_result: str) -> int:
         """
         根据野生宝可梦等级和战斗结果计算经验值获取
         胜利时获得经验，失败时不获得经验
-        公式：(基础经验 × 野生宝可梦等级) ÷ 7
+        公式：(基础经验值 × 野生宝可梦等级) ÷ 7
         """
-        # 基础经验固定为50
-        base_exp = 50
+        # 基础经验值从数据库获取
+        base_exp = self.pokemon_repo.get_base_exp(wild_pokemon_id)
 
         # 如果胜利，获得经验值；如果失败，不获得经验值
         if battle_result == "success":

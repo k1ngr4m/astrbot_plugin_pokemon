@@ -145,6 +145,10 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_latest_encounters(self, limit: int = 10) -> List[Dict[str, Any]]: pass
 
+    @abstractmethod
+    def get_base_exp(self, pokemon_id: int) -> int: pass
+
+
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""
 

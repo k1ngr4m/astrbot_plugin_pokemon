@@ -172,7 +172,7 @@ class BattleService:
             exp_details = {}
             if self.exp_service and result == "success":
                 # 计算宝可梦获得的经验值
-                pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_info.level, result)
+                pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_id=wild_pokemon_info.id, wild_pokemon_level=wild_pokemon_info.level, battle_result=result)
                 # user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon_info.level, result)
                 # 获取用户队伍中的所有宝可梦
                 user_team_data:UserTeam = self.team_repo.get_user_team(user_id)

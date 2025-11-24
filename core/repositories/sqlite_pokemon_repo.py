@@ -340,3 +340,14 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             row_dict.pop('updated_at', None)
             row_dict.pop('isdel', None)
             return WildPokemonEncounterLog(**row_dict)
+
+    def get_base_exp(self, pokemon_id: int) -> int:
+        """获取宝可梦的基础经验值"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT base_experience FROM pokemon_species
+                WHERE id = ?
+            """, (pokemon_id,))
+            row = cursor.fetchone()
+            return row['base_experience'] if row else 0
