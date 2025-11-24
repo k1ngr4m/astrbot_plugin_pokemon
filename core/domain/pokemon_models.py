@@ -197,6 +197,7 @@ class WildPokemonInfo:
                 return vars(obj)
 
         return {
+            "id": self.id,
             "species_id": self.species_id,
             "name": self.name,
             "gender": self.gender,
@@ -216,18 +217,15 @@ class WildPokemonInfo:
 class WildPokemonEncounterLog:
     id: int
     user_id: str
-    pokemon_species_id: int
-    pokemon_name: str
-    pokemon_level: int
-    pokemon_info: WildPokemonInfo
+    wild_pokemon_id: int
     location_id: int
-    location_name: str
     encounter_time: Optional[str] = None
     is_captured: Optional[int] = None
     is_battled: Optional[int] = None
     battle_result: Optional[str] = None
     encounter_rate: Optional[float] = None
     created_at: Optional[str] = None
+    updated_at: Optional[str] = None
     isdel: Optional[int] = 0
 
 

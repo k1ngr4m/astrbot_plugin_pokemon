@@ -120,6 +120,7 @@ class AdventureService:
                 return error_response(wild_pokemon_result.message)
             wild_pokemon = wild_pokemon_result.data
             wild_pokemon_info = WildPokemonInfo(
+                    id=0,
                     species_id=wild_pokemon.base_pokemon.id,
                     name=wild_pokemon.base_pokemon.name_zh,
                     gender=wild_pokemon.gender,
@@ -151,9 +152,11 @@ class AdventureService:
                     ),
                     moves = None,
             )
+            wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
+
             self.pokemon_repo.add_user_encountered_wild_pokemon(
                 user_id=user_id,
-                wild_pokemon_id = wild_pokemon_info.id,
+                wild_pokemon_id = wild_pokemon_id,
                 location_id=location.id,
                 encounter_rate=selected_location_pokemon.encounter_rate,
             )

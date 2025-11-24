@@ -154,9 +154,9 @@ class PokemonService:
         encountered_wild_pokemon = self.pokemon_repo.get_user_encountered_wild_pokemon(user_id)
         if not encountered_wild_pokemon:
             return None
-
-        pokemon_info: WildPokemonInfo = encountered_wild_pokemon.pokemon_info
-        return pokemon_info
+        wild_pokemon_id = encountered_wild_pokemon.wild_pokemon_id
+        wild_pokemon_info = self.pokemon_repo.get_wild_pokemon_by_id(wild_pokemon_id)
+        return wild_pokemon_info
 
     def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo):
         """

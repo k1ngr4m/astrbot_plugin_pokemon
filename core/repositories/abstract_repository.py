@@ -98,6 +98,9 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon_id: int, location_id: int, encounter_rate: float) -> None: pass
 
+    # 添加野生宝可梦
+    def add_wild_pokemon(self, wild_pokemon_info: WildPokemonInfo) -> int: pass
+
     # ==========改==========
     # 更新宝可梦经验
     @abstractmethod
@@ -148,6 +151,8 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_base_exp(self, pokemon_id: int) -> int: pass
 
+    @abstractmethod
+    def get_wild_pokemon_by_id(self, wild_pokemon_id: int) -> Optional[WildPokemonInfo]: pass
 
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""

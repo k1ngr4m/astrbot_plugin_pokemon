@@ -7,7 +7,7 @@ from typing import Optional, List, Dict, Any
 from .abstract_repository import AbstractPokemonRepository
 from ..domain.adventure_models import LocationInfo
 from ..domain.pokemon_models import PokemonSpecies, PokemonBaseStats, PokemonDetail, WildPokemonInfo, \
-    WildPokemonEncounterLog
+    WildPokemonEncounterLog, PokemonIVs, PokemonEVs, PokemonStats
 
 
 class SqlitePokemonRepository(AbstractPokemonRepository):
@@ -310,36 +310,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 LIMIT 1
             """, (user_id,))
             row = cursor.fetchone()
-            if row is None:
-                return None
-
-            row_dict = dict(row)
-            # 反序列化pokemon_info JSON字符串
-            if row_dict.get('pokemon_info'):
-                try:
-                    pokemon_info_data = json.loads(row_dict['pokemon_info'])
-                    # 从字典创建WildPokemonInfo对象
-                    from ..domain.pokemon_models import PokemonStats, PokemonIVs, PokemonEVs
-                    pokemon_info_obj = WildPokemonInfo(
-                        species_id=pokemon_info_data['species_id'],
-                        name=pokemon_info_data['name'],
-                        gender=pokemon_info_data['gender'],
-                        level=pokemon_info_data['level'],
-                        exp=pokemon_info_data['exp'],
-                        stats=PokemonStats(**pokemon_info_data['stats']),
-                        ivs=PokemonIVs(**pokemon_info_data['ivs']),
-                        evs=PokemonEVs(**pokemon_info_data['evs']),
-                        moves=pokemon_info_data['moves']
-                    )
-                    row_dict['pokemon_info'] = pokemon_info_obj
-                except (json.JSONDecodeError, KeyError):
-                    # 如果解析失败，保持原始值
-                    pass
-            # 移除数据库字段
-            row_dict.pop('created_at', None)
-            row_dict.pop('updated_at', None)
-            row_dict.pop('isdel', None)
-            return WildPokemonEncounterLog(**row_dict)
+            return WildPokemonEncounterLog(**dict(row)) if row else None
 
     def get_base_exp(self, pokemon_id: int) -> int:
         """获取宝可梦的基础经验值"""
@@ -351,3 +322,80 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             """, (pokemon_id,))
             row = cursor.fetchone()
             return row['base_experience'] if row else 0
+
+    def get_wild_pokemon_by_id(self, wild_pokemon_id: int) -> Optional[WildPokemonInfo]:
+        """根据野生宝可梦ID获取野生宝可梦信息"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM wild_pokemon
+                WHERE id = ? AND isdel = 0
+            """, (wild_pokemon_id,))
+            row = cursor.fetchone()
+            return WildPokemonInfo.to_dict(row) if row else None
+
+    def add_wild_pokemon(self, pokemon: WildPokemonInfo) -> int:
+        """添加野生宝可梦"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            sql = """
+            INSERT INTO wild_pokemon (
+                species_id, name, level, exp, gender,
+                hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
+                hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
+                hp, attack, defense, sp_attack, sp_defense, speed,
+                move1_id, move2_id, move3_id, move4_id
+            )
+            VALUES (?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?
+            )
+            """
+
+            species_id = pokemon.species_id
+            nickname = pokemon.name
+            level = pokemon.level
+            exp = pokemon.exp
+            gender = pokemon.gender
+
+            ivs: PokemonIVs = pokemon.ivs
+            hp_iv = ivs.hp_iv
+            attack_iv = ivs.attack_iv
+            defense_iv = ivs.defense_iv
+            sp_attack_iv = ivs.sp_attack_iv
+            sp_defense_iv = ivs.sp_defense_iv
+            speed_iv = ivs.speed_iv
+
+            evs: PokemonEVs = pokemon.evs
+            hp_ev = evs.hp_ev
+            attack_ev = evs.attack_ev
+            defense_ev = evs.defense_ev
+            sp_attack_ev = evs.sp_attack_ev
+            sp_defense_ev = evs.sp_defense_ev
+            speed_ev = evs.speed_ev
+
+            stats: PokemonStats = pokemon.stats
+            hp = stats.hp
+            attack = stats.attack
+            defense = stats.defense
+            sp_attack = stats.sp_attack
+            sp_defense = stats.sp_defense
+            speed = stats.speed
+
+            move1_id = None
+            move2_id = None
+            move3_id = None
+            move4_id = None
+
+            cursor.execute(sql, (
+                species_id, nickname, level, exp, gender,
+                hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
+                hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
+                hp, attack, defense, sp_attack, sp_defense, speed,
+                move1_id, move2_id, move3_id, move4_id
+            ))
+            new_id = cursor.lastrowid
+            conn.commit()
+            return new_id

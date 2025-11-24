@@ -226,6 +226,7 @@ def up(cursor: sqlite3.Cursor):
             move4_id INTEGER,                           -- 技能4ID
             created_at TEXT DEFAULT (datetime('now', '+8 hours')),
             updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            isdel TINYINT(10) DEFAULT 0,                 -- 是否删除 (0=未删除, 1=已删除)
             FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE
         );
     """)
