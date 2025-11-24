@@ -3,7 +3,7 @@ from typing import Optional, List, Dict, Any
 from ..domain.user_models import User, UserTeam, UserItems
 from ..domain.pokemon_models import PokemonCreateResult, PokemonSpecies, UserPokemonInfo, PokemonDetail, \
     WildPokemonInfo, WildPokemonEncounterLog
-from ..domain.adventure_models import AdventureArea, AreaPokemon, AreaInfo
+from ..domain.adventure_models import LocationTemplate, LocationPokemon, LocationInfo
 from ..domain.shop_models import Shop, ShopItem
 
 class AbstractUserRepository(ABC):
@@ -170,29 +170,28 @@ class AbstractAdventureRepository(ABC):
     # ==========增==========
     # 添加冒险区域模板
     @abstractmethod
-    def add_area_template(self, area: Dict[str, Any]) -> None: pass
+    def add_location_template(self, location: Dict[str, Any]) -> None: pass
 
     # 添加区域内宝可梦模板
     @abstractmethod
-    def add_area_pokemon_template(self, area_pokemon: Dict[str, Any]) -> None: pass
+    def add_location_pokemon_template(self, location_pokemon: Dict[str, Any]) -> None: pass
 
 
     # ==========查==========
     # 获取所有冒险区域
     @abstractmethod
-    def get_all_areas(self) -> List[AdventureArea]: pass
+    def get_all_locations(self) -> List[LocationTemplate]: pass
 
     # 根据区域编码获取区域
     @abstractmethod
-    def get_area_by_code(self, area_code: str) -> Optional[AdventureArea]: pass
+    def get_location_by_id(self, location_id: int) -> Optional[LocationTemplate]: pass
 
+
+
+    # ==========查==========
     # 根据区域ID获取区域内的宝可梦
     @abstractmethod
-    def get_area_pokemon_by_area_id(self, area_id: int) -> List[AreaPokemon]: pass
-
-    # 根据区域编码获取区域内的宝可梦
-    @abstractmethod
-    def get_area_pokemon_by_area_code(self, area_code: str) -> List[AreaPokemon]: pass
+    def get_location_pokemon_by_location_id(self, location_id: int) -> List[LocationPokemon]: pass
 
 
 class AbstractShopRepository(ABC):

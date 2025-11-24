@@ -60,6 +60,8 @@ class DataSetupService:
         pokemon_species_types_df = self._read_csv_data("pokemon_species_types.csv")
         pokemon_evolution_df = self._read_csv_data("pokemon_evolution.csv")
         items_df = self._read_csv_data("items.csv")
+        locations_df = self._read_csv_data("locations.csv")
+        location_pokemon_df = self._read_csv_data("location_pokemon.csv")
         # 注意：初始数据中的其他数据（如技能、冒险区域等）可能仍需要从其他来源获取
         # 我们假设这些数据仍然在initial_data.py中，或者需要创建对应的CSV文件
 
@@ -160,5 +162,38 @@ class DataSetupService:
                     self.shop_repo.add_item_template(item_data)
                 except (ValueError, TypeError) as e:
                     logger.error(f"处理物品数据时出错 (ID: {item_row.get('id', 'Unknown')}): {e}")
+                    continue
+
+        # 填充地点数据
+        if not locations_df.empty:
+            for _, location_row in locations_df.iterrows():
+                try:
+                    location_data = {
+                        "id": int(location_row['id']),
+                        "name": str(location_row['name']),
+                        "description": str(location_row['description']) if pd.notna(location_row['description']) else "",
+                        "min_level": int(location_row['min_level']) if pd.notna(location_row['min_level']) else 1,
+                        "max_level": int(location_row['max_level']) if pd.notna(location_row['max_level']) else 100
+                    }
+                    self.adventure_repo.add_location_template(location_data)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"处理地点数据时出错 (ID: {location_row.get('id', 'Unknown')}): {e}")
+                    continue
+
+        # 填充地点宝可梦关联数据
+        if not location_pokemon_df.empty:
+            for _, loc_pokemon_row in location_pokemon_df.iterrows():
+                try:
+                    location_pokemon_data = {
+                        "id": int(loc_pokemon_row['id']),
+                        "location_id": int(loc_pokemon_row['location_id']),  # 需要将CSV中的location_id映射为location_id
+                        "pokemon_species_id": int(loc_pokemon_row['pokemon_species_id']),
+                        "encounter_rate": float(loc_pokemon_row['encounter_rate']) if pd.notna(loc_pokemon_row['encounter_rate']) else 10.0,
+                        "min_level": int(loc_pokemon_row['min_level']) if pd.notna(loc_pokemon_row['min_level']) else 1,
+                        "max_level": int(loc_pokemon_row['max_level']) if pd.notna(loc_pokemon_row['max_level']) else 10
+                    }
+                    self.adventure_repo.add_location_pokemon_template(location_pokemon_data)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"处理地点宝可梦关联数据时出错 (Location: {loc_pokemon_row.get('location_id', 'Unknown')}, Pokemon: {loc_pokemon_row.get('pokemon_species_id', 'Unknown')}): {e}")
                     continue
 

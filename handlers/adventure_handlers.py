@@ -15,7 +15,7 @@ class AdventureHandlers:
         self.pokemon_service = plugin.pokemon_service
         self.team_service = plugin.team_service
 
-    async def view_areas(self, event: AstrMessageEvent):
+    async def view_locations(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
         user = self.plugin.user_repo.get_user_by_id(user_id)
@@ -24,23 +24,23 @@ class AdventureHandlers:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
             return
 
-        result = self.adventure_service.get_all_areas()
+        result = self.adventure_service.get_all_locations()
 
         if not result["success"]:
             yield event.plain_result(result["message"])
             return
 
-        if not result["areas"]:
+        if not result["locations"]:
             yield event.plain_result(result["message"])
             return
 
         # 组织显示信息
         message = f"🗺️ {result['message']}：\n\n"
-        for i, area in enumerate(result["areas"], 1):
-            message += f"{i}. {area['area_name']}\n"
-            message += f"   ID: {area['area_code']} | 等级: {area['min_level']}-{area['max_level']}\n"
-            if area['description'] != "暂无描述":
-                message += f"   描述: {area['description']}\n"
+        for i, location in enumerate(result["locations"], 1):
+            message += f"{i}. {location['location_name']}\n"
+            message += f"   ID: {location['location_id']} | 等级: {location['min_level']}-{location['max_level']}\n"
+            if location['description'] != "暂无描述":
+                message += f"   描述: {location['description']}\n"
             message += "\n"
 
         message += "💡 使用 冒险 <区域ID> 指令进入冒险！"
@@ -81,21 +81,21 @@ class AdventureHandlers:
 
         args = event.message_str.split(" ")
         if len(args) < 2:
-            yield event.plain_result(AnswerEnum.USER_ADVENTURE_AREA_NOT_SPECIFIED.value)
+            yield event.plain_result(AnswerEnum.USER_ADVENTURE_LOCATION_NOT_SPECIFIED.value)
             return
 
-        area_code = args[1].upper()  # 转换为大写
+        location_id = int(args[1])  # 转换为整数
 
         # 验证区域代码格式（A开头的四位数）
-        if not (area_code.startswith('A') and len(area_code) == 4 and area_code[1:].isdigit()):
-            yield event.plain_result(f"❌ 区域短码 {area_code} 格式不正确（应为A开头的四位数，如A001）。")
+        if not (location_id > 0):
+            yield event.plain_result(f"❌ 区域ID {location_id} 格式不正确（应为正整数）。")
             return
 
-        result = self.adventure_service.adventure_in_area(user_id, area_code)
+        result = self.adventure_service.adventure_in_location(user_id, location_id)
 
         if result.success:
             wild_pokemon = result.wild_pokemon
-            message = f"🌳 在 {result.area.area_name} 中冒险！\n\n"
+            message = f"🌳 在 {result.location.location_name} 中冒险！\n\n"
             message += f"✨ 遇到了野生的 {wild_pokemon.name}！\n"
             message += f"等级: {wild_pokemon.level}\n"
 

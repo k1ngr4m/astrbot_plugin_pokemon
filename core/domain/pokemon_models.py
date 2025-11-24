@@ -220,8 +220,8 @@ class WildPokemonEncounterLog:
     pokemon_name: str
     pokemon_level: int
     pokemon_info: WildPokemonInfo
-    area_code: str
-    area_name: str
+    location_id: int
+    location_name: str
     encounter_time: Optional[str] = None
     is_captured: Optional[int] = None
     is_battled: Optional[int] = None

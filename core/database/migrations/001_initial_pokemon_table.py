@@ -171,9 +171,11 @@ def up(cursor: sqlite3.Cursor):
         );
     """)
 
+    cursor.execute("""CREATE INDEX IF NOT EXISTS idx_locations_name ON locations(name);""")
+
     # --- 9. 地点宝可梦关联表 ---
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pokemon_location (
+        CREATE TABLE IF NOT EXISTS location_pokemon (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             location_id INTEGER NOT NULL,             -- 地点ID
             pokemon_species_id INTEGER NOT NULL,  -- 宝可梦种族ID
@@ -184,14 +186,12 @@ def up(cursor: sqlite3.Cursor):
             created_at TEXT DEFAULT (datetime('now', '+8 hours')),
             updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE,
-            FOREIGN KEY (pokemon_species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
-            UNIQUE(location_id, pokemon_species_id)
-        );
+            FOREIGN KEY (pokemon_species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE        );
     """)
 
     # 为地点宝可梦关联表创建索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_location_location_id ON pokemon_location(location_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_location_species_id ON pokemon_location(pokemon_species_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_location_location_id ON location_pokemon(location_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_location_species_id ON location_pokemon(pokemon_species_id)")
 
 
     cursor.execute("""

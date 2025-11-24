@@ -7,7 +7,7 @@ from ..domain.pokemon_models import WildPokemonInfo, PokemonStats, PokemonIVs, P
 from ..repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository
 )
-from ..domain.adventure_models import AdventureArea, AreaPokemon, AdventureResult, AreaInfo
+from ..domain.adventure_models import LocationTemplate, LocationPokemon, AdventureResult, LocationInfo
 from ..utils import get_now
 
 
@@ -28,37 +28,37 @@ class AdventureService:
         self.user_repo = user_repo
         self.config = config
 
-    def get_all_areas(self) -> Dict[str, Any]:
+    def get_all_locations(self) -> Dict[str, Any]:
         """
         获取所有可冒险的区域列表
         Returns:
             包含区域列表的字典
         """
         try:
-            areas = self.adventure_repo.get_all_areas()
+            locations = self.adventure_repo.get_all_locations()
 
-            if not areas:
+            if not locations:
                 return {
                     "success": True,
                     "message": "暂无可用的冒险区域",
-                    "areas": []
+                    "locations": []
                 }
 
-            formatted_areas = []
-            for area in areas:
-                formatted_areas.append({
-                    "area_code": area.area_code,
-                    "area_name": area.area_name,
-                    "description": area.description or "暂无描述",
-                    "min_level": area.min_level,
-                    "max_level": area.max_level
+            formatted_locations = []
+            for location in locations:
+                formatted_locations.append({
+                    "location_id": location.id,
+                    "location_name": location.name,
+                    "description": location.description or "暂无描述",
+                    "min_level": location.min_level,
+                    "max_level": location.max_level
                 })
 
             return {
                 "success": True,
-                "areas": formatted_areas,
-                "count": len(formatted_areas),
-                "message": f"共有 {len(formatted_areas)} 个可冒险区域"
+                "locations": formatted_locations,
+                "count": len(formatted_locations),
+                "message": f"共有 {len(formatted_locations)} 个可冒险区域"
             }
         except Exception as e:
             return {
@@ -66,12 +66,12 @@ class AdventureService:
                 "message": f"获取区域列表失败: {str(e)}"
             }
 
-    def adventure_in_area(self, user_id: str, area_code: str) -> AdventureResult:
+    def adventure_in_location(self, user_id: str, location_id: int) -> AdventureResult:
         """
         在指定区域进行冒险，随机刷新一只野生宝可梦
         Args:
             user_id: 用户ID
-            area_code: 区域代码
+            location_id: 区域ID
         Returns:
             包含冒险结果的字典
         """
@@ -81,38 +81,38 @@ class AdventureService:
                 success=False,
                 message=message,
                 wild_pokemon=None,
-                area=None
+                location=None
             )
         try:
             # 3. 获取区域信息
-            area = self.adventure_repo.get_area_by_code(area_code)
-            if not area:
-                return error_response(f"未找到区域 {area_code}")
+            location = self.adventure_repo.get_location_by_id(location_id)
+            if not location:
+                return error_response(f"未找到区域 {location_id}")
             # 4. 获取该区域的宝可梦列表
-            area_pokemon_list = self.adventure_repo.get_area_pokemon_by_area_code(area_code)
-            if not area_pokemon_list:
-                return error_response(f"区域 {area.area_name}) 中暂无野生宝可梦")
+            location_pokemon_list = self.adventure_repo.get_location_pokemon_by_location_id(location_id)
+            if not location_pokemon_list:
+                return error_response(f"区域 {location.name} 中暂无野生宝可梦")
             # 5. 权重随机选择宝可梦（使用itertools.accumulate简化累加逻辑）
-            encounter_rates = [ap.encounter_rate for ap in area_pokemon_list]
+            encounter_rates = [ap.encounter_rate for ap in location_pokemon_list]
             total_rate = sum(encounter_rates)
             random_value = random.uniform(0, total_rate)
 
             # 累加概率，找到第一个超过随机值的宝可梦
             for idx, cumulative_rate in enumerate(accumulate(encounter_rates)):
                 if random_value <= cumulative_rate:
-                    selected_area_pokemon = area_pokemon_list[idx]
+                    selected_location_pokemon = location_pokemon_list[idx]
                     break
             else:
                 # 兜底：如果循环未触发break（理论上不会发生），取最后一个
-                selected_area_pokemon = area_pokemon_list[-1]
+                selected_location_pokemon = location_pokemon_list[-1]
 
             # 6. 生成宝可梦等级（使用变量名简化赋值）
-            min_level = selected_area_pokemon.min_level
-            max_level = selected_area_pokemon.max_level
+            min_level = selected_location_pokemon.min_level
+            max_level = selected_location_pokemon.max_level
             wild_pokemon_level = random.randint(min_level, max_level)
             # 7. 创建野生宝可梦（直接使用返回结果，无需额外处理）
             wild_pokemon_result = self.pokemon_service.create_single_pokemon(
-                species_id=selected_area_pokemon.pokemon_species_id,
+                species_id=selected_location_pokemon.pokemon_species_id,
                 max_level=wild_pokemon_level,
                 min_level=wild_pokemon_level
             )
@@ -154,8 +154,8 @@ class AdventureService:
             self.pokemon_repo.add_user_encountered_wild_pokemon(
                 user_id=user_id,
                 wild_pokemon_id = wild_pokemon_info.id,
-                location_id=area.id,
-                encounter_rate=selected_area_pokemon.encounter_rate,
+                location_id=location.id,
+                encounter_rate=selected_location_pokemon.encounter_rate,
             )
 
 
@@ -163,11 +163,11 @@ class AdventureService:
             # 8. 构造返回结果（直接复用create_single_pokemon的计算结果）
             result = AdventureResult(
                 success=True,
-                message=f"在 {area.area_name} 中遇到了野生的 {wild_pokemon_info.name}！",
+                message=f"在 {location.name} 中遇到了野生的 {wild_pokemon_info.name}！",
                 wild_pokemon=wild_pokemon_info,
-                area=AreaInfo(
-                    area_code=area.area_code,
-                    area_name=area.area_name,
+                location=LocationInfo(
+                    location_id=location.id,
+                    location_name=location.name,
                 )
             )
             return result

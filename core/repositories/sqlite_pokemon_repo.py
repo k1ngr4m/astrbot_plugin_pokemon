@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
-from ..domain.adventure_models import AreaInfo
+from ..domain.adventure_models import LocationInfo
 from ..domain.pokemon_models import PokemonSpecies, PokemonBaseStats, PokemonDetail, WildPokemonInfo, \
     WildPokemonEncounterLog
 
