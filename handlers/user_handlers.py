@@ -27,7 +27,7 @@ class UserHandlers:
         """签到命令处理器"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
 
-        user = self.plugin.user_repo.get_by_id(user_id)
+        user = self.plugin.user_repo.get_user_by_id(user_id)
         if not user:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
             return

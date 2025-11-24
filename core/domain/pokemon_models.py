@@ -70,12 +70,12 @@ class PokemonBaseStats:
         return getattr(self, item)
 
 @dataclass
-class PokemonTemplate:
+class PokemonSpecies:
     """代表一种Pokemon的模版信息"""
     id: int
     name_en: str
-    name_cn: str
-    generation: int
+    name_zh: str
+    generation_id: int
     base_stats: PokemonBaseStats
     height: float
     weight: float
@@ -85,8 +85,8 @@ class PokemonTemplate:
         return {
             "id": self.id,
             "name_en": self.name_en,
-            "name_cn": self.name_cn,
-            "generation": self.generation,
+            "name_zh": self.name_zh,
+            "generation_id": self.generation_id,
             "base_stats": self.base_stats.__dict__,
             "height": self.height,
             "weight": self.weight,
@@ -95,7 +95,7 @@ class PokemonTemplate:
 
 @dataclass
 class PokemonDetail:
-    base_pokemon: PokemonTemplate
+    base_pokemon: PokemonSpecies
     gender: str
     level: int
     exp: int

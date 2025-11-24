@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
 from ..domain.adventure_models import AreaInfo
-from ..domain.pokemon_models import PokemonTemplate, PokemonBaseStats, PokemonDetail, WildPokemonInfo, \
+from ..domain.pokemon_models import PokemonSpecies, PokemonBaseStats, PokemonDetail, WildPokemonInfo, \
     WildPokemonEncounterLog
 
 
@@ -26,7 +26,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             self._local.connection = conn
         return conn
 
-    def _row_to_pokemon(self, row: sqlite3.Row) -> Optional[PokemonTemplate]:
+    def _row_to_pokemon(self, row: sqlite3.Row) -> Optional[PokemonSpecies]:
         if not row:
             return None
 
@@ -46,18 +46,18 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
         )
 
         # 使用剩余的字段创建PokemonTemplate对象
-        return PokemonTemplate(
+        return PokemonSpecies(
             base_stats=base_stats,
             **row_dict
         )
 
-    def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonTemplate]:
+    def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM pokemon_species WHERE id = ?", (pokemon_id,))
             return self._row_to_pokemon(cursor.fetchone())
 
-    def get_all_pokemon(self) -> List[PokemonTemplate]:
+    def get_all_pokemon(self) -> List[PokemonSpecies]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM pokemon_species ORDER BY id DESC")

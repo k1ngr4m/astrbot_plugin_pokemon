@@ -201,7 +201,7 @@ class ExpService:
         """
         战斗后更新用户的经验值和等级
         """
-        user = self.user_repo.get_by_id(user_id)
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             return {"success": False, "message": "用户不存在"}
 

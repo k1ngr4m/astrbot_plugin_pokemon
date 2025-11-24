@@ -43,12 +43,7 @@ class UserService:
         new_user = User(
             user_id = user_id,
             nickname = nickname,
-            level = 1,
-            exp = 0,
             coins = initial_coins,
-            created_at = get_now(),
-            init_selected = None,
-            last_adventure_time = None,
             origin_id = origin_id
         )
         self.user_repo.create_user(new_user)
@@ -77,7 +72,7 @@ class UserService:
             }
 
         # 检查用户是否存在
-        user = self.user_repo.get_by_id(user_id)
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             return {
                 "success": False,
@@ -120,7 +115,7 @@ class UserService:
         Returns:
             一个包含成功状态和消息的字典。
         """
-        user = self.user_repo.get_by_id(user_id)
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             return {"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}
         if user.init_selected:
@@ -299,7 +294,7 @@ class UserService:
         Returns:
             包含用户宝可梦信息的字典
         """
-        user = self.user_repo.get_by_id(user_id)
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             return {"success": False, "message": "用户不存在"}
 

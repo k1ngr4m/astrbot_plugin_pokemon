@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from astrbot.api import logger
-from ..domain.pokemon_models import PokemonTemplate, PokemonIVs, PokemonEVs, PokemonStats
+from ..domain.pokemon_models import PokemonSpecies, PokemonIVs, PokemonEVs, PokemonStats
 from ..domain.user_models import User, UserItems, UserItemInfo
 from ..domain.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserRepository
@@ -29,9 +29,8 @@ class SqliteUserRepository(AbstractUserRepository):
 
     def _row_to_user(self, row: sqlite3.Row) -> Optional[User]:
         """
-                [已修正] 将数据库行安全地转换为 User 对象。
-                现在可以正确读取所有新旧字段。
-                """
+        将数据库行安全地转换为 User 对象。
+        """
         if not row:
             return None
 
@@ -57,20 +56,26 @@ class SqliteUserRepository(AbstractUserRepository):
         user_data = {
             'user_id': row["user_id"],
             'nickname': row["nickname"],
-            'coins': row["coins"],
             'level': row["level"],
             'exp': row["exp"],
+            'coins': row["coins"],
             'init_selected': row["init_selected"],
             'created_at': parse_datetime(row["created_at"]),
         }
 
-        # 如果数据库行包含 last_adventure_time 字段，则添加
+        # 如果数据库行包含其他可选字段，则添加
         if "last_adventure_time" in row_keys:
             user_data['last_adventure_time'] = row["last_adventure_time"]
+        if "updated_at" in row_keys:
+            user_data['updated_at'] = parse_datetime(row["updated_at"])
+        if "isdel" in row_keys:
+            user_data['isdel'] = row["isdel"]
+        if "origin_id" in row_keys:
+            user_data['origin_id'] = row["origin_id"]
 
         return User(**user_data)
 
-    def get_by_id(self, user_id: str) -> Optional[User]:
+    def get_user_by_id(self, user_id: str) -> Optional[User]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
@@ -85,7 +90,11 @@ class SqliteUserRepository(AbstractUserRepository):
 
     def create_user(self, user: User) -> None:
         # 使用与 update 相同的动态方法，确保 add 也是完整的
-        fields = [f.name for f in dataclasses.fields(User)]
+        # 排除 created_at 和 updated_at 字段，以便使用数据库的默认 CURRENT_TIMESTAMP
+        # 排除 isdel 字段，使用数据库默认值
+        all_fields = [f.name for f in dataclasses.fields(User)]
+        fields_to_exclude = {'created_at', 'updated_at', 'isdel'}
+        fields = [f for f in all_fields if f not in fields_to_exclude]
         columns_clause = ", ".join(fields)
         placeholders_clause = ", ".join(["?"] * len(fields))
         values = [getattr(user, field) for field in fields]

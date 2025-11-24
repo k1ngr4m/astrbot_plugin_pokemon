@@ -18,7 +18,7 @@ class AdventureHandlers:
     async def view_areas(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_by_id(user_id)
+        user = self.plugin.user_repo.get_user_by_id(user_id)
 
         if not user:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
@@ -50,7 +50,7 @@ class AdventureHandlers:
     async def adventure(self, event: AstrMessageEvent):
         """进入指定区域冒险"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_by_id(user_id)
+        user = self.plugin.user_repo.get_user_by_id(user_id)
 
         if not user:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
@@ -65,7 +65,7 @@ class AdventureHandlers:
         # 检查冒险冷却时间
         import time
         current_time = time.time()
-        user = self.plugin.user_repo.get_by_id(user_id)
+        user = self.plugin.user_repo.get_user_by_id(user_id)
         last_adventure_time = user.last_adventure_time if user and user.last_adventure_time else 0
         cooldown_remaining = (last_adventure_time + self.plugin.adventure_cooldown) - current_time
 
@@ -115,7 +115,7 @@ class AdventureHandlers:
     async def battle(self, event: AstrMessageEvent):
         """处理战斗指令"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_by_id(user_id)
+        user = self.plugin.user_repo.get_user_by_id(user_id)
 
         if not user:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
@@ -213,7 +213,7 @@ class AdventureHandlers:
     async def catch_pokemon(self, event: AstrMessageEvent):
         """处理捕捉野生宝可梦的指令"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_by_id(user_id)
+        user = self.plugin.user_repo.get_user_by_id(user_id)
 
         if not user:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
@@ -380,7 +380,7 @@ class AdventureHandlers:
     async def run(self, event: AstrMessageEvent):
         """处理逃跑指令"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_by_id(user_id)
+        user = self.plugin.user_repo.get_user_by_id(user_id)
 
         if not user:
             yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)

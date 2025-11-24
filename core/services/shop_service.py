@@ -74,7 +74,7 @@ class ShopService:
             购买结果
         """
         # 首先验证用户是否存在
-        user = self.user_repo.get_by_id(user_id)
+        user = self.user_repo.get_user_by_id(user_id)
         if not user:
             return {
                 "success": False,

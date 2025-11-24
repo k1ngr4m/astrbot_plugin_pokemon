@@ -153,11 +153,8 @@ class AdventureService:
             )
             self.pokemon_repo.add_user_encountered_wild_pokemon(
                 user_id=user_id,
-                wild_pokemon = wild_pokemon_info,
-                area_info = AreaInfo(
-                    area_code=area.area_code,
-                    area_name=area.area_name,
-                ),
+                wild_pokemon_id = wild_pokemon_info.id,
+                location_id=area.id,
                 encounter_rate=selected_area_pokemon.encounter_rate,
             )
 

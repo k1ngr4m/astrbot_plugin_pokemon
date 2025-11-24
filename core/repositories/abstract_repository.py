@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 from ..domain.user_models import User, UserTeam, UserItems
-from ..domain.pokemon_models import PokemonCreateResult, PokemonTemplate, UserPokemonInfo, PokemonDetail, \
+from ..domain.pokemon_models import PokemonCreateResult, PokemonSpecies, UserPokemonInfo, PokemonDetail, \
     WildPokemonInfo, WildPokemonEncounterLog
 from ..domain.adventure_models import AdventureArea, AreaPokemon, AreaInfo
 from ..domain.shop_models import Shop, ShopItem
@@ -43,7 +43,7 @@ class AbstractUserRepository(ABC):
     # ==========查==========
     # 根据ID获取用户
     @abstractmethod
-    def get_by_id(self, user_id: str) -> Optional[User]: pass
+    def get_user_by_id(self, user_id: str) -> Optional[User]: pass
 
     # 检查用户是否存在
     @abstractmethod
@@ -119,11 +119,11 @@ class AbstractPokemonRepository(ABC):
     # ==========查==========
     # 获取宝可梦模板
     @abstractmethod
-    def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonTemplate]: pass
+    def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]: pass
 
     # 获取所有Pokemon模板
     @abstractmethod
-    def get_all_pokemon(self) -> List[PokemonTemplate]: pass
+    def get_all_pokemon(self) -> List[PokemonSpecies]: pass
 
     # 获取宝可梦类型
     @abstractmethod

@@ -6,7 +6,7 @@ from ..repositories.abstract_repository import (
 )
 
 from ..utils import get_now, get_today
-from ..domain.pokemon_models import PokemonTemplate, PokemonCreateResult, PokemonDetail, PokemonStats, PokemonIVs, \
+from ..domain.pokemon_models import PokemonSpecies, PokemonCreateResult, PokemonDetail, PokemonStats, PokemonIVs, \
     PokemonEVs, WildPokemonInfo, PokemonMoves
 from ..domain.user_models import User
 

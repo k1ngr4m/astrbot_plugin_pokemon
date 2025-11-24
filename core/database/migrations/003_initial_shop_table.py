@@ -20,8 +20,8 @@ def up(cursor: sqlite3.Cursor):
             description TEXT,
             shop_type TEXT NOT NULL DEFAULT 'normal' CHECK (shop_type IN ('normal','premium','limited')),
             is_active INTEGER DEFAULT 1 NOT NULL,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
             isdel TINYINT(10) DEFAULT 0         -- 是否已删除
         )
         """
