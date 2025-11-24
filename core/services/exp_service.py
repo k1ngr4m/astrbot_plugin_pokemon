@@ -170,7 +170,7 @@ class ExpService:
             new_speed = int((base_speed * 2 + speed_iv + speed_ev // 4) * new_level / 100) + 5
 
             new_pokemon_attributes = {
-                'current_hp': new_hp,
+                'hp': new_hp,
                 'attack': new_attack,
                 'defense': new_defense,
                 'sp_attack': new_sp_attack,

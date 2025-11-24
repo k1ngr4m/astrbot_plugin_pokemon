@@ -61,7 +61,7 @@ class SqliteAdventureRepository(AbstractAdventureRepository):
     def get_area_pokemon_by_area_id(self, area_id: int) -> List[AreaPokemon]:
         """根据区域ID获取该区域的宝可梦列表"""
         sql = """
-        SELECT ap.*, ps.name_cn as pokemon_name
+        SELECT ap.*, ps.name_zh as pokemon_name
         FROM area_pokemon ap
         JOIN pokemon_species ps ON ap.pokemon_species_id = ps.id
         WHERE ap.area_id = ?
@@ -84,7 +84,7 @@ class SqliteAdventureRepository(AbstractAdventureRepository):
     def get_area_pokemon_by_area_code(self, area_code: str) -> List[AreaPokemon]:
         """根据区域代码获取该区域的宝可梦列表"""
         sql = """
-        SELECT ap.*, ps.name_cn as pokemon_name
+        SELECT ap.*, ps.name_zh as pokemon_name
         FROM area_pokemon ap
         JOIN pokemon_species ps ON ap.pokemon_species_id = ps.id
         JOIN adventure_areas aa ON ap.area_id = aa.id

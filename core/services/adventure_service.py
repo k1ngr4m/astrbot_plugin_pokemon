@@ -121,7 +121,7 @@ class AdventureService:
             wild_pokemon = wild_pokemon_result.data
             wild_pokemon_info = WildPokemonInfo(
                     species_id=wild_pokemon.base_pokemon.id,
-                    name=wild_pokemon.base_pokemon.name_cn,
+                    name=wild_pokemon.base_pokemon.name_zh,
                     gender=wild_pokemon.gender,
                     level=wild_pokemon_level,
                     exp=wild_pokemon.exp,

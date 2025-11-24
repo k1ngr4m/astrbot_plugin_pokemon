@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 from astrbot.api import logger
-from ..domain.pokemon_models import PokemonSpecies, PokemonIVs, PokemonEVs, PokemonStats
+from ..domain.pokemon_models import PokemonSpecies, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves
 from ..domain.user_models import User, UserItems, UserItemInfo
 from ..domain.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserRepository
@@ -123,14 +123,14 @@ class SqliteUserRepository(AbstractUserRepository):
                 user_id, species_id, nickname, level, exp, gender,
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-                current_hp, attack, defense, sp_attack, sp_defense, speed,
-                moves, caught_time, shortcode
+                hp, attack, defense, sp_attack, sp_defense, speed,
+                move1_id, move2_id, move3_id, move4_id, caught_time, shortcode
             )
             VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
-                ?, CURRENT_TIMESTAMP, ?
+                ?, ?, ?, ?, CURRENT_TIMESTAMP, ?
             )
             """
 
@@ -164,14 +164,17 @@ class SqliteUserRepository(AbstractUserRepository):
             sp_defense = stats["sp_defense"]
             speed = stats["speed"]
 
-            moves = pokemon["moves"]
+            move1_id = None
+            move2_id = None
+            move3_id = None
+            move4_id = None
             # 获取新记录的ID（先插入然后获取ID用于生成短码）
             cursor.execute(sql, (
                 user_id, species_id, nickname, level, exp, gender,
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                moves, f"P{0:04d}"
+                move1_id, move2_id, move3_id, move4_id, f"P{0:04d}"
             ))
             new_id = cursor.lastrowid
             conn.commit()
@@ -206,7 +209,7 @@ class SqliteUserRepository(AbstractUserRepository):
 
         # 构造 PokemonStats 对象
         stats = PokemonStats(
-            hp=row_dict['current_hp'],
+            hp=row_dict['hp'],
             attack=row_dict['attack'],
             defense=row_dict['defense'],
             sp_attack=row_dict['sp_attack'],
@@ -247,7 +250,7 @@ class SqliteUserRepository(AbstractUserRepository):
             stats=stats,
             ivs=ivs,
             evs=evs,
-            moves=row_dict['moves'],
+            moves=None,
             caught_time=row_dict['caught_time'],
         )
 
@@ -260,7 +263,7 @@ class SqliteUserRepository(AbstractUserRepository):
             用户宝可梦列表
         """
         sql = """
-        SELECT up.*, ps.name_cn as species_name, ps.name_en as species_en_name
+        SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
         FROM user_pokemon up
         JOIN pokemon_species ps ON up.species_id = ps.id
         WHERE up.user_id = ?
@@ -285,7 +288,7 @@ class SqliteUserRepository(AbstractUserRepository):
             宝可梦实例信息（如果存在）
         """
         sql = """
-        SELECT up.*, ps.name_cn as species_name, ps.name_en as species_en_name
+        SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
         FROM user_pokemon up
         JOIN pokemon_species ps ON up.species_id = ps.id
         WHERE up.id = ? AND up.user_id = ?

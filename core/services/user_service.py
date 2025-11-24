@@ -137,7 +137,7 @@ class UserService:
         user_pokemon_info = UserPokemonInfo(
             id = 0,
             species_id = new_pokemon_data["base_pokemon"].id,
-            name = new_pokemon_data["base_pokemon"].name_cn,
+            name = new_pokemon_data["base_pokemon"].name_zh,
             gender = new_pokemon_data["gender"],
             level = new_pokemon_data["level"],
             exp = new_pokemon_data["exp"],
@@ -155,7 +155,7 @@ class UserService:
 
         return {
             "success": True,
-            "message": f"成功将 {pokemon_template.name_cn} 初始选择为宝可梦！\n\n它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
+            "message": f"成功将 {pokemon_template.name_zh} 初始选择为宝可梦！\n\n它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
         }
 
     def create_init_pokemon(self, species_id: int) -> Dict[str, Any]:

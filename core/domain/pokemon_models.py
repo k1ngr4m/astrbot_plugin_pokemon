@@ -80,6 +80,12 @@ class PokemonSpecies:
     height: float
     weight: float
     description: str
+    base_experience: Optional[int] = None
+    gender_rate: Optional[int] = None
+    capture_rate: Optional[int] = None
+    growth_rate_id: Optional[int] = None
+    orders: Optional[int] = None
+    isdel: Optional[int] = 0
 
     def to_dict(self) -> dict:
         return {
@@ -91,6 +97,12 @@ class PokemonSpecies:
             "height": self.height,
             "weight": self.weight,
             "description": self.description,
+            "base_experience": self.base_experience,
+            "gender_rate": self.gender_rate,
+            "capture_rate": self.capture_rate,
+            "growth_rate_id": self.growth_rate_id,
+            "orders": self.orders,
+            "isdel": self.isdel,
         }
 
 @dataclass
@@ -127,7 +139,7 @@ class UserPokemonInfo:
     stats: PokemonStats
     ivs: PokemonIVs
     evs: PokemonEVs
-    moves: PokemonMoves
+    moves: PokemonMoves | None = None
     caught_time: Optional[str] = None
 
     def __getitem__(self, item):
