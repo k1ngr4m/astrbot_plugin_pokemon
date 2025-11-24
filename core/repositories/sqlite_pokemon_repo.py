@@ -63,7 +63,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor.execute("SELECT * FROM pokemon_species ORDER BY id DESC")
             return [self._row_to_pokemon(row) for row in cursor.fetchall()]
 
-
     def add_pokemon_template(self, data: Dict[str, Any]) -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -143,16 +142,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 'region_id': data.get('region_id', 0),
                 'base_form_id': data.get('base_form_id', 0)
             })
-            conn.commit()
-
-    def add_item_template(self, data: Dict[str, Any]) -> None:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR IGNORE INTO items
-                (id, name, rarity, price, type, description)
-                VALUES (:id, :name, :rarity, :price, :type, :description)
-            """, {**data})
             conn.commit()
 
     def add_pokemon_move_template(self, data: Dict[str, Any]) -> None:

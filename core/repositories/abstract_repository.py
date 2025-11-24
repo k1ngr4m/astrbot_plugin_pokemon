@@ -86,10 +86,6 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def add_pokemon_evolution_template(self, evolution_data: Dict[str, Any]) -> None: pass
 
-    # 添加物品模板
-    @abstractmethod
-    def add_item_template(self, item_data: Dict[str, Any]) -> None: pass
-
     # 添加宝可梦招式模板
     @abstractmethod
     def add_pokemon_move_template(self, move_data: Dict[str, Any]) -> None: pass

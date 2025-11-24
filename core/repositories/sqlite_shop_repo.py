@@ -98,7 +98,7 @@ class SqliteShopRepository(AbstractShopRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT s.shop_id, s.id, i.name, i.type, i.description, i.rarity, s.price, s.stock, s.is_active
+                SELECT s.shop_id, s.id as shop_item_id, i.name_en, i.name_zh, i.category_id, i.description, i.rarity, s.price, s.stock, s.is_active
                 FROM shop_items s 
                 JOIN items i ON s.item_id = i.id
                 WHERE s.shop_id = ?
@@ -116,7 +116,7 @@ class SqliteShopRepository(AbstractShopRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT si.id as shop_item_id, si.price, si.stock, i.id as item_id, i.name
+                SELECT si.id as shop_item_id, si.price, si.stock, i.id as item_id, i.name_en, i.name_zh, i.category_id, i.description
                 FROM shop_items si
                 JOIN items i ON si.item_id = i.id
                 WHERE si.shop_id = ? AND i.id = ? AND si.is_active = 1
