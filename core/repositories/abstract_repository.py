@@ -199,9 +199,14 @@ class AbstractShopRepository(ABC):
     """商店数据仓储接口"""
 
     # ==========增==========
+    @abstractmethod
+    # 添加物品模板
+    def add_item_template(self, item_data: Dict[str, Any]) -> None: pass
+
     # 添加商店模板
     @abstractmethod
     def add_shop_template(self, shop: Dict[str, Any]) -> None: pass
+
     # 添加商店物品模板
     @abstractmethod
     def add_shop_item_template(self, shop_item: Dict[str, Any]) -> None: pass

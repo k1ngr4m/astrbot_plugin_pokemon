@@ -20,8 +20,8 @@ def up(cursor: sqlite3.Cursor):
             description TEXT,
             shop_type TEXT NOT NULL DEFAULT 'normal' CHECK (shop_type IN ('normal','premium','limited')),
             is_active INTEGER DEFAULT 1 NOT NULL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT  (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT  (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0         -- 是否已删除
         )
         """
@@ -36,8 +36,8 @@ def up(cursor: sqlite3.Cursor):
             price INTEGER NOT NULL DEFAULT 0,         -- 价格
             stock INTEGER NOT NULL DEFAULT -1,        -- 库存（-1表示无限库存）
             is_active INTEGER NOT NULL DEFAULT 1,     -- 是否上架（0/1）
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT  (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT  (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
             FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE CASCADE,

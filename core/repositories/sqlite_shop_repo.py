@@ -22,6 +22,17 @@ class SqliteShopRepository(AbstractShopRepository):
             self._local.connection = conn
         return conn
 
+    def add_item_template(self, item_data: Dict[str, Any]) -> None:
+        # 添加物品模板
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                           INSERT OR IGNORE INTO items
+                               (id, name_en, name_zh, category_id, cost, description)
+                           VALUES (:id, :name_en, :name_zh, :category_id, :cost, :description)
+                           """, {**item_data})
+            conn.commit()
+
     def add_shop_template(self, shop: Dict[str, Any]) -> None:
         """添加商店"""
         with self._get_connection() as conn:

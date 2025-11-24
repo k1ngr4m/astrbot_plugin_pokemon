@@ -69,24 +69,24 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_name ON pokemon_moves(name)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(type_id)")
 
-    # --- 4. 道具系统（后面可能也要重构） ---
+    # --- 4. 道具系统 ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- 道具ID
-            name TEXT NOT NULL,                   -- 名称
-            rarity INTEGER NOT NULL DEFAULT 1,
-            price INTEGER NOT NULL DEFAULT 0,
-            type TEXT CHECK(type IN ('Healing','Pokeball','Battle','Evolution','Misc')) NOT NULL,
+            name_en TEXT NOT NULL,                   -- 道具英文名称
+            name_zh TEXT,                           -- 道具中文名称
+            category_id INTEGER NOT NULL DEFAULT 1,
+            cost INTEGER NOT NULL DEFAULT 0,
             description TEXT,                      -- 道具说明
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0         -- 是否已删除
         );
     """)
 
     # items表索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_type ON items(type)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_rarity ON items(rarity)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_name ON items(name_en, name_zh)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_items_category_id ON items(category_id)")
 
     # --- 5. 宝可梦种族与属性对应关系 ---
     cursor.execute("""
@@ -165,8 +165,8 @@ def up(cursor: sqlite3.Cursor):
             description TEXT,                     -- 区域描述
             min_level INTEGER DEFAULT 1,          -- 最低推荐等级
             max_level INTEGER DEFAULT 100,        -- 最高推荐等级           
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0          -- 是否已删除
         );
     """)
@@ -181,8 +181,8 @@ def up(cursor: sqlite3.Cursor):
             min_level INTEGER DEFAULT 1,          -- 最低等级
             max_level INTEGER DEFAULT 10,         -- 最高等级
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             FOREIGN KEY (location_id) REFERENCES locations(id) ON DELETE CASCADE,
             FOREIGN KEY (pokemon_species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
             UNIQUE(location_id, pokemon_species_id)
@@ -224,8 +224,8 @@ def up(cursor: sqlite3.Cursor):
             move2_id INTEGER,                           -- 技能2ID
             move3_id INTEGER,                           -- 技能3ID
             move4_id INTEGER,                           -- 技能4ID
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE
         );
     """)
@@ -241,13 +241,13 @@ def up(cursor: sqlite3.Cursor):
             user_id TEXT NOT NULL,                    -- 遇到宝可梦的用户ID
             wild_pokemon_id INTEGER NOT NULL,
             location_id INTEGER NOT NULL,                        -- 遇到的区域ID
-            encounter_time TEXT DEFAULT CURRENT_TIMESTAMP, -- 遇到时间
+            encounter_time TEXT DEFAULT (datetime('now', '+8 hours')), -- 遇到时间
             is_captured INTEGER DEFAULT 0,            -- 是否被捕捉 (0=未捕捉, 1=已捕捉)
             is_battled INTEGER DEFAULT 0,             -- 是否进行了战斗 (0=未战斗, 1=已战斗)
             battle_result TEXT,                       -- 战斗结果 (win/lose/escaped)
             encounter_rate REAL,                      -- 遇到概率
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,                 -- 是否删除 (0=未删除, 1=已删除)
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (wild_pokemon_id) REFERENCES wild_pokemon(id) ON DELETE CASCADE,

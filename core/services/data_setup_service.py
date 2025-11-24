@@ -59,7 +59,8 @@ class DataSetupService:
         pokemon_types_df = self._read_csv_data("pokemon_types.csv")
         pokemon_species_types_df = self._read_csv_data("pokemon_species_types.csv")
         pokemon_evolution_df = self._read_csv_data("pokemon_evolution.csv")
-        # 注意：初始数据中的其他数据（如技能、物品、冒险区域等）可能仍需要从其他来源获取
+        items_df = self._read_csv_data("items.csv")
+        # 注意：初始数据中的其他数据（如技能、冒险区域等）可能仍需要从其他来源获取
         # 我们假设这些数据仍然在initial_data.py中，或者需要创建对应的CSV文件
 
         # 填充Pokemon数据
@@ -140,4 +141,24 @@ class DataSetupService:
                 }
 
                 self.pokemon_repo.add_pokemon_evolution_template(evolution_data)
+
+        # 填充物品数据
+        if not items_df.empty:
+            for _, item_row in items_df.iterrows():
+                try:
+                    # 注意：数据库items表字段为: id, name, rarity, price, type, description
+                    # 需要调整字段映射以适配数据库结构
+                    item_data = {
+                        "id": int(item_row['id']),
+                        "name_en": str(item_row['name_en']),  # 使用英文名称作为name_en字段
+                        "name_zh": str(item_row['name_zh']),  # 使用中文名称作为name_zh字段
+                        "category_id": int(item_row['category_id']),
+                        "cost": int(item_row['cost']),
+                        "description": str(item_row['description']) if pd.notna(item_row['description']) else ""
+                    }
+
+                    self.shop_repo.add_item_template(item_data)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"处理物品数据时出错 (ID: {item_row.get('id', 'Unknown')}): {e}")
+                    continue
 

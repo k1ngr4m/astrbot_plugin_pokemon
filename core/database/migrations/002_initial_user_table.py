@@ -22,8 +22,8 @@ def up(cursor: sqlite3.Cursor):
             init_selected TINYINT(1) DEFAULT 0, -- 是否已选择初始宝可梦
             last_adventure_time REAL DEFAULT NULL,
             origin_id TEXT DEFAULT NULL,          -- 原始玩家ID
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP, -- 玩家创建时间
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0      -- 是否已删除
         );
     """)
@@ -62,10 +62,10 @@ def up(cursor: sqlite3.Cursor):
             move2_id INTEGER,                           -- 技能2ID
             move3_id INTEGER,                           -- 技能3ID
             move4_id INTEGER,                           -- 技能4ID
-            caught_time TEXT DEFAULT CURRENT_TIMESTAMP,
+            caught_time TEXT DEFAULT (datetime('now', '+8 hours')),
             shortcode TEXT,                       -- 短码ID（格式为P+4位数字）
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (species_id) REFERENCES pokemon_species(id),
@@ -93,8 +93,8 @@ def up(cursor: sqlite3.Cursor):
             item_id INTEGER NOT NULL,             -- 道具ID
             quantity INTEGER DEFAULT 0,           -- 数量
             shortcode TEXT,                       -- 短码ID（格式为I+4位数字）
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             PRIMARY KEY (user_id, item_id),
             FOREIGN KEY (user_id) REFERENCES users(user_id),
@@ -111,8 +111,8 @@ def up(cursor: sqlite3.Cursor):
         CREATE TABLE IF NOT EXISTS user_team (
             user_id TEXT PRIMARY KEY,             -- 玩家ID
             team TEXT,                            -- 队伍配置（JSON字符串）
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (user_id) REFERENCES users(user_id)
         );
@@ -129,8 +129,8 @@ def up(cursor: sqlite3.Cursor):
             battle_log TEXT,                      -- 战斗日志（JSON或文本）
             start_time TEXT,                      -- 开始时间
             end_time TEXT,                        -- 结束时间
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (user1_id) REFERENCES users(user_id),
             FOREIGN KEY (user2_id) REFERENCES users(user_id)
@@ -152,8 +152,8 @@ def up(cursor: sqlite3.Cursor):
             gold_reward INTEGER NOT NULL,  -- 金币奖励
             item_reward_id INTEGER DEFAULT 1,  -- 获得的道具ID，默认为普通精灵球
             item_quantity INTEGER DEFAULT 1,  -- 道具数量
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-            updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            created_at TEXT DEFAULT (datetime('now', '+8 hours')),
+            updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
             FOREIGN KEY (user_id) REFERENCES users(user_id),
             FOREIGN KEY (item_reward_id) REFERENCES items(id),
