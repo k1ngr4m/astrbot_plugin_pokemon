@@ -66,7 +66,7 @@ class PokemonService:
             )
 
         # 2. 生成基础信息
-        gender = random.choice(["M", "F", "N"])
+        gender = self.determine_pokemon_gender(pokemon_template.gender_rate)
         level = random.randint(min_level, max_level)
         exp = 0
         moves = None
@@ -166,3 +166,44 @@ class PokemonService:
             wild_pokemon (PokemonDetail): 野生宝可梦的详细信息
         """
         self.pokemon_repo.add_user_encountered_wild_pokemon(user_id, wild_pokemon)
+
+    def determine_pokemon_gender(self, gender_rate: int) -> str:
+        """
+        根据gender_rate编码判定宝可梦性别
+        :param gender_rate: 性别比率编码（-1/0/1/2/4/6/8）
+        :return: 性别标识（M=雄性，F=雌性，N=无性别）
+        """
+        # 定义性别比率映射：(编码, 描述, 雄性概率, 雌性概率)
+        gender_mapping = {
+            -1: ("无性别", 0.0, 0.0),
+            0: ("仅雌性", 0.0, 1.0),
+            1: ("1雌:7雄", 0.875, 0.125),
+            2: ("1雌:3雄", 0.75, 0.25),
+            4: ("1雌:1雄", 0.5, 0.5),
+            6: ("3雌:1雄", 0.25, 0.75),
+            8: ("仅雄性", 1.0, 0.0)
+        }
+
+        # 检查编码是否有效，默认无性别
+        if gender_rate not in gender_mapping:
+            return "N"
+
+        desc, male_prob, female_prob = gender_mapping[gender_rate]
+
+        # 无性别判定
+        if male_prob == 0.0 and female_prob == 0.0:
+            return "N"
+        # 仅雌性判定
+        elif male_prob == 0.0 and female_prob == 1.0:
+            return "F"
+        # 仅雄性判定
+        elif male_prob == 1.0 and female_prob == 0.0:
+            return "M"
+        # 雌雄混合判定（基于概率随机选择）
+        else:
+            # 生成0~1的随机数，根据概率区间判定
+            random_val = random.random()
+            if random_val < male_prob:
+                return "M"
+            else:
+                return "F"
