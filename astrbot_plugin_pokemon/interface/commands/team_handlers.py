@@ -15,13 +15,12 @@ class TeamHandlers:
     async def set_team(self, event: AstrMessageEvent):
         """设置队伍中的宝可梦"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_user_by_id(user_id)
-
-        if not user:
-            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+        result = self.user_service.check_user_registered(user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
             return
 
-        args = event.message_str.split(" ")
+        args = event.message_str.split()
         if len(args) < 2:
             yield event.plain_result(AnswerEnum.TEAM_SET_USAGE_ERROR.value)
             return
@@ -40,15 +39,16 @@ class TeamHandlers:
         # 验证每个ID格式（仅支持数字ID）
         for id in pokemon_ids:
             if not id.isdigit():
-                yield event.plain_result(f"❌ 宝可梦ID {id} 格式不正确（仅支持数字ID）。")
+                yield event.plain_result(AnswerEnum.TEAM_SET_INVALID_ID.value.format(id=id))
                 return
 
         result = self.team_service.set_team_pokemon(user_id, [int(id) for id in pokemon_ids])
 
-        if result["success"]:
-            yield event.plain_result(result['message'])
+        if result.success:
+            d = result.data
+            yield event.plain_result(AnswerEnum.TEAM_SET_SUCCESS.value.format(pokemon_names=', '.join(d)))
         else:
-            yield event.plain_result(result['message'])
+            yield event.plain_result(result.message)
 
     async def view_team(self, event: AstrMessageEvent):
         """查看当前队伍配置"""

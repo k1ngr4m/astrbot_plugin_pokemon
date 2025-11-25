@@ -1,9 +1,12 @@
 from typing import Dict, Any, List
+
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
 )
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.user_models import UserTeam
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.interface.response.answer_enum import AnswerEnum
 
 
 class TeamService:
@@ -20,7 +23,7 @@ class TeamService:
         self.team_repo = team_repo
         self.config = config
 
-    def set_team_pokemon(self, user_id: str, pokemon_ids: List[int]) -> Dict[str, Any]:
+    def set_team_pokemon(self, user_id: str, pokemon_ids: List[int]) -> BaseResult:
         """
         设置用户的队伍配置，指定最多6只宝可梦组成队伍
         Args:
@@ -38,7 +41,7 @@ class TeamService:
             if id not in user_pokemon_dict:
                 temp_id = int(id)
                 if str(temp_id) not in user_pokemon_dict:
-                    return {"success": False, "message": f"宝可梦 {id} 不属于您或不存在"}
+                    return BaseResult(success=False, message=AnswerEnum.TEAM_SET_INVALID_POKEMON_ID.value.format(id=temp_id))
 
         user_team_pokemon_list = []
         user_team_pokemon_name_list = []
@@ -58,11 +61,11 @@ class TeamService:
         # 保存队伍配置
         self.team_repo.update_user_team(user_id, user_team)
 
-
-        return {
-            "success": True,
-            "message": f"成功设置队伍！队伍成员：{', '.join(user_team_pokemon_name_list)}。"
-        }
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.TEAM_SET_SUCCESS.value.format(pokemon_names=', '.join(user_team_pokemon_name_list)),
+            data=user_team_pokemon_name_list
+        )
 
     def get_user_team(self, user_id: str) -> Dict[str, Any]:
         """

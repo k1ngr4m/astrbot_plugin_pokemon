@@ -35,3 +35,6 @@ class AnswerEnum(Enum):
     TEAM_SET_USAGE_ERROR = "❌ 请输入宝可梦ID列表。\n\n用法：设置队伍 <宝可梦ID1> <宝可梦ID2> ...\n\n💡 提示：最多可设置6只宝可梦。\n\n使用 /我的宝可梦 指令查看您的宝可梦列表和对应的ID。"
     TEAM_SET_MAX_POKEMON = "❌ 队伍最多只能包含6只宝可梦。"
     TEAM_SET_MIN_POKEMON = "❌ 请至少选择1只宝可梦加入队伍。"
+    TEAM_SET_INVALID_ID = "❌ 宝可梦ID {id} 格式不正确（仅支持数字ID）。"
+    TEAM_SET_INVALID_POKEMON_ID = "❌ 宝可梦 {id} 不属于您或不存在。\n\n请检查您的宝可梦ID是否正确，或使用 /我的宝可梦 指令查看您的宝可梦列表和对应的ID。"
+    TEAM_SET_SUCCESS = "✅ 成功设置队伍！队伍成员：{pokemon_names}。"
