@@ -3,7 +3,7 @@ from typing import Dict, Any
 
 from .pokemon_service import PokemonService
 from ..repositories.abstract_repository import (
-    AbstractUserRepository, AbstractPokemonRepository,
+    AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository,
 )
 
 from ..utils import get_now, get_today, userid_to_base32
@@ -17,11 +17,13 @@ class UserService:
             self,
             user_repo: AbstractUserRepository,
             pokemon_repo: AbstractPokemonRepository,
+            item_repo: AbstractItemRepository,
             pokemon_service: PokemonService,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
+        self.item_repo = item_repo
         self.pokemon_service = pokemon_service
         self.config = config
 
@@ -96,9 +98,12 @@ class UserService:
         # 记录签到信息
         self.user_repo.add_user_checkin(user_id, today, gold_reward, item_reward_id, item_quantity)
 
+        # 获取道具名称
+        item_name = self.item_repo.get_item_name(item_reward_id)
+
         return {
             "success": True,
-            "message": f"✅ 签到成功！\n获得了 {gold_reward} 金币 💰\n获得了 普通精灵球 x{item_quantity} 🎒\n当前金币总数：{new_coins}",
+            "message": f"✅ 签到成功！\n获得了 {gold_reward} 金币 💰\n获得了 {item_name} x{item_quantity} 🎒\n当前金币总数：{new_coins}",
             "gold_reward": gold_reward,
             "item_reward": {
                 "id": item_reward_id,

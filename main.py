@@ -4,6 +4,7 @@ from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger, AstrBotConfig
 from .core.database.migration import run_migrations
+from .core.repositories.sqlite_item_repo import SqliteItemRepository
 from .core.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from .core.repositories.sqlite_team_repo import SqliteTeamRepository
 from .core.repositories.sqlite_user_repo import SqliteUserRepository
@@ -83,6 +84,7 @@ class PokemonPlugin(Star):
         self.team_repo = SqliteTeamRepository(db_path)
         self.adventure_repo = SqliteAdventureRepository(db_path)
         self.shop_repo = SqliteShopRepository(db_path)
+        self.item_repo = SqliteItemRepository(db_path)
 
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
@@ -97,6 +99,7 @@ class PokemonPlugin(Star):
         self.user_service = UserService(
             user_repo=self.user_repo,
             pokemon_repo=self.pokemon_repo,
+            item_repo=self.item_repo,
             pokemon_service=self.pokemon_service,
             config=self.game_config
         )

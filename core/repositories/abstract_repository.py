@@ -192,7 +192,6 @@ class AbstractAdventureRepository(ABC):
     def get_location_by_id(self, location_id: int) -> Optional[LocationTemplate]: pass
 
 
-
     # ==========查==========
     # 根据区域ID获取区域内的宝可梦
     @abstractmethod
@@ -238,3 +237,8 @@ class AbstractShopRepository(ABC):
     # 根据商店物品ID获取商店物品
     @abstractmethod
     def get_a_shop_item_by_id(self, shop_item_id: int, shop_id: int) -> Optional[Dict[str, Any]]: pass
+
+class AbstractItemRepository(ABC):
+    """物品数据仓储接口"""
+    @abstractmethod
+    def get_item_name(self, item_id: int) -> Optional[str]: pass
