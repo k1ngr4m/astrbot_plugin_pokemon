@@ -20,7 +20,7 @@ class AbstractUserRepository(ABC):
 
     # 为用户添加签到记录
     @abstractmethod
-    def add_user_checkin(self, user_id: str, checkin_date: str, gold_reward: int, item_reward_id: int = 1, item_quantity: int = 1) -> None: pass
+    def add_user_checkin(self, user_id: str, checkin_date: str, gold_reward: int, item_reward_id: int = 4, item_quantity: int = 1) -> None: pass
 
     # 为用户添加物品
     @abstractmethod
@@ -134,7 +134,7 @@ class AbstractPokemonRepository(ABC):
 
     # 获取用户遇到的所有野生宝可梦记录
     @abstractmethod
-    def get_user_encounters(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]: pass
+    def get_user_encounters(self, user_id: str, limit: int = 50, offset: int = 0) -> List[WildPokemonEncounterLog]: pass
 
     # 获取用户遇到的某个特定物种的次数
     @abstractmethod

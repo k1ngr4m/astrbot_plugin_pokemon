@@ -3,6 +3,7 @@ import threading
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
+from data.plugins.astrbot_plugin_pokemon.core.domain.pokemon_models import WildPokemonInfo
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
 from ..domain.adventure_models import LocationInfo
@@ -49,6 +50,60 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
         return PokemonSpecies(
             base_stats=base_stats,
             **row_dict
+        )
+
+    def _row_to_wild_pokemon(self, row: sqlite3.Row) -> WildPokemonInfo | None:
+        if not row:
+            return None
+
+        row_dict = dict(row)
+
+        # 构造 PokemonStats 对象
+        stats = PokemonStats(
+            hp=row_dict['hp'],
+            attack=row_dict['attack'],
+            defense=row_dict['defense'],
+            sp_attack=row_dict['sp_attack'],
+            sp_defense=row_dict['sp_defense'],
+            speed=row_dict['speed']
+        )
+
+        # 构造 PokemonIVs 对象
+        ivs = PokemonIVs(
+            hp_iv=row_dict['hp_iv'],
+            attack_iv=row_dict['attack_iv'],
+            defense_iv=row_dict['defense_iv'],
+            sp_attack_iv=row_dict['sp_attack_iv'],
+            sp_defense_iv=row_dict['sp_defense_iv'],
+            speed_iv=row_dict['speed_iv']
+        )
+
+        # 构造 PokemonEVs 对象
+        evs = PokemonEVs(
+            hp_ev=row_dict['hp_ev'],
+            attack_ev=row_dict['attack_ev'],
+            defense_ev=row_dict['defense_ev'],
+            sp_attack_ev=row_dict['sp_attack_ev'],
+            sp_defense_ev=row_dict['sp_defense_ev'],
+            speed_ev=row_dict['speed_ev']
+        )
+        row_dict = dict(row)
+
+        row_dict.pop('created_at', None)
+        row_dict.pop('updated_at', None)
+        row_dict.pop('isdel', None)
+
+        return WildPokemonInfo(
+            id=row_dict['id'],
+            species_id=row_dict['species_id'],
+            name=row_dict['name'],
+            gender=row_dict['gender'],
+            level=row_dict['level'],
+            exp=row_dict['exp'],
+            stats=stats,
+            ivs=ivs,
+            evs=evs,
+            moves=None
         )
 
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
@@ -245,7 +300,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             cursor.execute(sql, params)
             conn.commit()
 
-    def get_user_encounters(self, user_id: str, limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+    def get_user_encounters(self, user_id: str, limit: int = 50, offset: int = 0) -> List[WildPokemonEncounterLog]:
         """获取用户遇到的所有野生宝可梦记录"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -256,7 +311,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 LIMIT ? OFFSET ?
             """, (user_id, limit, offset))
             rows = cursor.fetchall()
-            return [dict(row) for row in rows]
+            return [WildPokemonEncounterLog(**dict(row)) for row in rows]
 
     def get_user_pokemon_encounter_count(self, user_id: str, wild_pokemon_id: int) -> int:
         """获取用户遇到的某个特定物种的次数"""
@@ -323,7 +378,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             row = cursor.fetchone()
             return row['base_experience'] if row else 0
 
-    def get_wild_pokemon_by_id(self, wild_pokemon_id: int) -> Optional[WildPokemonInfo]:
+    def get_wild_pokemon_by_id(self, wild_pokemon_id: int) -> Optional[Dict[str, Any]]:
         """根据野生宝可梦ID获取野生宝可梦信息"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -332,7 +387,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 WHERE id = ? AND isdel = 0
             """, (wild_pokemon_id,))
             row = cursor.fetchone()
-            return WildPokemonInfo.to_dict(row) if row else None
+            return self._row_to_wild_pokemon(row) if row else None
 
     def add_wild_pokemon(self, pokemon: WildPokemonInfo) -> int:
         """添加野生宝可梦"""

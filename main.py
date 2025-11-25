@@ -108,19 +108,23 @@ class PokemonPlugin(Star):
             config=self.game_config
         )
 
-        self.adventure_service = AdventureService(
-            adventure_repo=self.adventure_repo,
-            pokemon_repo=self.pokemon_repo,
-            pokemon_service=self.pokemon_service,
-            user_repo=self.user_repo,
-            config=self.game_config
-        )
         self.exp_service = ExpService(
             user_repo=self.user_repo,
             pokemon_repo=self.pokemon_repo,
             team_repo=self.team_repo,
             config=self.game_config
         )
+
+        self.adventure_service = AdventureService(
+            adventure_repo=self.adventure_repo,
+            pokemon_repo=self.pokemon_repo,
+            team_repo=self.team_repo,
+            pokemon_service=self.pokemon_service,
+            user_repo=self.user_repo,
+            exp_service=self.exp_service,
+            config=self.game_config
+        )
+
 
         self.battle_service = BattleService(
             user_repo=self.user_repo,

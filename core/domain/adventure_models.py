@@ -35,3 +35,8 @@ class AdventureResult:
     message: str
     wild_pokemon: 'WildPokemonInfo' | None
     location: 'LocationInfo' | None
+
+@dataclass
+class BattleResult:
+    success: bool
+    message: str

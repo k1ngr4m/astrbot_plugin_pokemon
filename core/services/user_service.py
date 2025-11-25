@@ -83,7 +83,7 @@ class UserService:
         gold_reward = random.randint(100, 300)
 
         # 道具奖励：普通精灵球（ID=1），数量=1
-        item_reward_id = 1
+        item_reward_id = 4
         item_quantity = 1
 
         # 更新用户金币

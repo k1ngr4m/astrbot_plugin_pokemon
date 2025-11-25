@@ -34,10 +34,9 @@ class UserItemInfo:
     """代表一个用户的道具信息领域模型"""
     item_id: str
     quantity: int
-    name: str
-    type: int
+    name_zh: str
+    category_id: int
     description: str
-    rarity: int
 
 @dataclass
 class UserItems:

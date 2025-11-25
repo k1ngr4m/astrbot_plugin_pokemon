@@ -327,7 +327,7 @@ class SqliteUserRepository(AbstractUserRepository):
             """, (user_id, today))
             return cursor.fetchone() is not None
 
-    def add_user_checkin(self, user_id: str, checkin_date: str, gold_reward: int, item_reward_id: int = 1, item_quantity: int = 1) -> None:
+    def add_user_checkin(self, user_id: str, checkin_date: str, gold_reward: int, item_reward_id: int = 4, item_quantity: int = 1) -> None:
         """
         为用户添加签到记录
         Args:
@@ -406,11 +406,11 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor = conn.cursor()
             # 查询用户物品及其详细信息
             sql = """
-            SELECT ui.item_id, ui.quantity, i.name, i.type, i.description, i.rarity
+            SELECT ui.item_id, ui.quantity, i.name_zh, i.category_id, i.description
             FROM user_items ui
             JOIN items i ON ui.item_id = i.id
             WHERE ui.user_id = ? and ui.quantity > 0
-            ORDER BY i.type, i.rarity DESC, i.name
+            ORDER BY i.category_id DESC, i.name_zh
             """
             cursor.execute(sql, (user_id,))
             rows = cursor.fetchall()
@@ -419,10 +419,9 @@ class SqliteUserRepository(AbstractUserRepository):
                 items_list.append(UserItemInfo(
                         item_id=row[0],
                         quantity=row[1],
-                        name=row[2],
-                        type=row[3],
-                        description=row[4],
-                        rarity=row[5]
+                        name_zh=row[2],
+                        category_id=row[3],
+                        description=row[4]
                 ))
             user_items: UserItems = UserItems(
                 user_id=user_id,
