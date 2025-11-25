@@ -276,7 +276,7 @@ class UserService:
             data=pokemon
         )
 
-    def get_user_specific_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult:
+    def get_user_specific_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult[UserPokemonInfo]:
         """
         获取用户特定宝可梦的详细信息
         Args:
@@ -286,57 +286,18 @@ class UserService:
             包含宝可梦详细信息的字典
         """
         # 获取特定宝可梦的信息
-        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, int(pokemon_id))
+        pokemon_data: UserPokemonInfo = self.user_repo.get_user_pokemon_by_id(user_id, int(pokemon_id))
         if not pokemon_data:
             return BaseResult(
                 success=False,
                 message=AnswerEnum.USER_POKEMON_NOT_FOUND.value
             )
 
-        # 显示详细信息
-        gender_str = {
-            "M": "♂️",
-            "F": "♀️",
-            "N": "⚲"
-        }.get(pokemon_data["gender"], "")
-
-        message = f"🔍 宝可梦详细信息：\n\n"
-        message += f"{pokemon_data['name']} {gender_str}\n\n"
-        message += f"等级: {pokemon_data['level']}\n"
-        message += f"经验: {pokemon_data['exp']}\n\n"
-
-        # 实际属性值
-        message += "💪 属性值:\n\n"
-        message += f"  HP: {pokemon_data['stats']['hp']}\t\n"
-        message += f"  攻击: {pokemon_data['stats']['attack']}\t\n"
-        message += f"  防御: {pokemon_data['stats']['defense']}\n\n"
-        message += f"  特攻: {pokemon_data['stats']['sp_attack']}\t\n"
-        message += f"  特防: {pokemon_data['stats']['sp_defense']}\t\n"
-        message += f"  速度: {pokemon_data['stats']['speed']}\n\n"
-
-        # 个体值 (IV)
-        message += "📊 个体值 (IV):\n\n"
-        message += f"  HP: {pokemon_data['ivs']['hp_iv']}/31\t\n"
-        message += f"  攻击: {pokemon_data['ivs']['attack_iv']}/31\t\n"
-        message += f"  防御: {pokemon_data['ivs']['defense_iv']}/31\n\n"
-        message += f"  特攻: {pokemon_data['ivs']['sp_attack_iv']}/31\t\n"
-        message += f"  特防: {pokemon_data['ivs']['sp_defense_iv']}/31\t\n"
-        message += f"  速度: {pokemon_data['ivs']['speed_iv']}/31\n\n"
-
-        # 努力值 (EV)
-        message += "📈 努力值 (EV):\n\n"
-        message += f"  HP: {pokemon_data['evs']['hp_ev']}\t\n"
-        message += f"  攻击: {pokemon_data['evs']['attack_ev']}\t\n"
-        message += f"  防御: {pokemon_data['evs']['defense_ev']}\n\n"
-        message += f"  特攻: {pokemon_data['evs']['sp_attack_ev']}\t\n"
-        message += f"  特防: {pokemon_data['evs']['sp_defense_ev']}\t\n"
-        message += f"  速度: {pokemon_data['evs']['speed_ev']}\n\n"
-
-        message += f"捕获时间: {pokemon_data['caught_time']}"
 
         return BaseResult(
             success=True,
-            message=message
+            message="",
+            data=pokemon_data
         )
 
     def get_user_all_pokemon(self, user_id: str) -> BaseResult:

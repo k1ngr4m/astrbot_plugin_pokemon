@@ -202,7 +202,7 @@ class PokemonPlugin(Star):
     @filter.command("我的宝可梦")
     async def my_pokemon(self, event: AstrMessageEvent):
         """查看我的宝可梦列表，或使用 /我的宝可梦 <宝可梦ID> 查看特定宝可梦详细信息"""
-        async for r in self.pokemon_handlers.my_pokemon(event):
+        async for r in self.user_pokemon_handlers.view_user_pokemon(event):
             yield r
 
     @filter.command("设置队伍")
