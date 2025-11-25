@@ -169,7 +169,7 @@ class AdventureHandlers:
         if not catch_success_rate['success']:
             yield event.plain_result(catch_success_rate['message'])
             return
-        message = f"您尝试捕捉野生的 {wild_pokemon.name} (Lv.{wild_pokemon.level})，捕捉成功率为 {catch_success_rate['data']['success_rate']}。\n\n"
+        message = f"您尝试捕捉野生的 {wild_pokemon.name} (Lv.{wild_pokemon.level})，捕捉成功率为 {catch_success_rate['data']['success_rate']*100:.2f}%。\n\n"
         # 随机决定捕捉结果
         is_successful = random.random() < catch_success_rate['data']['success_rate']
         pokeball_item = catch_success_rate['data']['pokeball_item']
@@ -222,10 +222,9 @@ class AdventureHandlers:
                 print(f"更新野生宝可梦遇到日志（捕捉）时出错: {e}")
 
         else:
-            message = f"❌ 捕捉失败！\n\n"
+            message += f"❌ 捕捉失败！\n\n"
             message += f"{wild_pokemon.name} 逃脱了！\n\n"
             message += f"使用的精灵球: [{pokeball_item.item_id}] {pokeball_item.name_zh}\n\n"
-            message += f"捕捉成功率: {catch_success_rate * 100:.1f}%\n\n"
             message += f"剩余精灵球: {pokeball_item.quantity - 1}\n\n"
             message += "你也可以使用 /逃跑 指令离开这只野生宝可梦。"
 

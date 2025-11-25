@@ -520,7 +520,7 @@ class AdventureService:
             if item_id is not None:
                 message = f"❌ 找不到ID为 {item_id} 的精灵球或该道具不存在，无法进行捕捉！请检查道具ID或先通过签到或其他方式获得精灵球。"
             else:
-                message = "❌ 您的背包中没有精灵球，无法进行捕捉！请先通过签到或其他方式获得精灵球。"
+                message = AnswerEnum.USER_POKEBALLS_EMPTY.value
             return {"success": False, "message": message}
 
         # 根据精灵球类型调整基础捕捉率
@@ -529,11 +529,14 @@ class AdventureService:
             ball_multiplier = 1.5
         elif pokeball_item.name_zh == '高级球':
             ball_multiplier = 2.0
+        elif pokeball_item.name_zh == '大师球':
+            ball_multiplier = 255
 
         # 边界条件：当前HP不能小于0或大于最大HP，基础捕获率范围0~255
         max_hp = wild_pokemon.stats.hp
-        # 假设current_hp为1/4最大HP
-        current_hp = max_hp // 4
+        # 假设current_hp为随机值，正态分布，均值为最大HP的3/4，标准差为最大HP的1/4
+        temp_current_hp = int(random.gauss(max_hp * 3 / 4, max_hp / 4))
+        current_hp = max(0, min(max_hp, temp_current_hp))  # 确保在有效范围内
         base_capture_rate = int(self.pokemon_repo.get_pokemon_capture_rate(wild_pokemon.species_id))
 
         status = "none"
@@ -560,14 +563,14 @@ class AdventureService:
         # 判定值上限为255（超过则100%成功）
         catch_value = min(catch_value, 255)
         # 计算成功率（随机数0~255，共256种可能）
-        success_rate = (catch_value / 256) * 100 if catch_value > 0 else 0.0
+        success_rate = (catch_value / 256) if catch_value > 0 else 0.0
 
         return {
             "success": True,
             "message": f"判定值为{catch_value}，捕捉成功率为{round(success_rate, 2)}%",
             "data": {
                 "catch_value": catch_value,
-                "success_rate": success_rate,
+                "success_rate": round(success_rate, 2),
                 "pokeball_item": pokeball_item,
             }
         }

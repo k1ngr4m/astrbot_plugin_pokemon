@@ -124,13 +124,13 @@ class SqliteUserRepository(AbstractUserRepository):
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id, caught_time, shortcode
+                move1_id, move2_id, move3_id, move4_id, shortcode
             )
             VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, CURRENT_TIMESTAMP, ?
+                ?, ?, ?, ?, ?
             )
             """
 
