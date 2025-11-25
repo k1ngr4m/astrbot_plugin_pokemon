@@ -5,6 +5,7 @@ from typing import Dict, Any, List, Tuple
 
 from .exp_service import ExpService
 from .pokemon_service import PokemonService
+from ..models.common_models import BaseResult
 from ...interface.response.answer_enum import AnswerEnum
 from ..models.pokemon_models import WildPokemonInfo, PokemonStats, PokemonIVs, PokemonEVs, \
     UserPokemonInfo, WildPokemonEncounterLog
@@ -60,43 +61,39 @@ class AdventureService:
             'fairy': {'fighting': 2.0, 'poison': 0.5, 'bug': 0.5, 'dragon': 2.0, 'dark': 2.0, 'steel': 0.5}
         }
 
-    def get_all_locations(self) -> Dict[str, Any]:
+    def get_all_locations(self) -> BaseResult[List[LocationInfo]]:
         """
         获取所有可冒险的区域列表
         Returns:
             包含区域列表的字典
         """
-        try:
-            locations = self.adventure_repo.get_all_locations()
 
-            if not locations:
-                return {
-                    "success": True,
-                    "message": "暂无可用的冒险区域",
-                    "locations": []
-                }
+        locations = self.adventure_repo.get_all_locations()
 
-            formatted_locations = []
-            for location in locations:
-                formatted_locations.append({
-                    "location_id": location.id,
-                    "location_name": location.name,
-                    "description": location.description or "暂无描述",
-                    "min_level": location.min_level,
-                    "max_level": location.max_level
-                })
+        if not locations:
+            return BaseResult(
+                success=True,
+                message=AnswerEnum.ADVENTURE_NO_LOCATIONS.value,
+            )
 
-            return {
-                "success": True,
-                "locations": formatted_locations,
-                "count": len(formatted_locations),
-                "message": f"共有 {len(formatted_locations)} 个可冒险区域"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"获取区域列表失败: {str(e)}"
-            }
+        formatted_locations: List[LocationInfo] = []
+        for location in locations:
+            location_info: LocationInfo = LocationInfo(
+                id=location.id,
+                name=location.name,
+                description=location.description or "暂无描述",
+                min_level=location.min_level,
+                max_level=location.max_level
+            )
+            formatted_locations.append(location_info)
+
+
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.ADVENTURE_LOCATIONS_FOUND.value.format(len(formatted_locations)),
+            data=formatted_locations
+        )
+
 
     def adventure_in_location(self, user_id: str, location_id: int) -> AdventureResult:
         """

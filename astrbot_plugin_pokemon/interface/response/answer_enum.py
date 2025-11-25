@@ -24,6 +24,7 @@ class AnswerEnum(Enum):
     USER_CHECKIN_SUCCESS = "✅ 签到成功！\n获得了 {gold_reward} 金币 💰\n获得了 {item_name} x{item_quantity} 🎒\n当前金币总数：{new_coins}"
     USER_POKEMONS_NOT_FOUND = "❌ 您还没有获得任何宝可梦。\n\n请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦，或使用 /捕捉 指令捕捉野生宝可梦。"
     USER_POKEMON_ALL_POKEMON_SUCCESS = "✅ 您当前已获得的所有宝可梦如下：\n\n{pokemon_list}"
+
     # 宝可梦相关提示
     POKEMON_INIT_SELECT_USAGE_ERROR = "❌ 请输入宝可梦ID。\n\n用法：初始选择 <宝可梦ID>"
     POKEMON_ID_INVALID = "❌ 请输入正确的宝可梦ID。"
@@ -41,3 +42,7 @@ class AnswerEnum(Enum):
     TEAM_GET_NO_TEAM = "❌ 您还没有设置队伍。\n\n请先使用 /设置队伍 指令设置您的出场队伍，才能进行冒险。"
     TEAM_GET_INVALID_POKEMON_ID = "❌ 队伍中包含不存在的宝可梦 {id}。\n\n请检查您的队伍设置是否正确，或使用 /我的宝可梦 指令查看您的宝可梦列表和对应的ID。"
     TEAM_GET_SUCCESS = "✅ 成功获取队伍信息。\n\n队伍成员：{pokemon_names}"
+
+    # 冒险相关提示
+    ADVENTURE_NO_LOCATIONS = "❌ 暂无可用的冒险区域。\n\n请联系管理员添加新的冒险区域。"
+    ADVENTURE_LOCATIONS_FOUND = "✅ 共有 {count} 个可冒险区域。\n\n使用 /冒险 <区域代码> 指令去冒险。"

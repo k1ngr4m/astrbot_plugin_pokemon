@@ -2,6 +2,7 @@ import random
 from typing import List
 
 from astrbot.api.event import AstrMessageEvent
+from ...core.models.adventure_models import LocationInfo
 from ...interface.response.answer_enum import AnswerEnum
 from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog
 from ...utils.utils import userid_to_base32
@@ -10,6 +11,7 @@ from ...utils.utils import userid_to_base32
 class AdventureHandlers:
     def __init__(self, plugin):
         self.plugin = plugin
+        self.user_service = plugin.user_service
         self.adventure_service = plugin.adventure_service
         self.battle_service = plugin.battle_service
         self.pokemon_service = plugin.pokemon_service
@@ -18,29 +20,26 @@ class AdventureHandlers:
     async def view_locations(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_user_by_id(user_id)
-
-        if not user:
-            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+        result = self.user_service.check_user_registered(user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
             return
 
         result = self.adventure_service.get_all_locations()
 
-        if not result["success"]:
-            yield event.plain_result(result["message"])
+        if not result.success:
+            yield event.plain_result(result.message)
             return
 
-        if not result["locations"]:
-            yield event.plain_result(result["message"])
-            return
+        locations: List[LocationInfo] = result.data
 
         # 组织显示信息
-        message = f"🗺️ {result['message']}：\n\n"
-        for i, location in enumerate(result["locations"], 1):
-            message += f"{i}. {location['location_name']}\n"
-            message += f"   ID: {location['location_id']} | 等级: {location['min_level']}-{location['max_level']}\n"
-            if location['description'] != "暂无描述":
-                message += f"   描述: {location['description']}\n"
+        message = f"🗺️ {AnswerEnum.ADVENTURE_LOCATIONS_FOUND.value.format(count=len(locations))}：\n\n"
+        for i, location in enumerate(locations, 1):
+            message += f"{i}. {location.name}\n"
+            message += f"   ID: {location.id} | 等级: {location.min_level}-{location.max_level}\n"
+            if location.description != "暂无描述":
+                message += f"   描述: {location.description}\n"
             message += "\n"
 
         message += "💡 使用 冒险 <区域ID> 指令进入冒险！"

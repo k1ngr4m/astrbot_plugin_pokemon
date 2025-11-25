@@ -225,13 +225,14 @@ class PokemonPlugin(Star):
         async for r in self.team_handlers.view_team(event):
             yield r
 
+    # ====================== 冒险相关指令 ======================
+
     @filter.command("查看区域")
     async def view_locations(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
         async for r in self.adventure_handlers.view_locations(event):
             yield r
 
-    # ====================== 冒险相关指令 ======================
     @filter.command("冒险")
     async def adventure(self, event: AstrMessageEvent):
         """在指定区域进行冒险"""

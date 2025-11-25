@@ -17,8 +17,11 @@ class LocationPokemon:
 
 @dataclass
 class LocationInfo:
-    location_id: int
-    location_name: str
+    id: int
+    name: str   # 区域名称
+    description: Optional[str] = None  # 区域描述
+    min_level: int = 1  # 最低推荐等级
+    max_level: int = 100  # 最高推荐等级
 
 @dataclass
 class LocationTemplate:
