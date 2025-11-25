@@ -28,27 +28,6 @@ class UserService:
         self.pokemon_service = pokemon_service
         self.config = config
 
-    def check_user_registered(self, user_id: str) -> BaseResult[User]:
-        """
-        检查用户是否已注册。
-        Args:
-            user_id: 用户ID
-        Returns:
-            如果用户已注册则返回{"success": True, "message": AnswerEnum.USER_ALREADY_REGISTERED.value, "data": user}，
-            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
-        """
-        user = self.user_repo.get_user_by_id(user_id)
-        if not user:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.USER_NOT_REGISTERED.value
-            )
-        return BaseResult(
-            success=True,
-            message=AnswerEnum.USER_ALREADY_REGISTERED.value,
-            data=user
-        )
-
     def register(self, user_id: str, nickname: str) -> BaseResult:
         """
         注册新用户。
@@ -143,14 +122,14 @@ class UserService:
             }
         )
 
-    def init_select_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult:
+    def check_user_registered(self, user_id: str) -> BaseResult[User]:
         """
-        初始化选择宝可梦。
+        检查用户是否已注册。
         Args:
             user_id: 用户ID
-            pokemon_id: 宝可梦ID
         Returns:
-            一个包含成功状态和消息的BaseResult对象。
+            如果用户已注册则返回{"success": True, "message": AnswerEnum.USER_ALREADY_REGISTERED.value, "data": user}，
+            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
         """
         user = self.user_repo.get_user_by_id(user_id)
         if not user:
@@ -158,199 +137,9 @@ class UserService:
                 success=False,
                 message=AnswerEnum.USER_NOT_REGISTERED.value
             )
-        if user.init_selected:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.USER_ALREADY_INITIALIZED_POKEMON.value
-            )
-
-        # 检查宝可梦是否存在
-        pokemon_template = self.pokemon_repo.get_pokemon_by_id(pokemon_id)
-        if not pokemon_template:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.POKEMON_NOT_FOUND.value
-            )
-
-        new_pokemon = self.pokemon_service.create_single_pokemon(pokemon_id, 1, 1)
-
-        if not new_pokemon["success"]:
-            return BaseResult(
-                success=False,
-                message=new_pokemon.message,
-            )
-        new_pokemon_data: PokemonDetail = new_pokemon.data
-        user_pokemon_info = UserPokemonInfo(
-            id = 0,
-            species_id = new_pokemon_data["base_pokemon"].id,
-            name = new_pokemon_data["base_pokemon"].name_zh,
-            gender = new_pokemon_data["gender"],
-            level = new_pokemon_data["level"],
-            exp = new_pokemon_data["exp"],
-            stats = new_pokemon_data["stats"],
-            ivs = new_pokemon_data["ivs"],
-            evs = new_pokemon_data["evs"],
-            moves = new_pokemon_data["moves"],
-        )
-
-        # 创建用户宝可梦记录，使用模板数据完善实例
-        self.user_repo.create_user_pokemon(user_id, user_pokemon_info,)
-
-        # 更新用户的初始选择状态
-        self.user_repo.update_init_select(user_id, pokemon_id)
-
         return BaseResult(
             success=True,
-            message=AnswerEnum.POKEMON_INIT_SELECT_SUCCESS.value,
-            data={
-                "pokemon_name": pokemon_template.name_zh
-            }
+            message=AnswerEnum.USER_ALREADY_REGISTERED.value,
+            data=user
         )
 
-    def create_init_pokemon(self, species_id: int) -> BaseResult:
-        """
-        创建一个新的宝可梦实例，使用指定的宝可梦ID
-        Args:
-            species_id (int): 宝可梦的ID
-
-        Returns:
-            Pokemon: 新创建的宝可梦实例
-        """
-        # 局部函数：生成0-31的随机IV
-        def generate_iv() -> int:
-            return random.randint(0, 31)
-
-        # 获取宝可梦完整基础数据
-        base_pokemon = self.pokemon_repo.get_pokemon_by_id(species_id).to_dict()
-
-        # 性别从 M/F/N 随机选择
-        gender = random.choice(['M', 'F', 'N'])
-
-        # 为初始宝可梦生成随机个体值(IV)，范围0-31
-        hp_iv = generate_iv()
-        attack_iv = generate_iv()
-        defense_iv = generate_iv()
-        sp_attack_iv = generate_iv()
-        sp_defense_iv = generate_iv()
-        speed_iv = generate_iv()
-
-        # 初始努力值为0
-        hp_ev = 0
-        attack_ev = 0
-        defense_ev = 0
-        sp_attack_ev = 0
-        sp_defense_ev = 0
-        speed_ev = 0
-
-        # 初始等级为1
-        level = 1
-        exp = 0
-
-        # 初始技能为空数组
-        moves = '[]'
-
-
-        pokemon = {
-            'base_pokemon': base_pokemon,
-            'gender': gender,
-            'hp_iv': hp_iv,
-            'attack_iv': attack_iv,
-            'defense_iv': defense_iv,
-            'sp_attack_iv': sp_attack_iv,
-            'sp_defense_iv': sp_defense_iv,
-            'speed_iv': speed_iv,
-            'hp_ev': hp_ev,
-            'attack_ev': attack_ev,
-            'defense_ev': defense_ev,
-            'sp_attack_ev': sp_attack_ev,
-            'sp_defense_ev': sp_defense_ev,
-            'speed_ev': speed_ev,
-            'level': level,
-            'exp': exp,
-            'moves': moves,
-        }
-
-        return BaseResult(
-            success=True,
-            message="成功创建初始宝可梦实例",
-            data=pokemon
-        )
-
-    def get_user_specific_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult[UserPokemonInfo]:
-        """
-        获取用户特定宝可梦的详细信息
-        Args:
-            user_id: 用户ID
-            pokemon_id: 宝可梦ID（数字ID）
-        Returns:
-            包含宝可梦详细信息的字典
-        """
-        # 获取特定宝可梦的信息
-        pokemon_data: UserPokemonInfo = self.user_repo.get_user_pokemon_by_id(user_id, int(pokemon_id))
-        if not pokemon_data:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.USER_POKEMON_NOT_FOUND.value
-            )
-
-
-        return BaseResult(
-            success=True,
-            message="",
-            data=pokemon_data
-        )
-
-    def get_user_all_pokemon(self, user_id: str) -> BaseResult:
-        """
-        获取用户的所有宝可梦信息
-        Args:
-            user_id: 用户ID
-        Returns:
-            包含用户宝可梦信息的字典
-        """
-        user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
-
-        if not user_pokemon_list:
-            return BaseResult(
-                success=True,
-                message="您还没有获得任何宝可梦",
-                data=[]
-            )
-
-        # 格式化返回数据
-        formatted_pokemon = []
-        for pokemon in user_pokemon_list:
-            formatted_pokemon.append({
-                "id": pokemon["id"],
-                "species_id": pokemon["species_id"],
-                "name": pokemon["name"],
-                "level": pokemon["level"],
-                "exp": pokemon["exp"],
-                "gender": pokemon["gender"],
-                "hp": pokemon["stats"]["hp"],
-                "attack": pokemon["stats"]["attack"],
-                "defense": pokemon["stats"]["defense"],
-                "sp_attack": pokemon["stats"]["sp_attack"],
-                "sp_defense": pokemon["stats"]["sp_defense"],
-                "speed": pokemon["stats"]["speed"],
-            })
-
-        # 组织显示信息
-        message = f"🌟 您拥有 {len(formatted_pokemon)} 只宝可梦：\n\n"
-        for i, pokemon in enumerate(formatted_pokemon, 1):
-            gender_str = {
-                "M": "♂️",
-                "F": "♀️",
-                "N": "⚲"
-            }.get(pokemon["gender"], "")
-
-            message += f"{i}. {pokemon['name']} {gender_str}\n"
-            message += f"   ID：{pokemon['id']} | 等级: {pokemon['level']} | HP: {pokemon['hp']}\n"
-
-        message += f"\n您可以使用 /我的宝可梦 <宝可梦ID> 来查看特定宝可梦的详细信息。"
-
-        return BaseResult(
-            success=True,
-            message=message,
-            data=formatted_pokemon
-        )

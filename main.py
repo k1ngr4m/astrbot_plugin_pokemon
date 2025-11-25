@@ -3,6 +3,7 @@ import os
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star
 from astrbot.api import logger, AstrBotConfig
+from .astrbot_plugin_pokemon.core.services.user_pokemon_service import UserPokemonService
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
 
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
@@ -101,6 +102,13 @@ class PokemonPlugin(Star):
             config=self.game_config
         )
 
+        self.user_pokemon_service = UserPokemonService(
+            user_repo=self.user_repo,
+            pokemon_repo=self.pokemon_repo,
+            item_repo=self.item_repo,
+            pokemon_service=self.pokemon_service,
+            config=self.game_config
+        )
         self.team_service = TeamService(
             user_repo=self.user_repo,
             pokemon_repo=self.pokemon_repo,

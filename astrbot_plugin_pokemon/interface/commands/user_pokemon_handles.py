@@ -1,5 +1,5 @@
 from astrbot.api.event import AstrMessageEvent
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
 
 from ...core.models.pokemon_models import UserPokemonInfo
 from ...core.models.user_models import User
@@ -13,6 +13,7 @@ class UserPokemonHandlers:
     def __init__(self, plugin: "PokemonPlugin"):
         self.plugin = plugin
         self.user_service = plugin.user_service
+        self.user_pokemon_service = plugin.user_pokemon_service
 
     async def init_select(self, event: AstrMessageEvent):
         """初始化选择宝可梦"""
@@ -39,7 +40,7 @@ class UserPokemonHandlers:
             yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
             return
 
-        result = self.user_service.init_select_pokemon(user_id, pokemon_id)
+        result = self.user_pokemon_service.init_select_pokemon(user_id, pokemon_id)
         if result.success:
             yield event.plain_result(
                 AnswerEnum.POKEMON_INIT_SELECT_SUCCESS.value.format(pokemon_name=result.data["pokemon_name"])
@@ -59,7 +60,7 @@ class UserPokemonHandlers:
         if len(args) >= 2:
             if not args[1].isdigit():
                 yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
-            result = self.user_service.get_user_specific_pokemon(user_id, int(args[1]))
+            result = self.user_pokemon_service.get_user_specific_pokemon(user_id, int(args[1]))
             if not result.success:
                 yield event.plain_result(result.message)
                 return
@@ -106,5 +107,22 @@ class UserPokemonHandlers:
             message += f"捕获时间: {pokemon_data['caught_time']}"
             yield event.plain_result(message)
         else:
-            result = self.user_service.get_user_all_pokemon(user_id)
-            yield event.plain_result(result.message)
+            result = self.user_pokemon_service.get_user_all_pokemon(user_id)
+            if not result.success:
+                yield event.plain_result(result.message)
+                return
+            user_pokemon_list:List[UserPokemonInfo] = result.data
+            # 组织显示信息
+            message = f"🌟 您拥有 {len(user_pokemon_list)} 只宝可梦：\n\n"
+            for i, pokemon in enumerate(user_pokemon_list, 1):
+                gender_str = {
+                    "M": "♂️",
+                    "F": "♀️",
+                    "N": "⚲"
+                }.get(pokemon.gender, "")
+
+                message += f"{i}. {pokemon.name} {gender_str}\n"
+                message += f"   ID：{pokemon.id} | 等级: {pokemon.level} | HP: {pokemon.stats['hp']}\n"
+
+            message += f"\n您可以使用 /我的宝可梦 <宝可梦ID> 来查看特定宝可梦的详细信息。"
+            yield event.plain_result(message)
