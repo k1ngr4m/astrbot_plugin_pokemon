@@ -20,6 +20,9 @@ class AnswerEnum(Enum):
     USER_ADVENTURE_NOT_ENCOUNTERED = "❌ 您当前没有遇到野生宝可梦。\n\n请先使用 /冒险 <区域代码> 指令去冒险遇到野生宝可梦。"
     USER_ITEMS_EMPTY = "🎒 您的背包是空的，快去签到或冒险获得道具吧！"
     USER_POKEBALLS_EMPTY = "❌ 您的背包中没有精灵球，无法进行捕捉！请先通过签到或其他方式获得精灵球。"
+    USER_POKEMON_NOT_FOUND = "❌ 您没有这只宝可梦，或宝可梦不存在。"
+    USER_CHECKIN_SUCCESS = "✅ 签到成功！\n获得了 {gold_reward} 金币 💰\n获得了 {item_name} x{item_quantity} 🎒\n当前金币总数：{new_coins}"
+
     # 宝可梦相关提示
     POKEMON_INIT_SELECT_USAGE_ERROR = "❌ 请输入宝可梦ID。\n\n用法：初始选择 <宝可梦ID>"
     POKEMON_ID_INVALID = "❌ 请输入正确的宝可梦ID。"

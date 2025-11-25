@@ -2,6 +2,7 @@ import random
 from typing import Dict, Any
 
 from .pokemon_service import PokemonService
+from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository,
 )
@@ -27,19 +28,43 @@ class UserService:
         self.pokemon_service = pokemon_service
         self.config = config
 
-    def register(self, user_id: str, nickname: str) -> Dict[str, Any]:
+    def check_user_registered(self, user_id: str) -> BaseResult[User]:
+        """
+        检查用户是否已注册。
+        Args:
+            user_id: 用户ID
+        Returns:
+            如果用户已注册则返回{"success": True, "message": AnswerEnum.USER_ALREADY_REGISTERED.value, "data": user}，
+            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
+        """
+        user = self.user_repo.get_user_by_id(user_id)
+        if not user:
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_NOT_REGISTERED.value
+            )
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_ALREADY_REGISTERED.value,
+            data=user
+        )
+
+    def register(self, user_id: str, nickname: str) -> BaseResult:
         """
         注册新用户。
         Args:
             user_id: 用户ID
             nickname: 用户昵称
         Returns:
-            一个包含成功状态和消息的字典。
+            一个包含成功状态、消息和用户数据的BaseResult对象。
         """
         origin_id = user_id
         user_id = userid_to_base32(user_id)
         if self.user_repo.check_exists(user_id):
-            return {"success": False, "message": AnswerEnum.USER_ALREADY_REGISTERED.value}
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_ALREADY_REGISTERED.value
+            )
 
         initial_coins = self.config.get("user", {}).get("initial_coins", 200)
         new_user = User(
@@ -50,12 +75,18 @@ class UserService:
         )
         self.user_repo.create_user(new_user)
 
-        return {
-            "success": True,
-            "message": f"注册成功！欢迎 {nickname} 🎉 你获得了 {initial_coins} 金币作为起始资金。\n\n请从妙蛙种子1、小火龙4、杰尼龟7中选择作为初始宝可梦。\n\n输入 /初始选择 <宝可梦ID> 来选择。"
-        }
+        return BaseResult(
+            success=True,
+            message=f"注册成功！欢迎 {nickname} 🎉 你获得了 {initial_coins} 金币作为起始资金。\n\n请从妙蛙种子1、小火龙4、杰尼龟7中选择作为初始宝可梦。\n\n输入 /初始选择 <宝可梦ID> 来选择。",
+            data={
+                "user_id": user_id,
+                "nickname": nickname,
+                "coins": initial_coins,
+                "origin_id": origin_id
+            }
+        )
 
-    def checkin(self, user_id: str) -> Dict[str, Any]:
+    def checkin(self, user_id: str) -> BaseResult:
         """
         用户签到
         Args:
@@ -68,18 +99,18 @@ class UserService:
 
         # 检查用户今天是否已经签到
         if self.user_repo.has_user_checked_in_today(user_id, today):
-            return {
-                "success": False,
-                "message": AnswerEnum.USER_ALREADY_CHECKED_IN.value,
-            }
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_ALREADY_CHECKED_IN.value,
+            )
 
         # 检查用户是否存在
         user = self.user_repo.get_user_by_id(user_id)
         if not user:
-            return {
-                "success": False,
-                "message": AnswerEnum.USER_NOT_REGISTERED.value,
-            }
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_NOT_REGISTERED.value,
+            )
 
         # 生成随机金币奖励（100-300之间）
         gold_reward = random.randint(100, 300)
@@ -101,17 +132,18 @@ class UserService:
         # 获取道具名称
         item_name = self.item_repo.get_item_name(item_reward_id)
 
-        return {
-            "success": True,
-            "message": f"✅ 签到成功！\n获得了 {gold_reward} 金币 💰\n获得了 {item_name} x{item_quantity} 🎒\n当前金币总数：{new_coins}",
-            "gold_reward": gold_reward,
-            "item_reward": {
-                "id": item_reward_id,
-                "quantity": item_quantity
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_CHECKIN_SUCCESS.value,
+            data={
+                "gold_reward": gold_reward,
+                "item_reward": item_name,
+                "quantity": item_quantity,
+                "new_coins": new_coins,
             }
-        }
+        )
 
-    def init_select_pokemon(self, user_id: str, pokemon_id: int) -> Dict[str, Any]:
+    def init_select_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult:
         """
         初始化选择宝可梦。
         Args:
@@ -122,23 +154,32 @@ class UserService:
         """
         user = self.user_repo.get_user_by_id(user_id)
         if not user:
-            return {"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_NOT_REGISTERED.value
+            )
         if user.init_selected:
-            return {"success": False, "message": AnswerEnum.USER_ALREADY_INITIALIZED_POKEMON.value}
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_ALREADY_INITIALIZED_POKEMON.value
+            )
 
         # 检查宝可梦是否存在
         pokemon_template = self.pokemon_repo.get_pokemon_by_id(pokemon_id)
         if not pokemon_template:
-            return {"success": False, "message": AnswerEnum.POKEMON_NOT_FOUND.value}
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.POKEMON_NOT_FOUND.value
+            )
 
         new_pokemon = self.pokemon_service.create_single_pokemon(pokemon_id, 1, 1)
 
         if not new_pokemon["success"]:
-            return {
-                "success": False,
-                "message": new_pokemon["message"],
-            }
-        new_pokemon_data: PokemonDetail = new_pokemon["data"]
+            return BaseResult(
+                success=False,
+                message=new_pokemon.message,
+            )
+        new_pokemon_data: PokemonDetail = new_pokemon.data
         user_pokemon_info = UserPokemonInfo(
             id = 0,
             species_id = new_pokemon_data["base_pokemon"].id,
@@ -158,12 +199,12 @@ class UserService:
         # 更新用户的初始选择状态
         self.user_repo.update_init_select(user_id, pokemon_id)
 
-        return {
-            "success": True,
-            "message": f"成功将 {pokemon_template.name_zh} 初始选择为宝可梦！\n\n它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
-        }
+        return BaseResult(
+            success=True,
+            message=f"成功将 {pokemon_template.name_zh} 初始选择为宝可梦！\n\n它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
+        )
 
-    def create_init_pokemon(self, species_id: int) -> Dict[str, Any]:
+    def create_init_pokemon(self, species_id: int) -> BaseResult:
         """
         创建一个新的宝可梦实例，使用指定的宝可梦ID
         Args:
@@ -226,9 +267,13 @@ class UserService:
             'moves': moves,
         }
 
-        return pokemon
+        return BaseResult(
+            success=True,
+            message="成功创建初始宝可梦实例",
+            data=pokemon
+        )
 
-    def get_user_specific_pokemon(self, user_id: str, pokemon_id: int) -> Dict[str, Any]:
+    def get_user_specific_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult:
         """
         获取用户特定宝可梦的详细信息
         Args:
@@ -240,10 +285,10 @@ class UserService:
         # 获取特定宝可梦的信息
         pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, int(pokemon_id))
         if not pokemon_data:
-            return {
-                "success": False,
-                "message": "❌ 您没有这只宝可梦，或宝可梦不存在。"
-            }
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_POKEMON_NOT_FOUND.value
+            )
 
         # 显示详细信息
         gender_str = {
@@ -286,12 +331,12 @@ class UserService:
 
         message += f"捕获时间: {pokemon_data['caught_time']}"
 
-        return {
-            "success": True,
-            "message": message
-        }
+        return BaseResult(
+            success=True,
+            message=message
+        )
 
-    def get_user_all_pokemon(self, user_id: str) -> Dict[str, Any]:
+    def get_user_all_pokemon(self, user_id: str) -> BaseResult:
         """
         获取用户的所有宝可梦信息
         Args:
@@ -299,14 +344,14 @@ class UserService:
         Returns:
             包含用户宝可梦信息的字典
         """
-        user = self.user_repo.get_user_by_id(user_id)
-        if not user:
-            return {"success": False, "message": "用户不存在"}
-
         user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
 
         if not user_pokemon_list:
-            return {"success": True, "message": "您还没有获得任何宝可梦", "pokemon_list": []}
+            return BaseResult(
+                success=True,
+                message="您还没有获得任何宝可梦",
+                data=[]
+            )
 
         # 格式化返回数据
         formatted_pokemon = []
@@ -340,7 +385,8 @@ class UserService:
 
         message += f"\n您可以使用 /我的宝可梦 <宝可梦ID> 来查看特定宝可梦的详细信息。"
 
-        return {
-            "success": True,
-            "message": message
-        }
+        return BaseResult(
+            success=True,
+            message=message,
+            data=formatted_pokemon
+        )
