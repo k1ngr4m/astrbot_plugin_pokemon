@@ -38,3 +38,6 @@ class AnswerEnum(Enum):
     TEAM_SET_INVALID_ID = "❌ 宝可梦ID {id} 格式不正确（仅支持数字ID）。"
     TEAM_SET_INVALID_POKEMON_ID = "❌ 宝可梦 {id} 不属于您或不存在。\n\n请检查您的宝可梦ID是否正确，或使用 /我的宝可梦 指令查看您的宝可梦列表和对应的ID。"
     TEAM_SET_SUCCESS = "✅ 成功设置队伍！队伍成员：{pokemon_names}。"
+    TEAM_GET_NO_TEAM = "❌ 您还没有设置队伍。\n\n请先使用 /设置队伍 指令设置您的出场队伍，才能进行冒险。"
+    TEAM_GET_INVALID_POKEMON_ID = "❌ 队伍中包含不存在的宝可梦 {id}。\n\n请检查您的队伍设置是否正确，或使用 /我的宝可梦 指令查看您的宝可梦列表和对应的ID。"
+    TEAM_GET_SUCCESS = "✅ 成功获取队伍信息。\n\n队伍成员：{pokemon_names}"

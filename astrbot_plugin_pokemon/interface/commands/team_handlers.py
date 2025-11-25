@@ -1,5 +1,7 @@
 from astrbot.api.event import AstrMessageEvent
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List
+
+from ...core.models.pokemon_models import UserPokemonInfo
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
 
@@ -60,12 +62,11 @@ class TeamHandlers:
             return
 
         result = self.team_service.get_user_team(user_id)
-
-        if not result["success"] or not result["team"]:
-            yield event.plain_result(result["message"])
+        if not result.success or not result.data:
+            yield event.plain_result(result.message)
             return
 
-        team:list = result["team"]
+        team: List[UserPokemonInfo] = result.data
 
         # 显示队伍信息
         message = "🏆 当前队伍配置：\n\n"
@@ -74,10 +75,10 @@ class TeamHandlers:
             message += f"\n队伍成员 ({len(team)}/6)：\n"
             for i, pokemon_data in enumerate(team, 1):
                 # 从pokemon_data中提取信息
-                id = pokemon_data.get('id')
-                name = pokemon_data.get('name')
-                level = pokemon_data.get('level', 1)
-                hp = pokemon_data.get('hp', 0)
+                id = pokemon_data.id
+                name = pokemon_data.name
+                level = pokemon_data.level
+                hp = pokemon_data.stats.hp
 
                 # 标记出战宝可梦（第一个是出战的）
                 marker = " ⭐" if i == 1 else ""

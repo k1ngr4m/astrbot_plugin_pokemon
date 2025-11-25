@@ -1,6 +1,7 @@
 from typing import Dict, Any, List
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import UserPokemonInfo
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
 )
@@ -67,41 +68,28 @@ class TeamService:
             data=user_team_pokemon_name_list
         )
 
-    def get_user_team(self, user_id: str) -> Dict[str, Any]:
+    def get_user_team(self, user_id: str) -> BaseResult[List[UserPokemonInfo]]:
         """
         获取用户的队伍信息
         Args:
             user_id: 用户ID
         Returns:
-            包含用户队伍信息的字典
+            包含用户队伍信息的BaseResult对象
         """
         user_team = self.team_repo.get_user_team(user_id)
         if not user_team:
-            return {"success": False, "message": "您还没有设置队伍", "team": None}
+            return BaseResult(success=False, message=AnswerEnum.TEAM_GET_NO_TEAM.value, data=None)
 
         team_pokemon_ids = user_team.team_pokemon_ids
-        team_info = []
+        team_info: List[UserPokemonInfo] = []
         for pokemon_id in team_pokemon_ids:
             pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
             if not pokemon_info:
-                return {"success": False, "message": f"队伍中包含不存在的宝可梦 {pokemon_id}"}
+                return BaseResult(success=False, message=AnswerEnum.TEAM_GET_INVALID_POKEMON_ID.value.format(id=pokemon_id), data=None)
+            team_info.append(pokemon_info)
 
-            pokemon_info_data = {
-                "id": pokemon_info.id,
-                "name": pokemon_info.name,
-                "level": pokemon_info.level,
-                "hp": pokemon_info.stats['hp'],
-                "attack": pokemon_info.stats['attack'],
-                "defense": pokemon_info.stats['defense'],
-                "sp_attack": pokemon_info.stats['sp_attack'],
-                "sp_defense": pokemon_info.stats['sp_defense'],
-                "speed": pokemon_info.stats['speed'],
-            }
-            team_info.append(pokemon_info_data)
-
-
-        return {
-            "success": True,
-            "team": team_info,
-            "message": "成功获取队伍信息"
-        }
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.TEAM_GET_SUCCESS.value,
+            data=team_info
+        )
