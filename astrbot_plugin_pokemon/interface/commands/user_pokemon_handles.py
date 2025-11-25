@@ -1,0 +1,51 @@
+from astrbot.api.event import AstrMessageEvent
+from typing import TYPE_CHECKING
+
+from ...core.models.user_models import User
+from ...interface.response.answer_enum import AnswerEnum
+from ...utils.utils import userid_to_base32
+
+if TYPE_CHECKING:
+    from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
+
+class UserPokemonHandlers:
+    def __init__(self, plugin: "PokemonPlugin"):
+        self.plugin = plugin
+        self.user_service = plugin.user_service
+
+    async def init_select(self, event: AstrMessageEvent):
+        """初始化选择宝可梦"""
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        result = self.user_service.check_user_registered(user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
+            return
+        user:User = result.data
+        if user.init_selected:
+            yield event.plain_result(AnswerEnum.USER_ALREADY_INITIALIZED_POKEMON.value)
+            return
+
+        args = event.message_str.split(" ")
+
+        if len(args) < 2:
+            yield event.plain_result(AnswerEnum.POKEMON_INIT_SELECT_USAGE_ERROR.value)
+            return
+        try:
+            pokemon_id = int(args[1])
+
+            if pokemon_id not in (1, 4, 7):
+                yield event.plain_result(AnswerEnum.POKEMON_INIT_SELECT_INVALID_POKEMON_ID.value)
+                return
+
+        except ValueError:
+            yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
+            return
+
+        result = self.user_service.init_select_pokemon(user_id, pokemon_id)
+
+        if result.success:
+            yield event.plain_result(
+                AnswerEnum.POKEMON_INIT_SELECT_SUCCESS.value.format(pokemon_name=result.data["pokemon_name"])
+            )
+        else:
+            yield event.plain_result(result.message)

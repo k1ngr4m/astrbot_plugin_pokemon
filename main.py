@@ -29,6 +29,7 @@ from .astrbot_plugin_pokemon.core.services.exp_service import ExpService
 from .astrbot_plugin_pokemon.core.services.user_service import UserService
 from .astrbot_plugin_pokemon.core.services.item_service import ItemService
 from .astrbot_plugin_pokemon.core.services.shop_service import ShopService
+from .astrbot_plugin_pokemon.interface.commands.user_pokemon_handles import UserPokemonHandlers
 
 
 class PokemonPlugin(Star):
@@ -141,6 +142,7 @@ class PokemonPlugin(Star):
         )
         self.common_handlers = CommonHandlers(self)
         self.user_handlers = UserHandlers(self)
+        self.user_pokemon_handlers = UserPokemonHandlers(self)
         self.team_handlers = TeamHandlers(self)
         self.pokemon_handlers = PokemonHandlers(self)
         self.adventure_handlers = AdventureHandlers(self)
@@ -194,7 +196,7 @@ class PokemonPlugin(Star):
     @filter.command("初始选择")
     async def init_select(self, event: AstrMessageEvent):
         """初始化选择宝可梦。用法：初始选择 <宝可梦ID>"""
-        async for r in self.common_handlers.init_select(event):
+        async for r in self.user_pokemon_handlers.init_select(event):
             yield r
 
     @filter.command("我的宝可梦")

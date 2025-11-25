@@ -150,7 +150,7 @@ class UserService:
             user_id: 用户ID
             pokemon_id: 宝可梦ID
         Returns:
-            一个包含成功状态和消息的字典。
+            一个包含成功状态和消息的BaseResult对象。
         """
         user = self.user_repo.get_user_by_id(user_id)
         if not user:
@@ -201,7 +201,10 @@ class UserService:
 
         return BaseResult(
             success=True,
-            message=f"成功将 {pokemon_template.name_zh} 初始选择为宝可梦！\n\n它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
+            message=AnswerEnum.POKEMON_INIT_SELECT_SUCCESS.value,
+            data={
+                "pokemon_name": pokemon_template.name_zh
+            }
         )
 
     def create_init_pokemon(self, species_id: int) -> BaseResult:

@@ -27,6 +27,8 @@ class AnswerEnum(Enum):
     POKEMON_INIT_SELECT_USAGE_ERROR = "❌ 请输入宝可梦ID。\n\n用法：初始选择 <宝可梦ID>"
     POKEMON_ID_INVALID = "❌ 请输入正确的宝可梦ID。"
     POKEMON_NOT_FOUND = "❌ 没有找到对应的宝可梦。"
+    POKEMON_INIT_SELECT_INVALID_POKEMON_ID = "❌ 请从妙蛙种子1、小火龙4、杰尼龟7中选择。"
+    POKEMON_INIT_SELECT_SUCCESS = "✅ 成功将 {pokemon_name} 初始选择为宝可梦！\n\n它已根据种族模板完善了个体值、努力值等特性。\n\n您可以使用 /我的宝可梦 来查看您的宝可梦详情。"
 
     # 队伍相关提示
     TEAM_SET_USAGE_ERROR = "❌ 请输入宝可梦ID列表。\n\n用法：设置队伍 <宝可梦ID1> <宝可梦ID2> ...\n\n💡 提示：最多可设置6只宝可梦。\n\n使用 /我的宝可梦 指令查看您的宝可梦列表和对应的ID。"
