@@ -4,6 +4,8 @@ from typing import Optional, TypedDict, Dict
 
 from dataclasses import dataclass
 
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import WildPokemonInfo
+
 
 @dataclass
 class LocationPokemon:
@@ -34,10 +36,8 @@ class LocationTemplate:
 
 @dataclass
 class AdventureResult:
-    success: bool
-    message: str
-    wild_pokemon: 'WildPokemonInfo' | None
-    location: 'LocationInfo' | None
+    wild_pokemon: WildPokemonInfo
+    location: LocationInfo
 
 @dataclass
 class BattleResult:

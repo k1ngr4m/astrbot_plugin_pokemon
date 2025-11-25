@@ -2,7 +2,7 @@ import random
 from typing import List
 
 from astrbot.api.event import AstrMessageEvent
-from ...core.models.adventure_models import LocationInfo
+from ...core.models.adventure_models import LocationInfo, AdventureResult
 from ...interface.response.answer_enum import AnswerEnum
 from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog
 from ...utils.utils import userid_to_base32
@@ -49,10 +49,9 @@ class AdventureHandlers:
     async def adventure(self, event: AstrMessageEvent):
         """进入指定区域冒险"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_user_by_id(user_id)
-
-        if not user:
-            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+        result = self.user_service.check_user_registered(user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
             return
 
         # 检查用户是否已经遇到了野生宝可梦
@@ -69,7 +68,7 @@ class AdventureHandlers:
         cooldown_remaining = (last_adventure_time + self.plugin.adventure_cooldown) - current_time
 
         if cooldown_remaining > 0:
-            yield event.plain_result(f"❌ 冒险冷却中，请等待 {int(cooldown_remaining)} 秒后再试。")
+            yield event.plain_result(AnswerEnum.USER_ADVENTURE_COOLDOWN.value.format(cooldown=int(cooldown_remaining)))
             return
 
         # 检查用户是否有设置队伍
@@ -85,31 +84,29 @@ class AdventureHandlers:
 
         location_id = int(args[1])  # 转换为整数
 
-        # 验证区域代码格式（A开头的四位数）
+        # 验证区域ID格式（确保是正整数）
         if not (location_id > 0):
-            yield event.plain_result(f"❌ 区域ID {location_id} 格式不正确（应为正整数）。")
+            yield event.plain_result(AnswerEnum.ADVENTURE_LOCATION_INVALID.value.format(location_id=location_id))
             return
 
         result = self.adventure_service.adventure_in_location(user_id, location_id)
-
-        if result.success:
-            wild_pokemon = result.wild_pokemon
-            message = f"🌳 在 {result.location.location_name} 中冒险！\n\n"
-            message += f"✨ 遇到了野生的 {wild_pokemon.name}！\n"
-            message += f"等级: {wild_pokemon.level}\n"
-
-            # 记录冒险时间到数据库，用于冷却时间控制
-            import time
-            current_time = time.time()
-            self.plugin.user_repo.update_user_last_adventure_time(user_id, current_time)
-
-            message += ("接下来你可以选择战斗、捕捉或逃跑...\n\n"
-                        "使用 /战斗 指令进行对战！\n\n"
-                        "使用 /捕捉 指令尝试捕捉它！\n\n"
-                        "使用 /逃跑 指令安全离开！")
-            yield event.plain_result(message)
-        else:
+        if not result.success:
             yield event.plain_result(result.message)
+            return
+        d: AdventureResult = result.data
+        wild_pokemon = d.wild_pokemon
+        message = f"🌳 在 {d.location.name} 中冒险！\n\n"
+        message += f"✨ 遇到了野生的 {wild_pokemon.name}！\n"
+        message += f"等级: {wild_pokemon.level}\n"
+
+        # 记录冒险时间到数据库，用于冷却时间控制
+        import time
+        current_time = time.time()
+        self.plugin.user_repo.update_user_last_adventure_time(user_id, current_time)
+
+        message += (AnswerEnum.ADVENTURE_LOCATION_POKEMON_ENCOUNTERED.value)
+        yield event.plain_result(message)
+
 
     async def battle(self, event: AstrMessageEvent):
         """处理战斗指令"""

@@ -95,7 +95,7 @@ class AdventureService:
         )
 
 
-    def adventure_in_location(self, user_id: str, location_id: int) -> AdventureResult:
+    def adventure_in_location(self, user_id: str, location_id: int) -> BaseResult[AdventureResult]:
         """
         在指定区域进行冒险，随机刷新一只野生宝可梦
         Args:
@@ -104,108 +104,102 @@ class AdventureService:
         Returns:
             包含冒险结果的字典
         """
-        # 统一错误返回函数（减少重复代码）
-        def error_response(message: str) -> AdventureResult:
-            return AdventureResult(
+        # 1. 获取区域信息
+        location = self.adventure_repo.get_location_by_id(location_id)
+        if not location:
+            return BaseResult(
                 success=False,
-                message=message,
-                wild_pokemon=None,
-                location=None
+                message=AnswerEnum.ADVENTURE_LOCATION_NOT_FOUND.value.format(location_id=location_id)
             )
-        try:
-            # 3. 获取区域信息
-            location = self.adventure_repo.get_location_by_id(location_id)
-            if not location:
-                return error_response(f"未找到区域 {location_id}")
-            # 4. 获取该区域的宝可梦列表
-            location_pokemon_list = self.adventure_repo.get_location_pokemon_by_location_id(location_id)
-            if not location_pokemon_list:
-                return error_response(f"区域 {location.name} 中暂无野生宝可梦")
-            # 5. 权重随机选择宝可梦（使用itertools.accumulate简化累加逻辑）
-            encounter_rates = [ap.encounter_rate for ap in location_pokemon_list]
-            total_rate = sum(encounter_rates)
-            random_value = random.uniform(0, total_rate)
-
-            # 累加概率，找到第一个超过随机值的宝可梦
-            for idx, cumulative_rate in enumerate(accumulate(encounter_rates)):
-                if random_value <= cumulative_rate:
-                    selected_location_pokemon = location_pokemon_list[idx]
-                    break
-            else:
-                # 兜底：如果循环未触发break（理论上不会发生），取最后一个
-                selected_location_pokemon = location_pokemon_list[-1]
-
-            # 6. 生成宝可梦等级（使用变量名简化赋值）
-            min_level = selected_location_pokemon.min_level
-            max_level = selected_location_pokemon.max_level
-            wild_pokemon_level = random.randint(min_level, max_level)
-            # 7. 创建野生宝可梦（直接使用返回结果，无需额外处理）
-            wild_pokemon_result = self.pokemon_service.create_single_pokemon(
-                species_id=selected_location_pokemon.pokemon_species_id,
-                max_level=wild_pokemon_level,
-                min_level=wild_pokemon_level
+        # 2 获取该区域的宝可梦列表
+        location_pokemon_list = self.adventure_repo.get_location_pokemon_by_location_id(location_id)
+        if not location_pokemon_list:
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.ADVENTURE_LOCATION_NO_POKEMON.value.format(location_name=location.name)
             )
-            if not wild_pokemon_result.success:
-                return error_response(wild_pokemon_result.message)
-            wild_pokemon = wild_pokemon_result.data
-            wild_pokemon_info = WildPokemonInfo(
-                    id=0,
-                    species_id=wild_pokemon.base_pokemon.id,
-                    name=wild_pokemon.base_pokemon.name_zh,
-                    gender=wild_pokemon.gender,
-                    level=wild_pokemon_level,
-                    exp=wild_pokemon.exp,
-                    stats=PokemonStats(
-                        hp=wild_pokemon.stats.hp,
-                        attack=wild_pokemon.stats.attack,
-                        defense=wild_pokemon.stats.defense,
-                        sp_attack=wild_pokemon.stats.sp_attack,
-                        sp_defense=wild_pokemon.stats.sp_defense,
-                        speed=wild_pokemon.stats.speed,
-                    ),
-                    ivs=PokemonIVs(
-                        hp_iv=wild_pokemon.ivs.hp_iv,
-                        attack_iv=wild_pokemon.ivs.attack_iv,
-                        defense_iv=wild_pokemon.ivs.defense_iv,
-                        sp_attack_iv=wild_pokemon.ivs.sp_attack_iv,
-                        sp_defense_iv=wild_pokemon.ivs.sp_defense_iv,
-                        speed_iv=wild_pokemon.ivs.speed_iv,
-                    ),
-                    evs=PokemonEVs(
-                        hp_ev=wild_pokemon.evs.hp_ev,
-                        attack_ev=wild_pokemon.evs.attack_ev,
-                        defense_ev=wild_pokemon.evs.defense_ev,
-                        sp_attack_ev=wild_pokemon.evs.sp_attack_ev,
-                        sp_defense_ev=wild_pokemon.evs.sp_defense_ev,
-                        speed_ev=wild_pokemon.evs.speed_ev,
-                    ),
-                    moves = None,
+        # 3. 权重随机选择宝可梦（使用itertools.accumulate简化累加逻辑）
+        encounter_rates = [ap.encounter_rate for ap in location_pokemon_list]
+        total_rate = sum(encounter_rates)
+        random_value = random.uniform(0, total_rate)
+
+        # 累加概率，找到第一个超过随机值的宝可梦
+        for idx, cumulative_rate in enumerate(accumulate(encounter_rates)):
+            if random_value <= cumulative_rate:
+                selected_location_pokemon = location_pokemon_list[idx]
+                break
+        else:
+            # 兜底：如果循环未触发break（理论上不会发生），取最后一个
+            selected_location_pokemon = location_pokemon_list[-1]
+
+        # 4. 生成宝可梦等级（使用变量名简化赋值）
+        min_level = selected_location_pokemon.min_level
+        max_level = selected_location_pokemon.max_level
+        wild_pokemon_level = random.randint(min_level, max_level)
+        # 5. 创建野生宝可梦（直接使用返回结果，无需额外处理）
+        wild_pokemon_result = self.pokemon_service.create_single_pokemon(
+            species_id=selected_location_pokemon.pokemon_species_id,
+            max_level=wild_pokemon_level,
+            min_level=wild_pokemon_level
+        )
+        if not wild_pokemon_result.success:
+            return BaseResult(
+                success=False,
+                message=wild_pokemon_result.message
             )
-            wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
+        wild_pokemon = wild_pokemon_result.data
+        wild_pokemon_info = WildPokemonInfo(
+                id=0,
+                species_id=wild_pokemon.base_pokemon.id,
+                name=wild_pokemon.base_pokemon.name_zh,
+                gender=wild_pokemon.gender,
+                level=wild_pokemon_level,
+                exp=wild_pokemon.exp,
+                stats=PokemonStats(
+                    hp=wild_pokemon.stats.hp,
+                    attack=wild_pokemon.stats.attack,
+                    defense=wild_pokemon.stats.defense,
+                    sp_attack=wild_pokemon.stats.sp_attack,
+                    sp_defense=wild_pokemon.stats.sp_defense,
+                    speed=wild_pokemon.stats.speed,
+                ),
+                ivs=PokemonIVs(
+                    hp_iv=wild_pokemon.ivs.hp_iv,
+                    attack_iv=wild_pokemon.ivs.attack_iv,
+                    defense_iv=wild_pokemon.ivs.defense_iv,
+                    sp_attack_iv=wild_pokemon.ivs.sp_attack_iv,
+                    sp_defense_iv=wild_pokemon.ivs.sp_defense_iv,
+                    speed_iv=wild_pokemon.ivs.speed_iv,
+                ),
+                evs=PokemonEVs(
+                    hp_ev=wild_pokemon.evs.hp_ev,
+                    attack_ev=wild_pokemon.evs.attack_ev,
+                    defense_ev=wild_pokemon.evs.defense_ev,
+                    sp_attack_ev=wild_pokemon.evs.sp_attack_ev,
+                    sp_defense_ev=wild_pokemon.evs.sp_defense_ev,
+                    speed_ev=wild_pokemon.evs.speed_ev,
+                ),
+                moves = None,
+        )
+        wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
 
-            self.pokemon_repo.add_user_encountered_wild_pokemon(
-                user_id=user_id,
-                wild_pokemon_id = wild_pokemon_id,
-                location_id=location.id,
-                encounter_rate=selected_location_pokemon.encounter_rate,
-            )
-
-
-
-            # 8. 构造返回结果（直接复用create_single_pokemon的计算结果）
-            result = AdventureResult(
-                success=True,
-                message=f"在 {location.name} 中遇到了野生的 {wild_pokemon_info.name}！",
+        self.pokemon_repo.add_user_encountered_wild_pokemon(
+            user_id=user_id,
+            wild_pokemon_id = wild_pokemon_id,
+            location_id=location.id,
+            encounter_rate=selected_location_pokemon.encounter_rate,
+        )
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.ADVENTURE_SUCCESS.value,
+            data=AdventureResult(
                 wild_pokemon=wild_pokemon_info,
                 location=LocationInfo(
-                    location_id=location.id,
-                    location_name=location.name,
-                )
+                    id=location.id,
+                    name=location.name,
+                ),
             )
-            return result
-
-        except Exception as e:
-            return error_response(f"冒险过程中发生错误: {str(e)}")
+        )
 
     def adventure_in_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo) -> Dict[str, Any]:
         """
