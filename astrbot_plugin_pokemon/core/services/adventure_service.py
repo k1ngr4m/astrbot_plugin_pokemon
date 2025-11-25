@@ -13,7 +13,7 @@ from ..models.user_models import UserTeam, UserItems
 from ...infrastructure.repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository
 )
-from ..models.adventure_models import AdventureResult, LocationInfo
+from ..models.adventure_models import AdventureResult, LocationInfo, BattleResult
 from astrbot.api import logger
 
 
@@ -201,7 +201,7 @@ class AdventureService:
             )
         )
 
-    def adventure_in_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo) -> Dict[str, Any]:
+    def adventure_in_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo) -> BaseResult:
         """
         处理用户与野生宝可梦战斗的结果。
 
@@ -213,92 +213,18 @@ class AdventureService:
         user_team_data: UserTeam = self.team_repo.get_user_team(user_id)
         user = self.user_repo.get_user_by_id(user_id)
         if not user_team_data:
-            return {
-                "success": False,
-                "message": AnswerEnum.USER_TEAM_NOT_SET.value,
-            }
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_TEAM_NOT_SET.value,
+            )
 
         user_team_list: List[int] = user_team_data.team_pokemon_ids
 
         # 开始战斗，传入玩家的队伍
         result = self.start_battle(user_id, wild_pokemon_info, user_team_list)
-        if result["success"]:
-            battle_details = result["battle_details"]
-            user_pokemon = battle_details["user_pokemon"]
-            wild_pokemon_data = battle_details["wild_pokemon"]
-            win_rates = battle_details["win_rates"]
-            battle_result = "胜利" if battle_details["result"] == "success" else "失败"
-            exp_details = battle_details["exp_details"]
+        return result
 
-            message = "⚔️ 宝可梦战斗开始！\n\n"
-            message += f"👤 我方宝可梦: {user_pokemon['name']} (Lv.{user_pokemon['level']})\n"
-            message += f"野生宝可梦: {wild_pokemon_data['name']} (Lv.{wild_pokemon_data['level']})\n\n"
-
-            message += "📊 战斗胜率分析:\n"
-            message += f"我方胜率: {win_rates['user_win_rate']}%\n"
-            message += f"野生胜率: {win_rates['wild_win_rate']}%\n\n"
-
-            message += f"🎯 战斗结果: {battle_result}\n"
-
-            # 添加经验值信息
-            if exp_details:
-                team_pokemon_results = exp_details.get("team_pokemon_results", [])
-                user_exp_info = exp_details.get("user_exp", {})
-
-                if team_pokemon_results:
-                    message += f"\n📈 经验值获取:\n"
-                    for i, pokemon_result in enumerate(team_pokemon_results):
-                        if pokemon_result.get("success"):
-                            exp_gained = pokemon_result.get("exp_gained", 0)
-                            pokemon_name = pokemon_result.get("pokemon_name", f"宝可梦{i+1}")
-                            message += f"  {pokemon_name} 获得了 {exp_gained} 点经验值\n"
-
-                            level_up_info = pokemon_result.get("level_up_info", {})
-                            if level_up_info.get("should_level_up"):
-                                levels_gained = level_up_info.get("levels_gained", 0)
-                                new_level = level_up_info.get("new_level", 0)
-                                message += f"  🎉 恭喜 {pokemon_name} 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n"
-
-                if user_exp_info.get("success"):
-                    user_exp_gained = user_exp_info.get("exp_gained", 0)
-                    if user_exp_gained > 0:  # 只有在获得经验时才显示
-                        user_levels_gained = user_exp_info.get("levels_gained", 0)
-                        new_user_level = user_exp_info.get("new_level", user.level)
-                        message += f"  训练家获得了 {user_exp_gained} 点经验值"
-                        if user_levels_gained > 0:
-                            message += f"，等级提升 {user_levels_gained} 级，现在是 {new_user_level} 级！\n"
-                        else:
-                            message += "\n"
-
-            # 更新野生宝可梦遇到日志 - 标记为已战斗
-            try:
-                # 获取最近的野生宝可梦遇到记录
-                recent_encounters: List[WildPokemonEncounterLog] = self.pokemon_repo.get_user_encounters(user_id, limit=5)
-                encounter_log_id = None
-                for encounter in recent_encounters:
-                    if (encounter.wild_pokemon_id == wild_pokemon_info.id and
-                        encounter.is_battled == 0):  # 未战斗的记录
-                        encounter_log_id = encounter.id
-                        break
-                if encounter_log_id:
-                    battle_outcome = "win" if "胜利" in battle_result else "lose"
-                    self.pokemon_repo.update_encounter_log(
-                        log_id=encounter_log_id,
-                        is_battled=1,
-                        battle_result=battle_outcome
-                    )
-                return {
-                    "success": True,
-                    "message": message,
-                }
-            except Exception as e:
-                logger.error(f"更新野生宝可梦遇到日志（战斗）时出错: {e}")
-                return {
-                    "success": False,
-                    "message": "更新野生宝可梦遇到日志（战斗）时出错",
-                }
-
-    def start_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo, user_team_list: List[int] = None) -> Dict[str, Any]:
+    def start_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo, user_team_list: List[int] = None) -> BaseResult[BattleResult]:
         """
         开始一场与野生宝可梦的战斗
         Args:
@@ -308,86 +234,90 @@ class AdventureService:
         Returns:
             包含战斗结果的字典
         """
-        try:
-            user_pokemon_id = user_team_list[0]
-            user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
-            # 计算战斗胜率
-            user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
 
-            # 随机决定战斗结果
-            import random
-            result = "success" if random.random() * 100 < user_win_rate else "fail"
+        user_pokemon_id = user_team_list[0]
+        user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
+        # 计算战斗胜率
+        user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
 
-            # 处理经验值（仅在胜利时）
-            exp_details = {}
-            if self.exp_service and result == "success":
-                # 计算宝可梦获得的经验值
-                pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_id=wild_pokemon_info.id, wild_pokemon_level=wild_pokemon_info.level, battle_result=result)
-                # user_exp_gained = self.exp_service.calculate_user_exp_gain(wild_pokemon_info.level, result)
-                # 获取用户队伍中的所有宝可梦
-                user_team_data:UserTeam = self.team_repo.get_user_team(user_id)
-                team_pokemon_results = []
-                team_pokemon_ids=user_team_data.team_pokemon_ids
-                # 更新队伍中所有宝可梦的经验值
-                if team_pokemon_ids:
-                    team_pokemon_results = self.exp_service.update_team_pokemon_after_battle(
-                        user_id, team_pokemon_ids, pokemon_exp_gained)
+        # 随机决定战斗结果
+        import random
+        result = "success" if random.random() * 100 < user_win_rate else "fail"
 
-                # 更新用户经验值（如果用户获得经验）
-                # user_update_result = {"success": True, "exp_gained": 0}
-                # if user_exp_gained > 0:
-                #     user_update_result = self.exp_service.update_user_after_battle(user_id, user_exp_gained)
+        # 处理经验值（仅在胜利时）
+        exp_details = {}
+        if self.exp_service and result == "success":
+            # 计算宝可梦获得的经验值
+            pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_id=wild_pokemon_info.id, wild_pokemon_level=wild_pokemon_info.level, battle_result=result)
+            # 获取用户队伍中的所有宝可梦
+            user_team_data:UserTeam = self.team_repo.get_user_team(user_id)
+            team_pokemon_results = []
+            team_pokemon_ids=user_team_data.team_pokemon_ids
+            # 更新队伍中所有宝可梦的经验值
+            if team_pokemon_ids:
+                team_pokemon_results = self.exp_service.update_team_pokemon_after_battle(
+                    user_id, team_pokemon_ids, pokemon_exp_gained)
 
-                exp_details = {
-                    "pokemon_exp": team_pokemon_results[0] if team_pokemon_results else {"success": False, "message": "未找到队伍中的宝可梦"},
-                    # "user_exp": user_update_result,
-                    "team_pokemon_results": team_pokemon_results
-                }
-            elif self.exp_service and result != "success":
-                # 战斗失败时不获得经验
-                exp_details = {
-                    "pokemon_exp": {"success": True, "exp_gained": 0, "message": "战斗失败，未获得经验值"},
-                    "user_exp": {"success": True, "exp_gained": 0, "message": "战斗失败，未获得经验值"},
-                    "team_pokemon_results": []
-                }
-
-            # 返回战斗结果
-            battle_result = {
-                "success": True,
-                "message": f"战斗结束！用户宝可梦 {user_pokemon_info.name} vs 野生宝可梦 {wild_pokemon_info.name}",
-                "battle_details": {
-                    "user_pokemon": {
-                        "name": user_pokemon_info.name,
-                        "species": user_pokemon_info.species_id,
-                        "level": user_pokemon_info.level,
-                        "hp": user_pokemon_info.stats.hp,
-                        "attack": user_pokemon_info.stats.attack,
-                        "defense": user_pokemon_info.stats.defense,
-                        "speed": user_pokemon_info.stats.speed
-                    },
-                    "wild_pokemon": {
-                        "name": wild_pokemon_info.name,
-                        "level": wild_pokemon_info.level,
-                        "hp": wild_pokemon_info.stats.hp,
-                        "attack": wild_pokemon_info.stats.attack,
-                        "defense": wild_pokemon_info.stats.defense,
-                        "speed": wild_pokemon_info.stats.speed
-                    },
-                    "win_rates": {
-                        "user_win_rate": user_win_rate,
-                        "wild_win_rate": wild_win_rate
-                    },
-                    "result": result,
-                    "exp_details": exp_details
-                }
+            exp_details = {
+                "pokemon_exp": team_pokemon_results[0] if team_pokemon_results else {"success": False, "message": AnswerEnum.TEAM_GET_NO_TEAM.value},
+                "team_pokemon_results": team_pokemon_results
             }
-            return battle_result
 
-        except Exception as e:
-            return {
-                "success": False,
-                "message": f"战斗过程中发生错误: {str(e)}"
+        elif self.exp_service and result != "success":
+            # 战斗失败时不获得经验
+            exp_details = {
+                "pokemon_exp": {"success": True, "exp_gained": 0, "message": AnswerEnum.BATTLE_FAILURE_NO_EXP.value},
+                "user_exp": {"success": True, "exp_gained": 0, "message": AnswerEnum.BATTLE_FAILURE_NO_EXP.value},
+                "team_pokemon_results": []
             }
+
+        # 更新野生宝可梦遇到日志 - 标记为已战斗
+        # 获取最近的野生宝可梦遇到记录
+        recent_encounters: List[WildPokemonEncounterLog] = self.pokemon_repo.get_user_encounters(user_id, limit=5)
+        encounter_log_id = None
+        for encounter in recent_encounters:
+            if (encounter.wild_pokemon_id == wild_pokemon_info.id and
+                encounter.is_battled == 0):  # 未战斗的记录
+                encounter_log_id = encounter.id
+                break
+        if encounter_log_id:
+            battle_outcome = "win" if result == "success" else "lose"
+            self.pokemon_repo.update_encounter_log(
+                log_id=encounter_log_id,
+                is_battled=1,
+                battle_result=battle_outcome
+            )
+
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.BATTLE_SUCCESS.value,
+            data=BattleResult(
+                user_pokemon={
+                    "name": user_pokemon_info.name,
+                    "species": user_pokemon_info.species_id,
+                    "level": user_pokemon_info.level,
+                    "hp": user_pokemon_info.stats.hp,
+                    "attack": user_pokemon_info.stats.attack,
+                    "defense": user_pokemon_info.stats.defense,
+                    "speed": user_pokemon_info.stats.speed
+                },
+                wild_pokemon={
+                    "name": wild_pokemon_info.name,
+                    "level": wild_pokemon_info.level,
+                    "hp": wild_pokemon_info.stats.hp,
+                    "attack": wild_pokemon_info.stats.attack,
+                    "defense": wild_pokemon_info.stats.defense,
+                    "speed": wild_pokemon_info.stats.speed
+                },
+                win_rates={
+                    "user_win_rate": user_win_rate,
+                    "wild_win_rate": wild_win_rate
+                },
+                result=result,
+                exp_details=exp_details
+            )
+        )
+
 
     def calculate_type_effectiveness(self, attacker_types: List[str], defender_types: List[str]) -> float:
         """
@@ -403,80 +333,231 @@ class AdventureService:
                     effectiveness *= self.TYPE_CHART[type_name].get(def_type_name, 1.0)
         return effectiveness
 
-    def calculate_battle_win_rate(self, user_pokemon: UserPokemonInfo, wild_pokemon: WildPokemonInfo, skill_type: str = 'special') -> Tuple[float, float]:
+    # def calculate_battle_win_rate(self, user_pokemon: UserPokemonInfo, wild_pokemon: WildPokemonInfo, skill_type: str = 'special') -> Tuple[float, float]:
+    #     """
+    #     计算宝可梦战斗胜率
+    #     Args:
+    #         user_pokemon: 攻击方宝可梦数据
+    #         wild_pokemon: 防御方宝可梦数据
+    #         skill_type: 技能类型 ('physical' 或 'special')，决定使用攻击/防御还是特攻/特防
+    #     Returns:
+    #         Tuple[float, float]: (攻击方胜率%, 防御方胜率%)
+    #     """
+    #     # 获取宝可梦的属性类型
+    #     user_pokemon_types = self.pokemon_repo.get_pokemon_types(user_pokemon.species_id)
+    #     wild_pokemon_types = self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id)
+    #     # 如果获取不到类型数据，使用默认的普通属性
+    #     if not user_pokemon_types:
+    #         user_pokemon_types = ['normal']
+    #     if not wild_pokemon_types:
+    #         wild_pokemon_types = ['normal']
+    #
+    #     # ----------------------
+    #     # 步骤1：计算属性克制系数（攻击方对防御方的总克制系数）
+    #     # ----------------------
+    #     self_type_modifier = self.calculate_type_effectiveness(user_pokemon_types, wild_pokemon_types)
+    #     # 防御方对攻击方的克制系数
+    #     opp_type_modifier = self.calculate_type_effectiveness(wild_pokemon_types, user_pokemon_types)
+    #     # ----------------------
+    #     # 步骤2：计算攻防能力（结合等级、属性修正）
+    #     # ----------------------
+    #
+    #     # 攻击方输出属性：按技能类型选择
+    #     atk_stat_attacker = 'attack' if skill_type == 'physical' else 'sp_attack'
+    #     # 防御方输出属性：取自身物攻和特攻的最大值（贴合实际定位）
+    #     atk_stat_defender = 'attack' if wild_pokemon.stats.attack > wild_pokemon.stats.sp_attack else 'sp_attack'
+    #     def_stat = 'defense' if skill_type == 'physical' else 'sp_defense'
+    #     # 等级修正系数（等级差距影响，避免碾压）
+    #     self_level_mod = user_pokemon.level / 50  # 等级50修正1.0，等级100修正2.0，等级25修正0.5
+    #     opp_level_mod = wild_pokemon.level / 50
+    #
+    #     # 攻击方输出能力 = 攻击属性值 × 等级修正 × 属性克制系数
+    #     self_offense = user_pokemon.stats[atk_stat_attacker] * self_level_mod * self_type_modifier
+    #     opp_offense = wild_pokemon.stats[atk_stat_defender] * opp_level_mod * opp_type_modifier  # 防御方用自己的核心输出属性
+    #     # 防御方承伤能力 = 防御属性值 × 等级修正
+    #     self_defense = user_pokemon.stats[def_stat] * self_level_mod
+    #     opp_defense = wild_pokemon.stats[def_stat] * opp_level_mod
+    #
+    #     # 有效战力 = 输出能力 / 承伤能力（比值越大，战力越强）
+    #     self_effective_power = self_offense / self_defense if self_defense > 0 else 0
+    #     opp_effective_power = opp_offense / opp_defense if opp_defense > 0 else 0
+    #     # ----------------------
+    #     # 步骤3：速度先手权修正（速度快的获得额外战力加成）
+    #     # ----------------------
+    #     speed_ratio = user_pokemon.stats.speed / max(wild_pokemon.stats.speed, 1)
+    #     self_speed_bonus = 0.0  # 初始化，避免未定义
+    #     opp_speed_bonus = 0.0
+    #
+    #     if speed_ratio > 1.0:
+    #         # 用对数缩放，速度比1.5时加成≈8%，速度比2.0时加成≈10%，更平滑
+    #         self_speed_bonus = min(0.1, math.log(speed_ratio) * 0.15)
+    #         self_effective_power *= (1 + self_speed_bonus)  # 关键：用加成放大攻击方战力
+    #
+    #     elif speed_ratio < 1.0:
+    #         opp_speed_bonus = min(0.1, math.log(1 / speed_ratio) * 0.15)
+    #         opp_effective_power *= (1 + opp_speed_bonus)  # 关键：用加成放大防御方战力
+    #
+    #     # ----------------------
+    #     # 步骤4：换算胜率（基于战力比，用Sigmoid函数平滑映射到0-1）
+    #     # ----------------------
+    #     power_diff = self_effective_power - opp_effective_power
+    #     # Sigmoid函数：将差值映射到0-1，斜率控制胜率对战力差的敏感度（0.15为经验值）
+    #     self_win_rate = 1 / (1 + math.exp(-0.15 * power_diff))
+    #     # 修正极端胜率（避免0%或100%，保留随机性）
+    #     self_win_rate = max(0.05, min(0.95, self_win_rate))
+    #     opp_win_rate = 1 - self_win_rate
+    #     return round(self_win_rate * 100, 1), round(opp_win_rate * 100, 1)
+    import math
+    import random
+    from typing import Tuple
+
+    # 假设这些类已经在你的项目中定义
+    # from ...core.models.pokemon_models import UserPokemonInfo, WildPokemonInfo
+
+    def calculate_battle_win_rate(self, user_pokemon: UserPokemonInfo, wild_pokemon: WildPokemonInfo,
+                                  skill_type: str = 'special') -> Tuple[float, float]:
         """
-        计算宝可梦战斗胜率
+        计算宝可梦战斗胜率 (基于真实伤害公式与击杀回合数模拟)
+
         Args:
             user_pokemon: 攻击方宝可梦数据
             wild_pokemon: 防御方宝可梦数据
-            skill_type: 技能类型 ('physical' 或 'special')，决定使用攻击/防御还是特攻/特防
+            skill_type: 用户选用的技能类型 ('physical' 或 'special')
+
         Returns:
             Tuple[float, float]: (攻击方胜率%, 防御方胜率%)
         """
-        # 获取宝可梦的属性类型
-        user_pokemon_types = self.pokemon_repo.get_pokemon_types(user_pokemon.species_id)
-        wild_pokemon_types = self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id)
-        # 如果获取不到类型数据，使用默认的普通属性
-        if not user_pokemon_types:
-            user_pokemon_types = ['normal']
-        if not wild_pokemon_types:
-            wild_pokemon_types = ['normal']
 
         # ----------------------
-        # 步骤1：计算属性克制系数（攻击方对防御方的总克制系数）
+        # 辅助函数：标准宝可梦伤害公式
         # ----------------------
-        self_type_modifier = self.calculate_type_effectiveness(user_pokemon_types, wild_pokemon_types)
-        # 防御方对攻击方的克制系数
-        opp_type_modifier = self.calculate_type_effectiveness(wild_pokemon_types, user_pokemon_types)
+        def calculate_damage(attacker_level, atk_stat, def_stat, power, type_effectiveness):
+            # 宝可梦伤害公式:
+            # Damage = ((((2 * Level / 5 + 2) * Attack * Power / Defense) / 50) + 2) * Modifier
+            # 这里假设技能威力 Power 为 80 (标准强力技能，如喷射火焰/十万伏特)
+            # 随机数 (0.85-1.0) 我们将在最后计算胜率概率时考虑，这里取期望值 0.925
+
+            base_damage = ((2 * attacker_level / 5 + 2) * power * atk_stat / max(1, def_stat)) / 50 + 2
+            final_damage = base_damage * type_effectiveness * 0.925  # 0.925是随机浮动的平均值
+            return final_damage
+        print(f"user_pokemon: {user_pokemon}")
+        print(f"wild_pokemon: {wild_pokemon}")
         # ----------------------
-        # 步骤2：计算攻防能力（结合等级、属性修正）
+        # 1. 准备数据
         # ----------------------
 
-        # 攻击方输出属性：按技能类型选择
-        atk_stat_attacker = 'attack' if skill_type == 'physical' else 'sp_attack'
-        # 防御方输出属性：取自身物攻和特攻的最大值（贴合实际定位）
-        atk_stat_defender = 'attack' if wild_pokemon.stats.attack > wild_pokemon.stats.sp_attack else 'sp_attack'
-        def_stat = 'defense' if skill_type == 'physical' else 'sp_defense'
-        # 等级修正系数（等级差距影响，避免碾压）
-        self_level_mod = user_pokemon.level / 50  # 等级50修正1.0，等级100修正2.0，等级25修正0.5
-        opp_level_mod = wild_pokemon.level / 50
+        # 获取属性类型
+        user_types = self.pokemon_repo.get_pokemon_types(user_pokemon.species_id) or ['normal']
+        wild_types = self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id) or ['normal']
 
-        # 攻击方输出能力 = 攻击属性值 × 等级修正 × 属性克制系数
-        self_offense = user_pokemon.stats[atk_stat_attacker] * self_level_mod * self_type_modifier
-        opp_offense = wild_pokemon.stats[atk_stat_defender] * opp_level_mod * opp_type_modifier  # 防御方用自己的核心输出属性
-        # 防御方承伤能力 = 防御属性值 × 等级修正
-        self_defense = user_pokemon.stats[def_stat] * self_level_mod
-        opp_defense = wild_pokemon.stats[def_stat] * opp_level_mod
+        # 计算属性克制倍率
+        # 玩家对野怪的克制
+        user_type_mod = self.calculate_type_effectiveness(user_types, wild_types)
+        # 野怪对玩家的克制
+        wild_type_mod = self.calculate_type_effectiveness(wild_types, user_types)
 
-        # 有效战力 = 输出能力 / 承伤能力（比值越大，战力越强）
-        self_effective_power = self_offense / self_defense if self_defense > 0 else 0
-        opp_effective_power = opp_offense / opp_defense if opp_defense > 0 else 0
-        # ----------------------
-        # 步骤3：速度先手权修正（速度快的获得额外战力加成）
-        # ----------------------
-        speed_ratio = user_pokemon.stats.speed / max(wild_pokemon.stats.speed, 1)
-        self_speed_bonus = 0.0  # 初始化，避免未定义
-        opp_speed_bonus = 0.0
+        # 确定攻防属性
+        # 玩家：指定了物理/特殊
+        user_atk_val = user_pokemon.stats.attack if skill_type == 'physical' else user_pokemon.stats.sp_attack
+        wild_def_val_for_user = wild_pokemon.stats.defense if skill_type == 'physical' else wild_pokemon.stats.sp_defense
 
-        if speed_ratio > 1.0:
-            # 用对数缩放，速度比1.5时加成≈8%，速度比2.0时加成≈10%，更平滑
-            self_speed_bonus = min(0.1, math.log(speed_ratio) * 0.15)
-            self_effective_power *= (1 + self_speed_bonus)  # 关键：用加成放大攻击方战力
+        # 野怪：智能选择它较高的攻击属性 (模拟野生宝可梦使用本系高攻技能)
+        if wild_pokemon.stats.attack > wild_pokemon.stats.sp_attack:
+            wild_atk_val = wild_pokemon.stats.attack
+            user_def_val_for_wild = user_pokemon.stats.defense
+        else:
+            wild_atk_val = wild_pokemon.stats.sp_attack
+            user_def_val_for_wild = user_pokemon.stats.sp_defense
 
-        elif speed_ratio < 1.0:
-            opp_speed_bonus = min(0.1, math.log(1 / speed_ratio) * 0.15)
-            opp_effective_power *= (1 + opp_speed_bonus)  # 关键：用加成放大防御方战力
+        # 假设技能威力 (使用标准威力80，如果有本系加成 STAB 则 x1.5)
+        # 这里简化处理：默认双方都使用威力 80 的技能
+        move_power = 80
 
         # ----------------------
-        # 步骤4：换算胜率（基于战力比，用Sigmoid函数平滑映射到0-1）
+        # 2. 计算每回合伤害 (DPT)
         # ----------------------
-        power_diff = self_effective_power - opp_effective_power
-        # Sigmoid函数：将差值映射到0-1，斜率控制胜率对战力差的敏感度（0.15为经验值）
-        self_win_rate = 1 / (1 + math.exp(-0.15 * power_diff))
-        # 修正极端胜率（避免0%或100%，保留随机性）
-        self_win_rate = max(0.05, min(0.95, self_win_rate))
-        opp_win_rate = 1 - self_win_rate
-        return round(self_win_rate * 100, 1), round(opp_win_rate * 100, 1)
+
+        # 玩家对野怪造成的单发伤害
+        damage_to_wild = calculate_damage(
+            user_pokemon.level, user_atk_val, wild_def_val_for_user, move_power, user_type_mod
+        )
+
+        # 野怪对玩家造成的单发伤害
+        damage_to_user = calculate_damage(
+            wild_pokemon.level, wild_atk_val, user_def_val_for_wild, move_power, wild_type_mod
+        )
+
+        # ----------------------
+        # 3. 计算击杀所需回合数 (Turns to Kill)
+        # ----------------------
+
+        # HP 修正：确保 HP 至少为 1
+        user_hp = max(1, user_pokemon.stats.hp)
+        wild_hp = max(1, wild_pokemon.stats.hp)
+
+        # 玩家打死野怪需要几下？ (向上取整)
+        turns_to_kill_wild = math.ceil(wild_hp / max(1, damage_to_wild))
+
+        # 野怪打死玩家需要几下？
+        turns_to_kill_user = math.ceil(user_hp / max(1, damage_to_user))
+
+        # ----------------------
+        # 4. 速度修正与胜率计算
+        # ----------------------
+
+        # 获取速度
+        user_speed = user_pokemon.stats.speed
+        wild_speed = wild_pokemon.stats.speed
+
+        # 核心逻辑：谁先手？
+        # 如果速度相同，视为50%概率先手
+        user_is_faster = user_speed >= wild_speed
+
+        # 这里的 win_score 不是最终胜率，而是一个胜势积分
+        # 积分越高，胜率越接近 100%
+        win_score = 0.0
+
+        # 情况 A: 玩家斩杀回合数 明显少于 野怪 (例如玩家2刀死，野怪要5刀) -> 必胜
+        if turns_to_kill_wild < turns_to_kill_user:
+            # 优势巨大
+            win_score = 2.0 + (turns_to_kill_user - turns_to_kill_wild)
+
+            # 情况 B: 野怪斩杀回合数 明显少于 玩家 -> 必败
+        elif turns_to_kill_wild > turns_to_kill_user:
+            win_score = -2.0 - (turns_to_kill_wild - turns_to_kill_user)
+
+        # 情况 C: 斩杀回合数相同 (例如都要 3 刀死) -> 拼速度
+        else:  # turns_to_kill_wild == turns_to_kill_user
+            if user_speed > wild_speed:
+                # 我先手，我先打出第 N 刀 -> 我赢
+                win_score = 1.5  # 速度优势
+            elif user_speed < wild_speed:
+                # 对面先手，对面先打出第 N 刀 -> 我输
+                win_score = -1.5  # 速度劣势
+            else:
+                # 同速，纯随机
+                win_score = 0.0
+
+        # ----------------------
+        # 5. 引入随机性 (Crit, Miss, Damage Roll) 并平滑胜率
+        # ----------------------
+
+        # 使用 Sigmoid 函数将 win_score 映射到 0-1
+        # 调整 coefficient (0.8) 可以控制胜率曲线的陡峭程度
+        # score = 0 -> 50%
+        # score = 2 -> 83%
+        # score = -2 -> 16%
+
+        sigmoid_k = 0.8
+        base_win_rate = 1 / (1 + math.exp(-sigmoid_k * win_score))
+
+        # 考虑命中率和暴击的干扰 (95% 命中, 6.25% 暴击)
+        # 我们不进行模拟，而是将胜率向 50% 收缩一点点，表示意外发生的可能性
+        # 比如 99% 的胜率修正为 98%，保留一点翻车概率
+
+        final_win_rate = base_win_rate * 0.96 + 0.02  # 压缩区间到 [2%, 98%]
+
+        return round(final_win_rate * 100, 1), round((1 - final_win_rate) * 100, 1)
 
     def calculate_catch_success_rate(self, user_id: str, wild_pokemon: WildPokemonInfo, item_id: str) -> Dict[str, Any]:
         """

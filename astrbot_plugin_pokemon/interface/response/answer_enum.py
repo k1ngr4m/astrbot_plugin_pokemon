@@ -52,3 +52,6 @@ class AnswerEnum(Enum):
     ADVENTURE_LOCATION_NOT_FOUND = "❌ 未找到区域 {location_id}。\n\n请检查区域ID是否正确，或使用 /查看区域 指令查看所有可冒险的区域。"
     ADVENTURE_LOCATION_NO_POKEMON = "❌ 区域 {location_name} 中暂无野生宝可梦。\n\n请稍后再试，或联系管理员添加野生宝可梦。"
     ADVENTURE_LOCATION_POKEMON_ENCOUNTERED = "接下来你可以选择战斗、捕捉或逃跑...\n\n 使用 /战斗 指令进行对战！\n\n 使用 /捕捉 指令尝试捕捉它！\n\n 使用 /逃跑 指令安全离开！"
+
+    BATTLE_FAILURE_NO_EXP = "战斗失败，未获得经验值"
+    BATTLE_SUCCESS = f"战斗结束！用户宝可梦 {{user_pokemon_info.name}} vs 野生宝可梦 {{wild_pokemon_info.name}}"

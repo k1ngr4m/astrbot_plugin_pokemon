@@ -41,5 +41,8 @@ class AdventureResult:
 
 @dataclass
 class BattleResult:
-    success: bool
-    message: str
+    user_pokemon: Dict[str, any]
+    wild_pokemon: Dict[str, any]
+    win_rates: Dict[str, float]
+    result: str
+    exp_details: Dict[str, any]

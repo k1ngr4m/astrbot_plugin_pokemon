@@ -2,7 +2,7 @@ import random
 from typing import List
 
 from astrbot.api.event import AstrMessageEvent
-from ...core.models.adventure_models import LocationInfo, AdventureResult
+from ...core.models.adventure_models import LocationInfo, AdventureResult, BattleResult
 from ...interface.response.answer_enum import AnswerEnum
 from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog
 from ...utils.utils import userid_to_base32
@@ -111,10 +111,9 @@ class AdventureHandlers:
     async def battle(self, event: AstrMessageEvent):
         """处理战斗指令"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_user_by_id(user_id)
-
-        if not user:
-            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+        result = self.user_service.check_user_registered(user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
             return
 
         # 检查是否有缓存的野生宝可梦信息
@@ -125,10 +124,45 @@ class AdventureHandlers:
             return
 
         result = self.adventure_service.adventure_in_battle(user_id, wild_pokemon_info)
-        if result['success']:
-            yield event.plain_result(result['message'])
-        else:
-            yield event.plain_result(result['message'])
+        if not result.success:
+            yield event.plain_result(result.message)
+        if result.success:
+            d: BattleResult = result.data
+            user_pokemon = d.user_pokemon
+            wild_pokemon_data = d.wild_pokemon
+            win_rates = d.win_rates
+            battle_result = "胜利" if d.result == "success" else "失败"
+            exp_details = d.exp_details
+
+            message = "⚔️ 宝可梦战斗开始！\n\n"
+            message += f"👤 我方宝可梦: {user_pokemon['name']} (Lv.{user_pokemon['level']})\n"
+            message += f"野生宝可梦: {wild_pokemon_data['name']} (Lv.{wild_pokemon_data['level']})\n\n"
+
+            message += "📊 战斗胜率分析:\n"
+            message += f"我方胜率: {win_rates['user_win_rate']}%\n"
+            message += f"野生胜率: {win_rates['wild_win_rate']}%\n\n"
+
+            message += f"🎯 战斗结果: {battle_result}\n"
+
+            # 添加经验值信息
+            if exp_details:
+                team_pokemon_results = exp_details.get("team_pokemon_results", [])
+
+                if team_pokemon_results:
+                    message += f"\n📈 经验值获取:\n"
+                    for i, pokemon_result in enumerate(team_pokemon_results):
+                        if pokemon_result.get("success"):
+                            exp_gained = pokemon_result.get("exp_gained", 0)
+                            pokemon_name = pokemon_result.get("pokemon_name", f"宝可梦{i + 1}")
+                            message += f"  {pokemon_name} 获得了 {exp_gained} 点经验值\n"
+
+                            level_up_info = pokemon_result.get("level_up_info", {})
+                            if level_up_info.get("should_level_up"):
+                                levels_gained = level_up_info.get("levels_gained", 0)
+                                new_level = level_up_info.get("new_level", 0)
+                                message += f"  🎉 恭喜 {pokemon_name} 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n"
+            yield event.plain_result(message)
+            return
 
     async def catch_pokemon(self, event: AstrMessageEvent):
         """处理捕捉野生宝可梦的指令"""

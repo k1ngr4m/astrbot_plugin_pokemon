@@ -1,4 +1,6 @@
 from typing import Dict, Any
+
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
 )
@@ -75,7 +77,6 @@ class ExpService:
             remaining_exp = remaining_exp - self.get_exp_needed_for_next_level(new_level - 1)
 
         new_level = min(100, new_level)
-
         return {
             "should_level_up": levels_gained > 0,
             "levels_gained": levels_gained,
@@ -99,11 +100,9 @@ class ExpService:
 
         # 检查是否升级
         level_up_info = self.check_pokemon_level_up(current_level, new_total_exp)
-
         # 使用宝可梦的数字ID，而不是短码ID
         # 从数据库返回的数据中获取数字ID
         pokemon_id = pokemon_data.id
-
 
         # 更新宝可梦数据
         self.pokemon_repo.update_pokemon_exp(level_up_info["new_level"], level_up_info["new_exp"], pokemon_id, user_id)
@@ -125,23 +124,23 @@ class ExpService:
         使用官方宝可梦公式: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5 或 + 10 (HP)
         """
         try:
+            print(f"pokemon_info: {pokemon_id}, {species_id}, {new_level}, {user_id}")
             # 获取宝可梦的种族值
             species_data = self.pokemon_repo.get_pokemon_by_id(species_id)
             if not species_data:
                 return False
-
             # 获取宝可梦的IV和EV值
             pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
             if not pokemon_data:
                 return False
-
             # 获取各种族值
-            base_hp = getattr(species_data, 'base_hp', 0)
-            base_attack = getattr(species_data, 'base_attack', 0)
-            base_defense = getattr(species_data, 'base_defense', 0)
-            base_sp_attack = getattr(species_data, 'base_sp_attack', 0)
-            base_sp_defense = getattr(species_data, 'base_sp_defense', 0)
-            base_speed = getattr(species_data, 'base_speed', 0)
+            base_data: PokemonBaseStats = species_data.base_stats
+            base_hp = base_data.base_hp
+            base_attack = base_data.base_attack
+            base_defense = base_data.base_defense
+            base_sp_attack = base_data.base_sp_attack
+            base_sp_defense = base_data.base_sp_defense
+            base_speed = base_data.base_speed
 
             # 获取IV值
             hp_iv = pokemon_data.ivs.hp_iv
@@ -150,7 +149,6 @@ class ExpService:
             sp_attack_iv = pokemon_data.ivs.sp_attack_iv
             sp_defense_iv = pokemon_data.ivs.sp_defense_iv
             speed_iv = pokemon_data.ivs.speed_iv
-
             # 获取EV值
             hp_ev = pokemon_data.evs.hp_ev
             attack_ev = pokemon_data.evs.attack_ev
@@ -168,7 +166,6 @@ class ExpService:
             new_sp_attack = int((base_sp_attack * 2 + sp_attack_iv + sp_attack_ev // 4) * new_level / 100) + 5
             new_sp_defense = int((base_sp_defense * 2 + sp_defense_iv + sp_defense_ev // 4) * new_level / 100) + 5
             new_speed = int((base_speed * 2 + speed_iv + speed_ev // 4) * new_level / 100) + 5
-
             new_pokemon_attributes = {
                 'hp': new_hp,
                 'attack': new_attack,
