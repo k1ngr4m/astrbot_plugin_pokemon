@@ -3,12 +3,14 @@ import random
 from itertools import accumulate
 from typing import Dict, Any, List, Optional, Tuple
 
+from slack_sdk.models.messages.message import message
+
 from .exp_service import ExpService
 from .pokemon_service import PokemonService
 from ..answer.answer_enum import AnswerEnum
 from ..domain.pokemon_models import WildPokemonInfo, PokemonStats, PokemonIVs, PokemonEVs, PokemonMoves, \
     UserPokemonInfo, WildPokemonEncounterLog
-from ..domain.user_models import UserTeam
+from ..domain.user_models import UserTeam, UserItems
 from ..repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository
 )
@@ -308,7 +310,6 @@ class AdventureService:
                     "message": "更新野生宝可梦遇到日志（战斗）时出错",
                 }
 
-
     def start_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo, user_team_list: List[int] = None) -> Dict[str, Any]:
         """
         开始一场与野生宝可梦的战斗
@@ -400,7 +401,6 @@ class AdventureService:
                 "message": f"战斗过程中发生错误: {str(e)}"
             }
 
-
     def calculate_type_effectiveness(self, attacker_types: List[str], defender_types: List[str]) -> float:
         """
         计算属性克制系数
@@ -415,13 +415,7 @@ class AdventureService:
                     effectiveness *= self.TYPE_CHART[type_name].get(def_type_name, 1.0)
         return effectiveness
 
-
-    def calculate_battle_win_rate(
-        self,
-        user_pokemon: UserPokemonInfo,
-        wild_pokemon: WildPokemonInfo,
-        skill_type: str = 'special'
-    ) -> Tuple[float, float]:
+    def calculate_battle_win_rate(self, user_pokemon: UserPokemonInfo, wild_pokemon: WildPokemonInfo, skill_type: str = 'special') -> Tuple[float, float]:
         """
         计算宝可梦战斗胜率
         Args:
@@ -496,3 +490,84 @@ class AdventureService:
         opp_win_rate = 1 - self_win_rate
         return round(self_win_rate * 100, 1), round(opp_win_rate * 100, 1)
 
+    def calculate_catch_success_rate(self, user_id: str, wild_pokemon: WildPokemonInfo, item_id: str) -> Dict[str, Any]:
+        """
+        计算捕捉成功率
+        Args:
+            user_id: 用户ID
+            wild_pokemon: 野生宝可梦数据
+        Returns:
+            float: 捕捉成功率（0-1之间）
+        """
+        # 检查用户背包中的道具
+        user_items:UserItems = self.user_repo.get_user_items(user_id)
+        pokeball_item = None
+        user_item_list = user_items.items
+        if item_id is not None:
+            # 用户指定了特定的道具ID
+            for item in user_item_list:
+                if item.item_id == item_id and int(item.category_id) == 34 and item.quantity > 0:
+                    pokeball_item = item
+                    break
+        else:
+            # 用户未指定道具ID，自动寻找第一个可用的精灵球
+            for item in user_item_list:
+                if int(item.category_id) == 34 and item.quantity > 0:
+                    pokeball_item = item
+                    break
+
+        if not pokeball_item:
+            if item_id is not None:
+                message = f"❌ 找不到ID为 {item_id} 的精灵球或该道具不存在，无法进行捕捉！请检查道具ID或先通过签到或其他方式获得精灵球。"
+            else:
+                message = "❌ 您的背包中没有精灵球，无法进行捕捉！请先通过签到或其他方式获得精灵球。"
+            return {"success": False, "message": message}
+
+        # 根据精灵球类型调整基础捕捉率
+        ball_multiplier = 1.0  # 普通精灵球
+        if pokeball_item.name_zh == '超级球':
+            ball_multiplier = 1.5
+        elif pokeball_item.name_zh == '高级球':
+            ball_multiplier = 2.0
+
+        # 边界条件：当前HP不能小于0或大于最大HP，基础捕获率范围0~255
+        max_hp = wild_pokemon.stats.hp
+        # 假设current_hp为1/4最大HP
+        current_hp = max_hp // 4
+        base_capture_rate = int(self.pokemon_repo.get_pokemon_capture_rate(wild_pokemon.species_id))
+
+        status = "none"
+        # 异常状态倍率映射
+        status_multipliers = {
+            "none": 1.0,
+            "paralysis": 1.2,
+            "burn": 1.2,
+            "poison": 1.2,
+            "sleep": 1.5,
+            "freeze": 1.5
+        }
+        status_multi = status_multipliers.get(status.lower(), 1.0)
+
+        # 计算核心公式
+        if current_hp == 0:
+            catch_value = 0  # 濒死宝可梦无法捕捉
+        else:
+            hp_term = 3 * max_hp - 2 * current_hp
+            numerator = hp_term * base_capture_rate * ball_multiplier * status_multi
+            denominator = 3 * max_hp
+            catch_value = int(numerator // denominator)  # 向下取整
+
+        # 判定值上限为255（超过则100%成功）
+        catch_value = min(catch_value, 255)
+        # 计算成功率（随机数0~255，共256种可能）
+        success_rate = (catch_value / 256) * 100 if catch_value > 0 else 0.0
+
+        return {
+            "success": True,
+            "message": f"判定值为{catch_value}，捕捉成功率为{round(success_rate, 2)}%",
+            "data": {
+                "catch_value": catch_value,
+                "success_rate": success_rate,
+                "pokeball_item": pokeball_item,
+            }
+        }

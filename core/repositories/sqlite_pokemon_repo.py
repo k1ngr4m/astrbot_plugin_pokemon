@@ -454,3 +454,14 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             new_id = cursor.lastrowid
             conn.commit()
             return new_id
+
+    def get_pokemon_capture_rate(self, pokemon_id: int) -> int:
+        """获取宝可梦的捕捉率"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT capture_rate FROM pokemon_species
+                WHERE id = ?
+            """, (pokemon_id,))
+            row = cursor.fetchone()
+            return row['capture_rate'] if row else 0

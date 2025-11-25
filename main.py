@@ -168,7 +168,7 @@ class PokemonPlugin(Star):
         # 管理员扮演功能
         self.impersonation_map = {}
 
-        # 冒险冷却时间管理（默认60秒）
+        # 冒险冷却时间管理
         self.adventure_cooldown = self.game_config["adventure"]["cooldown"]
 
     def _get_effective_user_id(self, event: AstrMessageEvent):

@@ -154,6 +154,9 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_wild_pokemon_by_id(self, wild_pokemon_id: int) -> Optional[WildPokemonInfo]: pass
 
+    @abstractmethod
+    def get_pokemon_capture_rate(self, pokemon_id: int) -> int: pass
+
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""
 

@@ -164,66 +164,15 @@ class AdventureHandlers:
                 yield event.plain_result("❌ 无效的道具ID格式。请使用命令格式: /捕捉 [道具ID] 或 /捕捉")
                 return
 
-        # 检查用户背包中的道具
-        user_items:UserItems = self.plugin.user_repo.get_user_items(user_id)
-        pokeball_item = None
-        user_item_list = user_items.items
-        if item_id is not None:
-            # 用户指定了特定的道具ID
-            for item in user_item_list:
-                if item.item_id == item_id and int(item.category_id) == 34 and item.quantity > 0:
-                    pokeball_item = item
-                    break
-        else:
-            # 用户未指定道具ID，自动寻找第一个可用的精灵球
-            for item in user_item_list:
-                if int(item.category_id) == 34 and item.quantity > 0:
-                    pokeball_item = item
-                    break
-
-        if not pokeball_item:
-            if item_id is not None:
-                yield event.plain_result(f"❌ 找不到ID为 {item_id} 的精灵球或该道具不存在，无法进行捕捉！请检查道具ID或先通过签到或其他方式获得精灵球。")
-            else:
-                yield event.plain_result("❌ 您的背包中没有精灵球，无法进行捕捉！请先通过签到或其他方式获得精灵球。")
-            return
-
         # 计算捕捉成功率
-
-        # 根据精灵球类型调整基础捕捉率
-        ball_multiplier = 1.0  # 普通精灵球
-        if pokeball_item.name_zh == '超级球':
-            ball_multiplier = 1.5
-        elif pokeball_item.name_zh == '高级球':
-            ball_multiplier = 2.0
-
-        # 基础捕捉率，考虑精灵球类型
-        base_catch_rate = 0.2 * ball_multiplier
-
-        # 根据野生宝可梦的等级调整成功率（等级越高越难捕捉）
-        level_factor = max(0.1, 1.0 - (wild_pokemon.level / 100.0))
-
-        # 如果用户有战斗胜率信息，可以将其作为额外因素
-        # 计算一个简化版本的胜率
-        # user_win_rate, wild_win_rate = self.plugin.battle_service.calculate_battle_win_rate(
-        #     {"species_id": wild_pokemon.species_id, "level": 5, "speed": 50,  # 假设用户派出一只低等级宝可梦
-        #      "attack": 50, "defense": 50, "sp_attack": 50, "sp_defense": 50},
-        #     wild_pokemon
-        # )
-        # 将战斗胜率作为捕捉成功率的修正因子（胜利可能性高则捕捉成功率增加）
-        # battle_factor = user_win_rate / 100.0  # 转换为0-1之间的值
-        battle_factor = 0.5
-        # 捕捉成功率 = 基础捕捉率 * 等级因素 * 战斗胜率修正
-        catch_success_rate = base_catch_rate * level_factor * (0.5 + 0.5 * battle_factor)
-
-        # 确保成功率在合理范围内
-        # catch_success_rate = max(0.05, min(0.95, catch_success_rate))
-        # 先80%捕捉，后面再改概率
-        catch_success_rate = 0.8
-
+        catch_success_rate = self.adventure_service.calculate_catch_success_rate(user_id, wild_pokemon, item_id)
+        if not catch_success_rate['success']:
+            yield event.plain_result(catch_success_rate['message'])
+            return
+        message = f"您尝试捕捉野生的 {wild_pokemon.name} (Lv.{wild_pokemon.level})，捕捉成功率为 {catch_success_rate['data']['success_rate']}。\n\n"
         # 随机决定捕捉结果
-        is_successful = random.random() < catch_success_rate
-
+        is_successful = random.random() < catch_success_rate['data']['success_rate']
+        pokeball_item = catch_success_rate['data']['pokeball_item']
         # 扣除一个精灵球
         self.plugin.user_repo.add_user_item(user_id, pokeball_item.item_id, -1)
 
@@ -247,7 +196,7 @@ class AdventureHandlers:
             # 获取新捕捉的宝可梦信息
             new_pokemon:UserPokemonInfo = self.plugin.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
 
-            message = f"🎉 捕捉成功！\n\n"
+            message += f"🎉 捕捉成功！\n\n"
             message += f"您成功捕捉到了 {wild_pokemon.name} (Lv.{wild_pokemon.level})！\n\n"
             message += f"已添加到您的宝可梦收藏中。\n\n"
             message += f"宝可梦ID: {new_pokemon.id}\n\n"
