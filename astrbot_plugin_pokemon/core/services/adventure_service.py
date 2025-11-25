@@ -90,7 +90,7 @@ class AdventureService:
 
         return BaseResult(
             success=True,
-            message=AnswerEnum.ADVENTURE_LOCATIONS_FOUND.value.format(len(formatted_locations)),
+            message=AnswerEnum.ADVENTURE_LOCATIONS_FOUND.value,
             data=formatted_locations
         )
 
