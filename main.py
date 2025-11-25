@@ -1,32 +1,34 @@
 import os
 
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
-from astrbot.api.star import Context, Star, register
+from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.star import Context, Star
 from astrbot.api import logger, AstrBotConfig
-from .core.database.migration import run_migrations
-from .core.repositories.sqlite_item_repo import SqliteItemRepository
-from .core.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
-from .core.repositories.sqlite_team_repo import SqliteTeamRepository
-from .core.repositories.sqlite_user_repo import SqliteUserRepository
-from .core.repositories.sqlite_adventure_repo import SqliteAdventureRepository
-from .core.repositories.sqlite_shop_repo import SqliteShopRepository
-from .core.services.data_setup_service import DataSetupService
-from .core.services.pokemon_service import PokemonService
-from .core.services.team_service import TeamService
-from .core.services.adventure_service import AdventureService
-from .core.services.battle_service import BattleService
-from .core.services.exp_service import ExpService
-from .handlers.common_handlers import CommonHandlers
-from .handlers.pokemon_handlers import PokemonHandlers
-from .handlers.team_handlers import TeamHandlers
-from .handlers.adventure_handlers import AdventureHandlers
-from .handlers.item_handlers import ItemHandlers
-from .handlers.shop_handlers import ShopHandlers
+from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
 
-from .core.services.user_service import UserService
-from .core.services.item_service import ItemService
-from .core.services.shop_service import ShopService
-from .handlers.user_handlers import UserHandlers
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_team_repo import SqliteTeamRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
+
+from .astrbot_plugin_pokemon.interface.commands.common_handlers import CommonHandlers
+from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers
+from .astrbot_plugin_pokemon.interface.commands.team_handlers import TeamHandlers
+from .astrbot_plugin_pokemon.interface.commands.adventure_handlers import AdventureHandlers
+from .astrbot_plugin_pokemon.interface.commands.item_handlers import ItemHandlers
+from .astrbot_plugin_pokemon.interface.commands.shop_handlers import ShopHandlers
+from .astrbot_plugin_pokemon.interface.commands.user_handlers import UserHandlers
+
+from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
+from .astrbot_plugin_pokemon.core.services.pokemon_service import PokemonService
+from .astrbot_plugin_pokemon.core.services.team_service import TeamService
+from .astrbot_plugin_pokemon.core.services.adventure_service import AdventureService
+from .astrbot_plugin_pokemon.core.services.battle_service import BattleService
+from .astrbot_plugin_pokemon.core.services.exp_service import ExpService
+from .astrbot_plugin_pokemon.core.services.user_service import UserService
+from .astrbot_plugin_pokemon.core.services.item_service import ItemService
+from .astrbot_plugin_pokemon.core.services.shop_service import ShopService
 
 
 class PokemonPlugin(Star):
@@ -37,13 +39,7 @@ class PokemonPlugin(Star):
         self.plugin_id = "astrbot_plugin_pokemon"
 
         # --- 1.1. 数据与临时文件路径管理 ---
-        try:
-            # 优先使用框架提供的 get_data_dir 方法
-            self.data_dir = self.context.get_data_dir(self.plugin_id)
-        except (AttributeError, TypeError):
-            # 如果方法不存在或调用失败，则回退到旧的硬编码路径
-            logger.warning(f"无法使用 self.context.get_data_dir('{self.plugin_id}'), 将回退到旧的 'data/' 目录。")
-            self.data_dir = "data"
+        self.data_dir = "data"
 
         self.tmp_dir = os.path.join(self.data_dir, "tmp")
         os.makedirs(self.tmp_dir, exist_ok=True)
@@ -74,7 +70,7 @@ class PokemonPlugin(Star):
 
         # 初始化数据库模式
         plugin_root_dir = os.path.dirname(__file__)
-        migrations_path = os.path.join(plugin_root_dir, "core", "database", "migrations")
+        migrations_path = os.path.join(plugin_root_dir, self.plugin_id, "infrastructure", "database", "migrations")
         print(migrations_path)
         run_migrations(db_path, migrations_path)
 
