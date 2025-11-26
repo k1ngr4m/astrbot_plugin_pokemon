@@ -438,11 +438,10 @@ class AdventureService:
         user_types = self.pokemon_repo.get_pokemon_types(user_pokemon.species_id) or ['normal']
         wild_types = self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id) or ['normal']
 
-        # 计算属性克制倍率
-        # 玩家对野怪的克制
-        user_type_mod = self.calculate_type_effectiveness(user_types, wild_types)
+        # 为了保持兼容性，计算宝可梦自身的属性克制，但实际伤害计算使用招式的属性克制
+        # 玩家对野怪的克制（基于宝可梦属性，但实际用处是招式属性）
         # 野怪对玩家的克制
-        wild_type_mod = self.calculate_type_effectiveness(wild_types, user_types)
+        # 我们已经在前面的招式选择逻辑中计算了具体招式的克制系数，直接使用即可
 
         # 确定攻防属性
         # 玩家：指定了物理/特殊
@@ -468,6 +467,8 @@ class AdventureService:
         user_move_power = 80  # 默认值
         user_move_type = ''   # 默认值
         user_stab_bonus = 1.0  # STAB加成
+        user_type_mod = 1.0  # 招式属性克制系数
+        user_move_accuracy = 100.0  # 招式命中率（0-100，转换为0-1之间的值）
 
         if self.move_repo and valid_user_moves:
             best_damage = 0
@@ -482,6 +483,7 @@ class AdventureService:
                     if (skill_type == 'physical' and is_physical) or (skill_type == 'special' and is_special):
                         move_power = move_info.get('power', 80)
                         move_type = move_info.get('type_name', '')
+                        move_accuracy = move_info.get('accuracy', 100)  # 命中率，如果为None则默认100%
 
                         # 计算该招式的预期伤害
                         damage_class_atk_val = user_pokemon.stats.attack if is_physical else user_pokemon.stats.sp_attack
@@ -493,9 +495,12 @@ class AdventureService:
                         # 计算STAB加成
                         stab_bonus = 1.5 if move_type in user_types else 1.0
 
-                        # 计算预期伤害
+                        # 计算预期伤害（考虑命中率）
                         expected_damage = ((2 * user_pokemon.level / 5 + 2) * damage_class_atk_val * move_power / max(1, damage_class_def_val)) / 50 + 2
                         expected_damage *= move_type_effectiveness * stab_bonus * 0.925  # 0.925是平均随机浮动值
+                        # 对于非必中招式，还要乘以命中率
+                        if move_accuracy < 100:  # 不是必中招式
+                            expected_damage *= move_accuracy / 100.0
 
                         # 如果这个招式的伤害更高，选择它
                         if expected_damage > best_damage:
@@ -503,6 +508,8 @@ class AdventureService:
                             user_move_power = move_power
                             user_move_type = move_type
                             user_stab_bonus = stab_bonus
+                            user_type_mod = move_type_effectiveness  # 保存招式的属性克制系数
+                            user_move_accuracy = move_accuracy  # 保存招式命中率
 
         # 获取野生宝可梦的招式
         wild_moves = [wild_pokemon.moves.move1_id, wild_pokemon.moves.move2_id,
@@ -515,13 +522,17 @@ class AdventureService:
         wild_move_power = 80  # 默认值
         wild_move_type = ''   # 默认值
         wild_stab_bonus = 1.0  # STAB加成
+        wild_type_mod = 1.0  # 招式属性克制系数
+        wild_move_accuracy = 100.0  # 招式命中率（0-100，转换为0-1之间的值）
 
         if self.move_repo and valid_wild_moves:
-            best_wild_damage = 0
+            total_wild_damage = 0
+            valid_move_count = 0
             # 为了模拟野怪的攻击偏重，我们根据野怪的攻击属性来决定使用哪种类型的招式
             prefers_physical = wild_pokemon.stats.attack >= wild_pokemon.stats.sp_attack
             preferred_skill_type = 'physical' if prefers_physical else 'special'
 
+            selected_moves = []  # 存储所有有效的招式信息
             for move_id in valid_wild_moves:
                 move_info = self.move_repo.get_move_by_id(move_id)
                 if move_info:
@@ -533,6 +544,7 @@ class AdventureService:
                     if (preferred_skill_type == 'physical' and is_physical) or (preferred_skill_type == 'special' and is_special):
                         move_power = move_info.get('power', 80)
                         move_type = move_info.get('type_name', '')
+                        move_accuracy = move_info.get('accuracy', 100)  # 命中率，如果为None则默认100%
 
                         # 计算该招式的预期伤害
                         damage_class_atk_val = wild_pokemon.stats.attack if is_physical else wild_pokemon.stats.sp_attack
@@ -544,16 +556,45 @@ class AdventureService:
                         # 计算STAB加成
                         stab_bonus = 1.5 if move_type in wild_types else 1.0
 
-                        # 计算预期伤害
+                        # 计算预期伤害（考虑命中率）
                         expected_damage = ((2 * wild_pokemon.level / 5 + 2) * damage_class_atk_val * move_power / max(1, damage_class_def_val)) / 50 + 2
                         expected_damage *= move_type_effectiveness * stab_bonus * 0.925  # 0.925是平均随机浮动值
+                        # 对于非必中招式，还要乘以命中率
+                        if move_accuracy < 100:  # 不是必中招式
+                            expected_damage *= move_accuracy / 100.0
 
-                        # 如果这个招式的伤害更高，选择它
-                        if expected_damage > best_wild_damage:
-                            best_wild_damage = expected_damage
-                            wild_move_power = move_power
-                            wild_move_type = move_type
-                            wild_stab_bonus = stab_bonus
+                        # 保存招式信息用于后续的平均伤害计算
+                        selected_moves.append({
+                            'move_power': move_power,
+                            'move_type': move_type,
+                            'stab_bonus': stab_bonus,
+                            'type_mod': move_type_effectiveness,
+                            'accuracy': move_accuracy,
+                            'expected_damage': expected_damage
+                        })
+                        total_wild_damage += expected_damage
+                        valid_move_count += 1
+
+            # 如果有有效的招式，使用平均伤害来反映野怪的真实攻击能力
+            if selected_moves:
+                # 计算平均伤害用于后续的伤害计算，模拟野怪随机使用技能的特性
+                avg_wild_damage = total_wild_damage / valid_move_count
+
+                # 为了保持一致性，我们选择第一个招式作为代表（或随机选择一个）
+                # 这样可以保持单个招式的属性信息用于后续计算
+                first_move = selected_moves[0]  # 使用列表中的第一个招式作为代表
+                wild_move_power = first_move['move_power']
+                wild_move_type = first_move['move_type']
+                wild_stab_bonus = first_move['stab_bonus']
+                wild_type_mod = first_move['type_mod']  # 保存招式的属性克制系数
+                wild_move_accuracy = first_move['accuracy']  # 保存招式命中率
+            else:
+                # 如果没有有效招式，使用默认值
+                wild_move_power = 80
+                wild_move_type = 'normal'
+                wild_stab_bonus = 1.0
+                wild_type_mod = 1.0
+                wild_move_accuracy = 100.0
         else:
             # 如果没有move_repo或野怪没有招式，使用原始逻辑
             # 模拟野怪使用其类型的招式
@@ -563,6 +604,12 @@ class AdventureService:
                 # 如果野怪招式类型与野怪属性相同，则有STAB加成
                 if wild_move_type in wild_types:
                     wild_stab_bonus = 1.5
+                    # 计算属性克制
+                    wild_type_mod = self.calculate_type_effectiveness(wild_types, user_types)
+                else:
+                    wild_type_mod = self.calculate_type_effectiveness(wild_types, user_types)
+                # 设置默认命中率
+                wild_move_accuracy = 100.0  # 默认为100%
 
         # ----------------------
         # 2. 计算每回合伤害 (DPT) - 考虑随机波动
@@ -598,26 +645,31 @@ class AdventureService:
         user_hp = max(1, user_pokemon.stats.hp)
         wild_hp = max(1, wild_pokemon.stats.hp)
 
-        # 检查是否可以一击必杀（最大伤害 >= 对方HP）
+        # 检查是否可以一击必杀（最大伤害 >= 对方HP），同时考虑命中率
         user_can_ohko = max_damage_to_wild >= wild_hp
         wild_can_ohko = max_damage_to_user >= user_hp
 
         # 初始化win_score
         win_score = 0.0
 
-        # 如果有一方可一击必杀，计算其成功概率
+        # 如果有一方可一击必杀，计算其成功概率，同时考虑命中率
         if user_can_ohko and not wild_can_ohko:
             # 用户可以一击必杀，但野怪不能
-            # 考虑用户先手优势
+            # 考虑用户先手优势和命中率
+            effective_user_ohko_chance = 1.0
+            if user_move_accuracy < 100:  # 如果不是必中招式
+                effective_user_ohko_chance = user_move_accuracy / 100.0
+
             if user_pokemon.stats.speed >= wild_pokemon.stats.speed:
                 # 用户先手，计算一击必杀的概率
                 if max_damage_to_wild >= wild_hp and min_damage_to_wild < wild_hp:
                     # 介于HP和最大伤害之间，计算精确击杀概率
                     ohko_chance = (max_damage_to_wild - wild_hp) / (max_damage_to_wild - min_damage_to_wild)
-                    win_score = ohko_chance * 3.0  # 给予高权重
+                    win_score = ohko_chance * effective_user_ohko_chance * 3.0  # 结合命中率
                 else:
                     # 肯定能击杀或肯定不能击杀
-                    win_score = 3.0 if max_damage_to_wild >= wild_hp else 0.0
+                    base_chance = 1.0 if max_damage_to_wild >= wild_hp else 0.0
+                    win_score = base_chance * effective_user_ohko_chance * 3.0  # 结合命中率
             else:
                 # 野怪先手，用户需要活过第一轮，然后反击击杀
                 if max_damage_to_user >= user_hp:
@@ -630,7 +682,7 @@ class AdventureService:
                 else:
                     user_survive_chance = 1.0
 
-                # 如果用户活过第一轮，再计算反击击杀概率
+                # 如果用户活过第一轮，再计算反击击杀概率，结合命中率
                 if user_survive_chance > 0:
                     user_ohko_chance = 0.0
                     if max_damage_to_wild >= wild_hp:
@@ -638,12 +690,18 @@ class AdventureService:
                             (max_damage_to_wild - wild_hp) / (max_damage_to_wild - min_damage_to_wild)
                             if max_damage_to_wild > min_damage_to_wild else 0.0
                         )
-                    win_score = user_survive_chance * user_ohko_chance * 2.0
+                    # 考虑反击招式的命中率
+                    effective_user_ohko_chance = user_ohko_chance * (user_move_accuracy / 100.0)
+                    win_score = user_survive_chance * effective_user_ohko_chance * 2.0
                 else:
-                    win_score = -3.0  # 野怪必定先手击杀
+                    win_score = -3.0 * (wild_move_accuracy / 100.0)  # 野怪必定先手击杀（考虑命中率）
 
         elif wild_can_ohko and not user_can_ohko:
             # 野怪可以一击必杀，但用户不能
+            effective_wild_ohko_chance = 1.0
+            if wild_move_accuracy < 100:  # 如果不是必中招式
+                effective_wild_ohko_chance = wild_move_accuracy / 100.0
+
             if wild_pokemon.stats.speed >= user_pokemon.stats.speed:
                 # 野怪先手，计算击杀概率
                 wild_ohko_chance = 0.0
@@ -652,7 +710,7 @@ class AdventureService:
                         (max_damage_to_user - user_hp) / (max_damage_to_user - min_damage_to_user)
                         if max_damage_to_user > min_damage_to_user else 0.0
                     )
-                win_score = -wild_ohko_chance * 3.0
+                win_score = -wild_ohko_chance * effective_wild_ohko_chance * 3.0  # 结合命中率
             else:
                 # 用户先手，需要击杀或活过野怪第一轮
                 user_kill_chance = 0.0
@@ -661,6 +719,8 @@ class AdventureService:
                         (max_damage_to_wild - wild_hp) / (max_damage_to_wild - min_damage_to_wild)
                         if max_damage_to_wild > min_damage_to_wild else 0.0
                     )
+                # 考虑用户招式的命中率
+                effective_user_kill_chance = user_kill_chance * (user_move_accuracy / 100.0)
 
                 # 野怪一击必杀概率
                 wild_ohko_chance = 0.0
@@ -669,10 +729,12 @@ class AdventureService:
                         (max_damage_to_user - user_hp) / (max_damage_to_user - min_damage_to_user)
                         if max_damage_to_user > min_damage_to_user else 0.0
                     )
+                # 考虑野怪招式的命中率
+                effective_wild_ohko_chance_for_prob = wild_ohko_chance * (wild_move_accuracy / 100.0)
 
                 # 用户胜率 = 先手击杀率 + (活过第一轮率 * 后续击杀率)
-                user_win_rate = user_kill_chance + (1 - wild_ohko_chance) * user_kill_chance
-                wild_win_rate = wild_ohko_chance
+                user_win_rate = effective_user_kill_chance + (1 - effective_wild_ohko_chance_for_prob) * effective_user_kill_chance
+                wild_win_rate = effective_wild_ohko_chance_for_prob
                 win_score = (user_win_rate - wild_win_rate) * 2.0
 
         elif user_can_ohko and wild_can_ohko:
@@ -683,14 +745,18 @@ class AdventureService:
                     (max_damage_to_wild - wild_hp) / (max_damage_to_wild - min_damage_to_wild)
                     if max_damage_to_wild > min_damage_to_wild else 0.0
                 ) if max_damage_to_wild >= wild_hp else 0.0
-                win_score = user_ohko_chance * 2.0
+                # 考虑用户招式的命中率
+                effective_user_ohko_chance = user_ohko_chance * (user_move_accuracy / 100.0)
+                win_score = effective_user_ohko_chance * 2.0
             elif wild_pokemon.stats.speed > user_pokemon.stats.speed:
                 # 野怪先手，用户败
                 wild_ohko_chance = 1.0 if min_damage_to_user >= user_hp else (
                     (max_damage_to_user - user_hp) / (max_damage_to_user - min_damage_to_user)
                     if max_damage_to_user > min_damage_to_user else 0.0
                 ) if max_damage_to_user >= user_hp else 0.0
-                win_score = -wild_ohko_chance * 2.0
+                # 考虑野怪招式的命中率
+                effective_wild_ohko_chance = wild_ohko_chance * (wild_move_accuracy / 100.0)
+                win_score = -effective_wild_ohko_chance * 2.0
             else:
                 # 速度相同，各50%先手概率
                 user_ohko_chance = 1.0 if min_damage_to_wild >= wild_hp else (
@@ -702,17 +768,26 @@ class AdventureService:
                     if max_damage_to_user > min_damage_to_user else 0.0
                 ) if max_damage_to_user >= user_hp else 0.0
 
+                # 考虑命中率
+                effective_user_ohko_chance = user_ohko_chance * (user_move_accuracy / 100.0)
+                effective_wild_ohko_chance = wild_ohko_chance * (wild_move_accuracy / 100.0)
+
                 # 各50%先手，计算期望胜率
-                user_first_win = user_ohko_chance
-                wild_first_win = wild_ohko_chance
+                user_first_win = effective_user_ohko_chance
+                wild_first_win = effective_wild_ohko_chance
                 win_score = (user_first_win - wild_first_win) * 1.0
         else:
             # 正常战斗情况，没有一击必杀
+            # 考虑命中率对平均伤害的影响
+            avg_damage_to_wild_with_accuracy = avg_damage_to_wild * (user_move_accuracy / 100.0)
+            avg_damage_to_user_with_accuracy = avg_damage_to_user * (wild_move_accuracy / 100.0)
+
             # 玩家打死野怪需要几下？ (向上取整)
-            avg_turns_to_kill_wild = math.ceil(wild_hp / max(1, avg_damage_to_wild))
+            # 使用考虑命中率的平均伤害
+            avg_turns_to_kill_wild = math.ceil(wild_hp / max(1, avg_damage_to_wild_with_accuracy)) if avg_damage_to_wild_with_accuracy > 0 else float('inf')
 
             # 野怪打死玩家需要几下？
-            avg_turns_to_kill_user = math.ceil(user_hp / max(1, avg_damage_to_user))
+            avg_turns_to_kill_user = math.ceil(user_hp / max(1, avg_damage_to_user_with_accuracy)) if avg_damage_to_user_with_accuracy > 0 else float('inf')
 
             # 使用平均回合数作为主要参考
             turns_to_kill_wild = avg_turns_to_kill_wild
@@ -739,14 +814,14 @@ class AdventureService:
                     # 同速，纯随机
                     win_score = 0.0
 
-            # 考虑伤害波动对胜率的影响
-            damage_ratio = avg_damage_to_wild / max(1, avg_damage_to_user)
-            if damage_ratio > 1.5:
+            # 考虑伤害波动对胜率的影响，结合命中率
+            adjusted_damage_ratio = (avg_damage_to_wild * (user_move_accuracy / 100.0)) / max(1, avg_damage_to_user * (wild_move_accuracy / 100.0))
+            if adjusted_damage_ratio > 1.5:
                 # 用户伤害远高于野怪，胜率增加
-                win_score += (damage_ratio - 1.0) * 0.5
-            elif damage_ratio < 2/3:
+                win_score += (adjusted_damage_ratio - 1.0) * 0.5
+            elif adjusted_damage_ratio < 2/3:
                 # 用户伤害远低于野怪，败率增加
-                win_score -= (1.0 - damage_ratio) * 0.5
+                win_score -= (1.0 - adjusted_damage_ratio) * 0.5
 
         # ----------------------
         # 4. 引入随机性 (Crit, Miss, Damage Roll) 并平滑胜率
