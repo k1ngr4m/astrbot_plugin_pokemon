@@ -163,10 +163,10 @@ class SqliteUserRepository(AbstractUserRepository):
             speed = stats["speed"]
 
             moves: PokemonMoves = pokemon["moves"]
-            move1_id = moves.move1_id
-            move2_id = moves.move2_id
-            move3_id = moves.move3_id
-            move4_id = moves.move4_id
+            move1_id = moves["move1_id"]
+            move2_id = moves["move2_id"]
+            move3_id = moves["move3_id"]
+            move4_id = moves["move4_id"]
             # 获取新记录的ID（先插入然后获取ID用于生成短码）
             cursor.execute(sql, (
                 user_id, species_id, nickname, level, exp, gender,

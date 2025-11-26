@@ -1,6 +1,6 @@
 from __future__ import annotations
 import datetime
-from typing import Optional, TypedDict, Dict
+from typing import Optional, TypedDict, Dict, List
 
 from dataclasses import dataclass
 

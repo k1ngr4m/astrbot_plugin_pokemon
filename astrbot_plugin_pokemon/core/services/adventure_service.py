@@ -302,8 +302,8 @@ class AdventureService:
         if battle_result is None:
             # 如果所有宝可梦都失败，使用所有尝试过的宝可梦的平均胜率
             if all_user_win_rates:
-                user_win_rate = sum(all_user_win_rates) / len(all_user_win_rates)
-                wild_win_rate = sum(all_wild_win_rates) / len(all_wild_win_rates)
+                user_win_rate = round(sum(all_user_win_rates) / len(all_user_win_rates), 2)
+                wild_win_rate = round(sum(all_wild_win_rates) / len(all_wild_win_rates), 2)
             else:
                 # 如果没有找到有效的宝可梦，返回失败结果
                 user_win_rate, wild_win_rate = 0.0, 100.0

@@ -57,6 +57,9 @@ class PokemonMoves:
     move3_id: int
     move4_id: int
 
+    def __getitem__(self, item):
+        return getattr(self, item)
+
 @dataclass
 class PokemonBaseStats:
     base_hp: int
@@ -139,7 +142,7 @@ class UserPokemonInfo:
     stats: PokemonStats
     ivs: PokemonIVs
     evs: PokemonEVs
-    moves: PokemonMoves | None = None
+    moves: PokemonMoves
     caught_time: Optional[str] = None
 
     def __getitem__(self, item):

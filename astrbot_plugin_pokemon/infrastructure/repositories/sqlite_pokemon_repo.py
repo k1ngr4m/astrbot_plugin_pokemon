@@ -85,6 +85,15 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             sp_defense_ev=row_dict['sp_defense_ev'],
             speed_ev=row_dict['speed_ev']
         )
+
+        # 构造 PokemonMoves 对象
+        moves = PokemonMoves(
+            move1_id=row_dict['move1_id'],
+            move2_id=row_dict['move2_id'],
+            move3_id=row_dict['move3_id'],
+            move4_id=row_dict['move4_id']
+        )
+
         row_dict = dict(row)
 
         row_dict.pop('created_at', None)
@@ -101,7 +110,7 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             stats=stats,
             ivs=ivs,
             evs=evs,
-            moves=None
+            moves=moves
         )
 
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
