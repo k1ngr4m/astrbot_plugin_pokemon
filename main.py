@@ -12,6 +12,7 @@ from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_team_repo import
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_battle_repo import SqliteBattleRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
 
@@ -87,6 +88,7 @@ class PokemonPlugin(Star):
         self.shop_repo = SqliteShopRepository(db_path)
         self.item_repo = SqliteItemRepository(db_path)
         self.move_repo = SqliteMoveRepository(db_path)
+        self.battle_repo = SqliteBattleRepository(db_path)
 
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
@@ -136,7 +138,8 @@ class PokemonPlugin(Star):
             user_repo=self.user_repo,
             exp_service=self.exp_service,
             config=self.game_config,
-            move_repo=self.move_repo
+            move_repo=self.move_repo,
+            battle_repo=self.battle_repo
         )
 
 
@@ -261,6 +264,12 @@ class PokemonPlugin(Star):
     async def run(self, event: AstrMessageEvent):
         """逃跑离开当前遇到的野生宝可梦"""
         async for r in self.adventure_handlers.run(event):
+            yield r
+
+    @filter.command("查看战斗")
+    async def view_battle_log(self, event: AstrMessageEvent):
+        """查看战斗日志。用法：/查看战斗 <日志ID>"""
+        async for r in self.adventure_handlers.view_battle_log(event):
             yield r
 
     # ====================== 道具相关指令 ======================

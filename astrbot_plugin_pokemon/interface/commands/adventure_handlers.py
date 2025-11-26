@@ -146,11 +146,14 @@ class AdventureHandlers:
                     message += f"  {i}. {battle_record['pokemon_name']} [{battle_record['pokemon_id']}] (Lv.{battle_record['level']}) - {pokemon_result} (胜率: {battle_record['win_rate']}%)\n"
                 message += "\n"
 
-            message += "📊 战斗胜率分析:\n"
-            message += f"最终我方胜率: {win_rates['user_win_rate']}%\n"
-            message += f"最终野生胜率: {win_rates['wild_win_rate']}%\n\n"
+            # message += "📊 战斗胜率分析:\n"
+            # message += f"最终我方胜率: {win_rates['user_win_rate']}%\n"
+            # message += f"最终野生胜率: {win_rates['wild_win_rate']}%\n\n"
 
             message += f"🎯 战斗结果: {battle_result}\n"
+            if d.log_id and d.log_id > 0:
+                message += f"📜 战斗日志已生成，ID: {d.log_id}\n"
+                message += f"💡 使用 /查看战斗 {d.log_id} 查看详细战斗过程\n"
 
             # 添加经验值信息
             if exp_details:
@@ -172,6 +175,54 @@ class AdventureHandlers:
                                 message += f"  🎉 恭喜 {pokemon_name}[{pokemon_id}] 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n\n"
             yield event.plain_result(message)
             return
+
+    async def view_battle_log(self, event: AstrMessageEvent):
+        """查看战斗日志"""
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        args = event.message_str.split()
+        if len(args) < 2:
+            yield event.plain_result("❌ 请提供战斗日志ID，例如：/查看战斗 1")
+            return
+
+        try:
+            log_id = int(args[1])
+        except ValueError:
+            yield event.plain_result("❌ 无效的战斗日志ID")
+            return
+
+        if not self.plugin.battle_repo:
+            yield event.plain_result("❌ 战斗日志系统未启用")
+            return
+
+        log = self.plugin.battle_repo.get_battle_log_by_id(log_id)
+        if not log:
+            yield event.plain_result("❌ 找不到该战斗日志")
+            return
+
+        # Check permission? Usually logs are public or user specific.
+        # If user specific:
+        # if log['user_id'] != user_id:
+        #     yield event.plain_result("❌ 你只能查看自己的战斗日志")
+        #     return
+        # For now, let's allow viewing any log if they have the ID.
+
+        message = f"📜 战斗日志 #{log['id']}\n\n"
+        message += f"时间: {log['created_at']}\n\n"
+        message += f"对手: {log['target_name']}\n\n"
+        message += f"结果: {'胜利' if log['result'] == 'success' else '失败'}\n\n"
+
+        log_data = log['log_data']
+        # log_data is a list of skirmishes
+        for i, skirmish in enumerate(log_data, 1):
+            message += f"=== 第 {i} 场对战 ===\n\n"
+            message += f"我方: {skirmish['pokemon_name']} (Lv.{skirmish['level']})\n\n"
+            message += f"胜率预测: {skirmish['win_rate']}%\n\n"
+            message += "详细过程:\n\n"
+            for line in skirmish['details']:
+                message += f"  {line}\n\n"
+            message += f"结果: {'胜利' if skirmish['result'] == 'win' else '失败'}\n\n"
+
+        yield event.plain_result(message)
 
     async def catch_pokemon(self, event: AstrMessageEvent):
         """处理捕捉野生宝可梦的指令"""

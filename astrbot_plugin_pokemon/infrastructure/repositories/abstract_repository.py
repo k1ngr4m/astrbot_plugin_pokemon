@@ -262,3 +262,13 @@ class AbstractMoveRepository(ABC):
     # 获取招式详细信息
     @abstractmethod
     def get_move_by_id(self, move_id: int) -> Dict[str, Any] | None: pass
+
+class AbstractBattleRepository(ABC):
+    """战斗日志数据仓储接口"""
+    # ==========增==========
+    # 添加战斗日志
+    @abstractmethod
+    def save_battle_log(self, user_id: str, target_name: str, log_data: List[str], result: str) -> None: pass
+
+    @abstractmethod
+    def get_battle_log_by_id(self, battle_log_id: int) -> Optional[Dict[str, Any]]: pass

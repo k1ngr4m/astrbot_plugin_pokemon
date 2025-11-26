@@ -28,6 +28,7 @@ class BattleMoveInfo:
     type_effectiveness: float
     stab_bonus: float
     move_id: int = 0
+    move_name: str = ""
 
 
 class AdventureService:
@@ -42,7 +43,8 @@ class AdventureService:
             user_repo: AbstractUserRepository,
             exp_service: ExpService,
             config: Dict[str, Any],
-            move_repo = None  # 为兼容性添加，可选参数
+            move_repo = None,
+            battle_repo = None
     ):
         self.adventure_repo = adventure_repo
         self.pokemon_repo = pokemon_repo
@@ -52,6 +54,7 @@ class AdventureService:
         self.exp_service = exp_service
         self.config = config
         self.move_repo = move_repo
+        self.battle_repo = battle_repo
         # ----------------------
         # 宝可梦属性克制表（第三世代及之后全属性，key: 攻击属性, value: {防御属性: 克制系数}）
         # ----------------------
@@ -285,33 +288,80 @@ class AdventureService:
 
             final_user_pokemon_info = user_pokemon_info  # 记录当前战斗的宝可梦信息
 
-            # 计算战斗胜率
+            # 1. Calculate Win Rate (Monte Carlo) - for display
             user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
             all_user_win_rates.append(user_win_rate)
             all_wild_win_rates.append(wild_win_rate)
 
-            # 随机决定战斗结果
-            import random
-            current_battle_result_str = "success" if random.random() * 100 < user_win_rate else "fail"
+            # 2. Execute Real Battle (One run, with logging)
+            # Use current wild HP (it might have been damaged by previous pokemon)
+            # But wait, wild_pokemon_info is passed in. If we want persistence, we need to track it.
+            # For now, let's assume fresh fight per pokemon as per original logic, 
+            # OR better: if we want "Team vs Wild", we should track wild HP.
+            # Given the original code didn't track wild HP explicitly across loop (it re-read wild_pokemon_info?), 
+            # actually wild_pokemon_info is an object. If we modify it, it persists?
+            # No, wild_pokemon_info is a Pydantic model or dataclass? It's from `WildPokemonInfo`.
+            # Let's assume we want to simulate a fresh fight for the "outcome" determination of THIS specific 1v1 matchup.
+            # If the user wins this 1v1, the battle is over (User caught/defeated wild).
+            # If user loses, next pokemon comes out.
+            # To be fair, the wild pokemon should keep its HP.
+            
+            # Let's initialize wild_hp outside the loop if we want persistence.
+            # But `wild_pokemon_info` has `stats.hp`.
+            # Let's use a local variable for wild_hp tracking across the team.
+            
+            # Actually, let's stick to the request: "Battle result changes to a random single battle".
+            # I will implement `execute_real_battle` which returns the log and result.
+            
+            battle_outcome, battle_log_data, remaining_wild_hp = self.execute_real_battle(
+                user_pokemon_info, wild_pokemon_info
+            )
 
-            # 记录当前宝可梦的战斗情况
+            # 3. Save Log
+            # We save one log entry per 1v1 skirmish? Or one big log?
+            # The user asked for "View [LogID]". If a battle has 3 skirmishes, it's better to have one ID.
+            # But the structure of `battle_logs` table is simple.
+            # Let's append to `battle_log` list and save ONE record at the end of `start_battle`.
+            
             battle_log.append({
                 "pokemon_id": user_pokemon_info.id,
                 "pokemon_name": user_pokemon_info.name,
-                "species_name": user_pokemon_info.species_id,  # 实际上应该是宝可梦的物种名称，这里暂时使用id
+                "species_name": user_pokemon_info.species_id,
                 "level": user_pokemon_info.level,
                 "win_rate": user_win_rate,
-                "result": current_battle_result_str
+                "result": battle_outcome,
+                "details": battle_log_data # Detailed turn-by-turn
             })
 
-            # 如果当前宝可梦获胜，跳出循环
+            current_battle_result_str = "success" if battle_outcome == "win" else "fail"
+
+            # If current pokemon wins, break
             if current_battle_result_str == "success":
                 battle_result = (user_win_rate, wild_win_rate)
                 battle_result_str = "success"
                 break
             else:
-                # 当前宝可梦失败，尝试下一个宝可梦
+                # Current pokemon lost
                 current_pokemon_index += 1
+                # Ideally update wild_pokemon_info HP for next fight?
+                # wild_pokemon_info.stats.hp = remaining_wild_hp
+                # But `stats` might be shared or immutable. 
+                # Let's just proceed. The `execute_real_battle` will start with whatever HP is passed.
+                # If we want persistence, we must update `wild_pokemon_info`.
+                wild_pokemon_info.stats.hp = max(0, remaining_wild_hp)
+
+        # Save the full battle log to DB
+        log_id = 0
+        if self.battle_repo:
+            full_log = [entry["details"] for entry in battle_log]
+            # Flatten the log or keep structure?
+            # Let's store the list of skirmishes.
+            log_id = self.battle_repo.save_battle_log(
+                user_id=user_id, 
+                target_name=wild_pokemon_info.name, 
+                log_data=battle_log, 
+                result=battle_result_str
+            )
 
         # 如果所有宝可梦都失败了，则战斗失败
         if battle_result is None:
@@ -397,7 +447,8 @@ class AdventureService:
                 },
                 result=battle_result_str,
                 exp_details=exp_details,
-                battle_log=battle_log
+                battle_log=battle_log,
+                log_id=log_id # Return the log ID
             )
         )
 
@@ -433,7 +484,7 @@ class AdventureService:
         # Default move (Struggle-like)
         default_move = BattleMoveInfo(
             power=50, accuracy=100.0, type_name='normal',
-            damage_class_id=2, priority=0, type_effectiveness=1.0, stab_bonus=1.0, move_id=0
+            damage_class_id=2, priority=0, type_effectiveness=1.0, stab_bonus=1.0, move_id=0, move_name="默认招式"
         )
 
         if not self.move_repo or not valid_moves:
@@ -448,6 +499,7 @@ class AdventureService:
             if power == 0:  # Status move, ignore for now
                 continue
 
+            move_name = move_data.get('name_zh', 'Unknown Move')
             accuracy = move_data.get('accuracy', 100) or 100
             type_name = move_data.get('type_name', 'normal')
             damage_class = move_data.get('damage_class_id', 2)  # 2 phys, 3 spec
@@ -469,6 +521,7 @@ class AdventureService:
             if damage_score > max_expected_damage:
                 max_expected_damage = damage_score
                 best_move = BattleMoveInfo(
+                    move_name=move_name,
                     power=power,
                     accuracy=float(accuracy),
                     type_name=type_name,
@@ -507,6 +560,85 @@ class AdventureService:
         final_damage = base_damage * move.type_effectiveness * move.stab_bonus * crit_multiplier * random_multiplier
 
         return int(final_damage)
+
+    def execute_real_battle(self, user_pokemon: UserPokemonInfo, wild_pokemon: WildPokemonInfo) -> Tuple[str, List[str], int]:
+        """
+        Execute a single real battle simulation and return log and result.
+        Returns: (result_str, log_lines, remaining_wild_hp)
+        """
+        user_best_move = self.get_best_move(user_pokemon, wild_pokemon)
+        wild_best_move = self.get_best_move(wild_pokemon, user_pokemon)
+
+        cur_user_hp = user_pokemon.stats.hp
+        cur_wild_hp = wild_pokemon.stats.hp
+
+        log_lines = []
+        log_lines.append(f"战斗开始！{user_pokemon.name} (Lv.{user_pokemon.level}) VS {wild_pokemon.name} (Lv.{wild_pokemon.level})\n\n")
+        log_lines.append(f"{user_pokemon.name} HP: {cur_user_hp}, {wild_pokemon.name} HP: {cur_wild_hp}\n\n")
+
+        turn = 0
+        max_turns = 50
+        result = "fail"
+
+        while cur_user_hp > 0 and cur_wild_hp > 0 and turn < max_turns:
+            turn += 1
+            log_lines.append(f"--- 第 {turn} 回合 ---\n\n")
+
+            user_first = self.user_goes_first(
+                user_pokemon.stats.speed,
+                wild_pokemon.stats.speed,
+                user_best_move,
+                wild_best_move
+            )
+
+            first_attacker = user_pokemon if user_first else wild_pokemon
+            second_attacker = wild_pokemon if user_first else user_pokemon
+            first_move = user_best_move if user_first else wild_best_move
+            second_move = wild_best_move if user_first else user_best_move
+
+            # First Attack
+            dmg = self.resolve_damage(first_attacker, second_attacker, first_move)
+            if user_first:
+                cur_wild_hp -= dmg
+                log_lines.append(f"{user_pokemon.name} 使用了 {first_move.type_name} 属性招式 {first_move.move_name} ！造成了 {dmg} 点伤害。\n\n")
+                if cur_wild_hp <= 0:
+                    log_lines.append(f"{wild_pokemon.name} 倒下了！\n\n")
+                    result = "win"
+                    break
+            else:
+                cur_user_hp -= dmg
+                log_lines.append(f"{wild_pokemon.name} 使用了 {first_move.type_name} 属性招式 {first_move.move_name} ！造成了 {dmg} 点伤害。\n\n")
+                if cur_user_hp <= 0:
+                    log_lines.append(f"{user_pokemon.name} 倒下了！\n\n")
+                    result = "fail"
+                    break
+
+            # Second Attack
+            dmg = self.resolve_damage(second_attacker, first_attacker, second_move)
+            if user_first:
+                cur_user_hp -= dmg
+                log_lines.append(f"{wild_pokemon.name} 使用了 {second_move.type_name} 属性招式 {second_move.move_name} ！造成了 {dmg} 点伤害。\n\n")
+                if cur_user_hp <= 0:
+                    log_lines.append(f"{user_pokemon.name} 倒下了！\n\n")
+                    result = "fail"
+                    break
+            else:
+                cur_wild_hp -= dmg
+                log_lines.append(f"{user_pokemon.name} 使用了 {second_move.type_name} 属性招式 {second_move.move_name} ！造成了 {dmg} 点伤害。\n\n")
+                if cur_wild_hp <= 0:
+                    log_lines.append(f"{wild_pokemon.name} 倒下了！\n\n")
+                    result = "win"
+                    break
+            
+            log_lines.append(f"剩余HP - {user_pokemon.name}: {max(0, cur_user_hp)}, {wild_pokemon.name}: {max(0, cur_wild_hp)}\n\n")
+
+        if turn >= max_turns:
+            log_lines.append("战斗回合数达到上限，强制结束。\n\n")
+            # Determine winner by HP ratio? Or just fail?
+            # Usually fail if wild not dead.
+            result = "fail"
+
+        return result, log_lines, cur_wild_hp
 
     def user_goes_first(self, user_speed: int, wild_speed: int, user_move: BattleMoveInfo, wild_move: BattleMoveInfo) -> bool:
         if user_move.priority > wild_move.priority:

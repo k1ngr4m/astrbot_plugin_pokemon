@@ -47,3 +47,4 @@ class BattleResult:
     result: str
     exp_details: Dict[str, any]
     battle_log: List[Dict[str, any]] = None  # 战斗日志，记录所有参与战斗的宝可梦及结果
+    log_id: int = 0  # 战斗日志ID
