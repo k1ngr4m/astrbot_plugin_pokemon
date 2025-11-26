@@ -91,3 +91,42 @@ class SqliteMoveRepository(AbstractMoveRepository):
         except Exception as e:
             logger.error(f"获取宝可梦升级招式失败: {e}")
             return []
+
+    def get_move_by_id(self, move_id: int) -> Dict[str, Any] | None:
+        """
+        获取招式详细信息
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, name_en, name_zh, type_id, power, pp, accuracy,
+                           priority, target_id, damage_class_id, effect_id, effect_chance, description
+                    FROM moves
+                    WHERE id = ?
+                """, (move_id,))
+                row = cursor.fetchone()
+                if row:
+                    # 获取招式类型名称
+                    cursor.execute("SELECT name_zh FROM types WHERE id = ?", (row[3],))  # type_id
+                    type_row = cursor.fetchone()
+                    type_name = type_row[0] if type_row else "normal"
+
+                    return {
+                        "id": row[0],
+                        "name_en": row[1],
+                        "name_zh": row[2],
+                        "type_name": type_name.lower(),
+                        "power": row[4] if row[4] is not None else 0,
+                        "pp": row[5] if row[5] is not None else 1,
+                        "accuracy": row[6] if row[6] is not None else 100,
+                        "priority": row[7] if row[7] is not None else 0,
+                        "target_id": row[8],
+                        "damage_class_id": row[9],
+                        "effect_id": row[10],
+                        "effect_chance": row[11],
+                        "description": row[12]
+                    }
+        except Exception as e:
+            logger.error(f"获取招式详细信息失败: {e}")
+            return None

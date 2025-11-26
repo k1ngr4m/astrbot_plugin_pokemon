@@ -185,7 +185,7 @@ class WildPokemonInfo:
     stats: PokemonStats
     ivs: PokemonIVs
     evs: PokemonEVs
-    moves: PokemonMoves | None
+    moves: PokemonMoves
 
     def to_dict(self):
         def get_dict(obj):
