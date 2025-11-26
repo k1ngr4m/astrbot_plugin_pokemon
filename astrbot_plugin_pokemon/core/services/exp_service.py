@@ -123,66 +123,72 @@ class ExpService:
         根据新的等级计算并更新宝可梦的属性
         使用官方宝可梦公式: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5 或 + 10 (HP)
         """
-        try:
-            print(f"pokemon_info: {pokemon_id}, {species_id}, {new_level}, {user_id}")
-            # 获取宝可梦的种族值
-            species_data = self.pokemon_repo.get_pokemon_by_id(species_id)
-            if not species_data:
-                return False
-            # 获取宝可梦的IV和EV值
-            pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
-            if not pokemon_data:
-                return False
-            # 获取各种族值
-            base_data: PokemonBaseStats = species_data.base_stats
-            base_hp = base_data.base_hp
-            base_attack = base_data.base_attack
-            base_defense = base_data.base_defense
-            base_sp_attack = base_data.base_sp_attack
-            base_sp_defense = base_data.base_sp_defense
-            base_speed = base_data.base_speed
-
-            # 获取IV值
-            hp_iv = pokemon_data.ivs.hp_iv
-            attack_iv = pokemon_data.ivs.attack_iv
-            defense_iv = pokemon_data.ivs.defense_iv
-            sp_attack_iv = pokemon_data.ivs.sp_attack_iv
-            sp_defense_iv = pokemon_data.ivs.sp_defense_iv
-            speed_iv = pokemon_data.ivs.speed_iv
-            # 获取EV值
-            hp_ev = pokemon_data.evs.hp_ev
-            attack_ev = pokemon_data.evs.attack_ev
-            defense_ev = pokemon_data.evs.defense_ev
-            sp_attack_ev = pokemon_data.evs.sp_attack_ev
-            sp_defense_ev = pokemon_data.evs.sp_defense_ev
-            speed_ev = pokemon_data.evs.speed_ev
-
-            # 根据公式计算新属性值
-            # HP: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 等级 + 10
-            new_hp = int((base_hp * 2 + hp_iv + hp_ev // 4) * new_level / 100) + new_level + 10
-            # 非HP属性: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5
-            new_attack = int((base_attack * 2 + attack_iv + attack_ev // 4) * new_level / 100) + 5
-            new_defense = int((base_defense * 2 + defense_iv + defense_ev // 4) * new_level / 100) + 5
-            new_sp_attack = int((base_sp_attack * 2 + sp_attack_iv + sp_attack_ev // 4) * new_level / 100) + 5
-            new_sp_defense = int((base_sp_defense * 2 + sp_defense_iv + sp_defense_ev // 4) * new_level / 100) + 5
-            new_speed = int((base_speed * 2 + speed_iv + speed_ev // 4) * new_level / 100) + 5
-            new_pokemon_attributes = {
-                'hp': new_hp,
-                'attack': new_attack,
-                'defense': new_defense,
-                'sp_attack': new_sp_attack,
-                'sp_defense': new_sp_defense,
-                'speed': new_speed,
-            }
-            # 更新宝可梦的属性
-            self.pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
-
-
-
-            return True
-        except Exception as e:
-            print(f"更新宝可梦属性时出错: {e}")
+        def calculate_stat(base: int, iv: int, ev: int, level: int, is_hp: bool = False) -> int:
+            """
+            根据种族值、IV、EV、等级计算最终属性值
+            Args:
+                base: 种族值
+                iv: 个体值
+                ev: 努力值
+                level: 等级
+                is_hp: 是否为HP属性（HP公式不同）
+            """
+            base_calculation = (base * 2 + iv + ev // 4) * level / 100
+            if is_hp:
+                return int(base_calculation) + level + 10
+            return int(base_calculation) + 5
+        # 获取宝可梦的种族值
+        species_data = self.pokemon_repo.get_pokemon_by_id(species_id)
+        if not species_data:
             return False
+        # 获取宝可梦的IV和EV值
+        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_data:
+            return False
+        # 获取各种族值
+        base_data: PokemonBaseStats = species_data.base_stats
+        base_hp = base_data.base_hp
+        base_attack = base_data.base_attack
+        base_defense = base_data.base_defense
+        base_sp_attack = base_data.base_sp_attack
+        base_sp_defense = base_data.base_sp_defense
+        base_speed = base_data.base_speed
+
+        # 获取IV值
+        hp_iv = pokemon_data.ivs.hp_iv
+        attack_iv = pokemon_data.ivs.attack_iv
+        defense_iv = pokemon_data.ivs.defense_iv
+        sp_attack_iv = pokemon_data.ivs.sp_attack_iv
+        sp_defense_iv = pokemon_data.ivs.sp_defense_iv
+        speed_iv = pokemon_data.ivs.speed_iv
+        # 获取EV值
+        hp_ev = pokemon_data.evs.hp_ev
+        attack_ev = pokemon_data.evs.attack_ev
+        defense_ev = pokemon_data.evs.defense_ev
+        sp_attack_ev = pokemon_data.evs.sp_attack_ev
+        sp_defense_ev = pokemon_data.evs.sp_defense_ev
+        speed_ev = pokemon_data.evs.speed_ev
+
+        # 根据公式计算新属性值
+        # HP: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 等级 + 10
+        new_hp = calculate_stat(base_hp, hp_iv, hp_ev, new_level, is_hp=True)
+        # 非HP属性: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5
+        new_attack = calculate_stat(base_attack, attack_iv, attack_ev, new_level)
+        new_defense = calculate_stat(base_defense, defense_iv, defense_ev, new_level)
+        new_sp_attack = calculate_stat(base_sp_attack, sp_attack_iv, sp_attack_ev, new_level)
+        new_sp_defense = calculate_stat(base_sp_defense, sp_defense_iv, sp_defense_ev, new_level)
+        new_speed = calculate_stat(base_speed, speed_iv, speed_ev, new_level)
+        new_pokemon_attributes = {
+            'hp': new_hp,
+            'attack': new_attack,
+            'defense': new_defense,
+            'sp_attack': new_sp_attack,
+            'sp_defense': new_sp_defense,
+            'speed': new_speed,
+        }
+        # 更新宝可梦的属性
+        self.pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
+        return True
 
     def update_team_pokemon_after_battle(self, user_id: str, team_pokemon_ids: list, exp_gained: int) -> list:
         """
