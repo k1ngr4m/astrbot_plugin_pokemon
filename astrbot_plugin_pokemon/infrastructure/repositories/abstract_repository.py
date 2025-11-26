@@ -87,14 +87,6 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def add_pokemon_evolution_template(self, evolution_data: Dict[str, Any]) -> None: pass
 
-    # 添加宝可梦招式模板
-    @abstractmethod
-    def add_pokemon_move_template(self, move_data: Dict[str, Any]) -> None: pass
-
-    # 添加宝可梦物种招式模板
-    @abstractmethod
-    def add_pokemon_species_move_template(self, species_move_data: Dict[str, Any]) -> None: pass
-
     # 添加野生宝可梦遇到记录
     @abstractmethod
     def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon_id: int, location_id: int, encounter_rate: float) -> None: pass
@@ -246,3 +238,15 @@ class AbstractItemRepository(ABC):
     """物品数据仓储接口"""
     @abstractmethod
     def get_item_name(self, item_id: int) -> Optional[str]: pass
+
+
+class AbstractMoveRepository(ABC):
+    """技能数据仓储接口"""
+    # ==========增==========
+    # 添加技能模板
+    @abstractmethod
+    def add_move_template(self, move_data: Dict[str, Any]) -> None: pass
+
+    # 添加宝可梦物种招式模板
+    @abstractmethod
+    def add_pokemon_species_move_template(self, pokemon_moves_data: Dict[str, Any]) -> None: pass

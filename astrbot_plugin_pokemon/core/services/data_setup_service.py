@@ -1,10 +1,13 @@
 import os
 import pandas as pd
+import glob
+import re
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository,
     AbstractAdventureRepository,
     AbstractShopRepository,
+    AbstractMoveRepository,
 )
 from astrbot.api import logger
 
@@ -15,12 +18,14 @@ class DataSetupService:
     def __init__(self,
                  pokemon_repo: AbstractPokemonRepository,
                  adventure_repo: AbstractAdventureRepository,
-                 shop_repo=AbstractShopRepository,
+                 shop_repo: AbstractShopRepository,
+                 move_repo: AbstractMoveRepository,
                  data_path: str = None
                  ):
         self.pokemon_repo = pokemon_repo
         self.adventure_repo = adventure_repo
         self.shop_repo = shop_repo
+        self.move_repo = move_repo
         # 如果未指定路径，则使用相对于插件根目录的路径
         if data_path is None:
             plugin_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -61,6 +66,8 @@ class DataSetupService:
         items_df = self._read_csv_data("items.csv")
         locations_df = self._read_csv_data("locations.csv")
         location_pokemon_df = self._read_csv_data("location_pokemon.csv")
+        moves_df = self._read_csv_data("moves.csv")
+        pokemon_moves_df = self._read_csv_data("pokemon_moves.csv")
         # 注意：初始数据中的其他数据（如技能、冒险区域等）可能仍需要从其他来源获取
         # 我们假设这些数据仍然在initial_data.py中，或者需要创建对应的CSV文件
 
@@ -196,3 +203,43 @@ class DataSetupService:
                     logger.error(f"处理地点宝可梦关联数据时出错 (Location: {loc_pokemon_row.get('location_id', 'Unknown')}, Pokemon: {loc_pokemon_row.get('pokemon_species_id', 'Unknown')}): {e}")
                     continue
 
+        # 填充技能数据
+        if not moves_df.empty:
+            for _, move_row in moves_df.iterrows():
+                try:
+                    move_data = {
+                        "id": int(move_row['id']),
+                        "name_en": str(move_row['name_en']),
+                        "name_zh": str(move_row['name_zh']) if pd.notna(move_row['name_zh']) else None,
+                        "generation_id": int(move_row['generation_id']),
+                        "type_id": int(move_row['type_id']),
+                        "power": int(move_row['power']) if pd.notna(move_row['power']) else None,
+                        "pp": int(move_row['pp']) if pd.notna(move_row['pp']) else None,
+                        "accuracy": int(move_row['accuracy']) if pd.notna(move_row['accuracy']) else None,
+                        "priority": int(move_row['priority']) if pd.notna(move_row['priority']) else 0,
+                        "target_id": int(move_row['target_id']),
+                        "damage_class_id": int(move_row['damage_class_id']),
+                        "effect_id": int(move_row['effect_id']) if pd.notna(move_row['effect_id']) else None,
+                        "effect_chance": int(move_row['effect_chance']) if pd.notna(move_row['effect_chance']) else None,
+                        "description": str(move_row['description']) if pd.notna(move_row['description']) else ""
+                    }
+                    self.move_repo.add_move_template(move_data)
+
+
+                except (ValueError, TypeError) as e:
+                    logger.error(f"处理技能数据时出错 (ID: {move_row.get('id', 'Unknown')}): {e}")
+                    continue
+
+        if not pokemon_moves_df.empty:
+            for _, pokemon_move_row in pokemon_moves_df.iterrows():
+                try:
+                    pokemon_move_data = {
+                        "pokemon_species_id": int(pokemon_move_row['pokemon_id']),
+                        "move_id": int(pokemon_move_row['move_id']),
+                        "move_method_id": int(pokemon_move_row['pokemon_move_method_id']),
+                        "level": int(pokemon_move_row['level']) if pd.notna(pokemon_move_row['level']) else 0
+                    }
+                    self.move_repo.add_pokemon_species_move_template(pokemon_move_data)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"处理宝可梦技能学习数据时出错 (ID: {pokemon_move_row.get('id', 'Unknown')}): {e}")
+                    continue

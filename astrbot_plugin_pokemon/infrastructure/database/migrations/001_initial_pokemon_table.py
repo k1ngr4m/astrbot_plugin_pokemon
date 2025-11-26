@@ -49,25 +49,52 @@ def up(cursor: sqlite3.Cursor):
         );
     """)
 
-    # --- 3. 宝可梦技能定义（不完全，有点复杂，先放着） ---
+    # --- 技能表 ---
+    cursor.execute("""
+                   CREATE TABLE IF NOT EXISTS moves
+                   (
+                       id              INTEGER PRIMARY KEY,  -- 技能ID (来自CSV)
+                       name_en         TEXT NOT NULL,        -- 英文名
+                       name_zh         TEXT,                 -- 中文名
+                       generation_id   INTEGER,              -- 世代ID
+                       type_id         INTEGER,              -- 属性ID
+                       power           INTEGER,              -- 威力
+                       pp              INTEGER,              -- PP值
+                       accuracy        INTEGER,              -- 命中率
+                       priority        INTEGER,              -- 优先度
+                       target_id       INTEGER,              -- 目标ID
+                       damage_class_id INTEGER,              -- 伤害类别ID (物理/特殊/变化)
+                       effect_id       INTEGER,              -- 效果ID
+                       effect_chance   INTEGER,              -- 效果触发几率
+                       description     TEXT,                 -- 描述
+                       isdel           TINYINT(10) DEFAULT 0 -- 是否已删除
+                   );
+                   """)
+
+    # 索引
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_moves_name_en ON moves(name_en)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_moves_name_zh ON moves(name_zh)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_moves_type_id ON moves(type_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_moves_damage_class_id ON moves(damage_class_id)")
+
+    # --- 3. 宝可梦技能定义 ---
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS pokemon_moves (
             id INTEGER PRIMARY KEY AUTOINCREMENT, -- 技能ID
-            name TEXT NOT NULL,                   -- 技能名称
-            type_id INTEGER,                      -- 技能属性
-            category TEXT CHECK(category IN ('Physical','Special','Status')) NOT NULL,
-            power INTEGER,
-            accuracy INTEGER,
-            pp INTEGER,
-            description TEXT,                     -- 技能描述
-            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
-            FOREIGN KEY (type_id) REFERENCES pokemon_types(id)
+            pokemon_species_id INTEGER,
+            move_id INTEGER,
+            move_method_id INTEGER,
+            level INTEGER,
+            FOREIGN KEY (pokemon_species_id) REFERENCES pokemon_species(id),
+            FOREIGN KEY (move_id) REFERENCES moves(id)
         );
     """)
 
     # pokemon_moves表索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_name ON pokemon_moves(name)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(type_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_name ON pokemon_moves(pokemon_species_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(move_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(move_method)")
+
 
     # --- 4. 道具系统 ---
     cursor.execute("""
@@ -139,23 +166,6 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("""CREATE INDEX idx_pokemon_evolution_evolved_species_id ON pokemon_evolutions(evolved_species_id);""")
     cursor.execute("""CREATE INDEX idx_pokemon_evolution_evolution_trigger_id ON pokemon_evolutions(evolution_trigger_id);""")
 
-    # 7. 宝可梦种族-技能学习关系表（待重构）
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pokemon_species_moves (
-            species_id INTEGER NOT NULL,          -- 宝可梦种族ID
-            move_id INTEGER NOT NULL,             -- 技能ID
-            learn_method TEXT CHECK(learn_method IN ('LevelUp','EggMove','TM','HM','Tutor','Initial')) NOT NULL,
-            learn_value TEXT NOT NULL,            -- 学习条件（等级/道具编号/无）
-            isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
-            PRIMARY KEY (species_id, move_id, learn_method), -- 复合唯一键
-            FOREIGN KEY (species_id) REFERENCES pokemon_species(id) ON DELETE CASCADE,
-            FOREIGN KEY (move_id) REFERENCES pokemon_moves(id) ON DELETE CASCADE
-        );
-    """)
-
-    # pokemon_species_moves表索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_moves_species_id ON pokemon_species_moves(species_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_moves_move_id ON pokemon_species_moves(move_id)")
 
     # --- 8. 冒险地点 ---
     cursor.execute("""

@@ -11,7 +11,9 @@ from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_pokemon_repo imp
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_team_repo import SqliteTeamRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
+from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
 
 from .astrbot_plugin_pokemon.interface.commands.common_handlers import CommonHandlers
 from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers
@@ -82,7 +84,9 @@ class PokemonPlugin(Star):
         self.team_repo = SqliteTeamRepository(db_path)
         self.adventure_repo = SqliteAdventureRepository(db_path)
         self.shop_repo = SqliteShopRepository(db_path)
+        self.shop_repo = SqliteShopRepository(db_path)
         self.item_repo = SqliteItemRepository(db_path)
+        self.move_repo = SqliteMoveRepository(db_path)
 
 
         # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
@@ -159,7 +163,7 @@ class PokemonPlugin(Star):
         # --- 4. 启动后台任务 ---
 
         # --- 5. 初始化核心游戏数据 ---
-        data_setup_service = DataSetupService(self.pokemon_repo, self.adventure_repo, self.shop_repo)
+        data_setup_service = DataSetupService(self.pokemon_repo, self.adventure_repo, self.shop_repo, self.move_repo)
         data_setup_service.setup_initial_data()
 
         # --- Web后台配置 ---

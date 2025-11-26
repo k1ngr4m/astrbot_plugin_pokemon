@@ -207,15 +207,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             """, {**data})
             conn.commit()
 
-    def add_pokemon_species_move_template(self, data: Dict[str, Any]) -> None:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR IGNORE INTO pokemon_species_moves
-                (species_id, move_id, learn_method, learn_value)
-                VALUES (:species_id, :move_id, :learn_method, :learn_value)
-            """, {**data})
-            conn.commit()
 
     def get_pokemon_types(self, species_id: int) -> List[str]:
         with self._get_connection() as conn:
