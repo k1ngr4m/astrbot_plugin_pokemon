@@ -403,8 +403,7 @@ class AdventureService:
                     effectiveness *= self.TYPE_CHART[type_name].get(def_type_name, 1.0)
         return effectiveness
 
-    def calculate_battle_win_rate(self, user_pokemon: UserPokemonInfo, wild_pokemon: WildPokemonInfo,
-                                  skill_type: str = 'special') -> Tuple[float, float]:
+    def calculate_battle_win_rate(self, user_pokemon: UserPokemonInfo, wild_pokemon: WildPokemonInfo) -> Tuple[float, float]:
         """
         计算宝可梦战斗胜率 (基于真实伤害公式与击杀回合数模拟)
 
@@ -443,18 +442,24 @@ class AdventureService:
         # 野怪对玩家的克制
         # 我们已经在前面的招式选择逻辑中计算了具体招式的克制系数，直接使用即可
 
-        # 确定攻防属性
-        # 玩家：指定了物理/特殊
-        user_atk_val = user_pokemon.stats.attack if skill_type == 'physical' else user_pokemon.stats.sp_attack
-        wild_def_val_for_user = wild_pokemon.stats.defense if skill_type == 'physical' else wild_pokemon.stats.sp_defense
+        # 在这里不再预先确定攻防属性，而是根据每个招式来确定
+        # 玩家：智能选择它较高的攻击属性 (模拟用户使用指定类型中高伤的招式)
+        if user_pokemon.stats.attack > user_pokemon.stats.sp_attack:
+            preferred_user_atk_stat = 'attack'
+        else:
+            preferred_user_atk_stat = 'sp_attack'
 
         # 野怪：智能选择它较高的攻击属性 (模拟野生宝可梦使用本系高攻技能)
         if wild_pokemon.stats.attack > wild_pokemon.stats.sp_attack:
-            wild_atk_val = wild_pokemon.stats.attack
-            user_def_val_for_wild = user_pokemon.stats.defense
+            preferred_wild_atk_stat = 'attack'
         else:
-            wild_atk_val = wild_pokemon.stats.sp_attack
-            user_def_val_for_wild = user_pokemon.stats.sp_defense
+            preferred_wild_atk_stat = 'sp_attack'
+
+        # 初始化用户和野怪的攻防值 - 默认使用基于skill_type的值
+        user_atk_val = user_pokemon.stats.attack if preferred_user_atk_stat == 'attack' else user_pokemon.stats.sp_attack
+        wild_def_val_for_user = wild_pokemon.stats.defense if preferred_user_atk_stat == 'attack' else wild_pokemon.stats.sp_defense
+        wild_atk_val = wild_pokemon.stats.attack if preferred_wild_atk_stat == 'attack' else wild_pokemon.stats.sp_attack
+        user_def_val_for_wild = user_pokemon.stats.defense if preferred_wild_atk_stat == 'attack' else user_pokemon.stats.sp_defense
 
         # 获取宝可梦的招式
         user_moves = [user_pokemon.moves.move1_id, user_pokemon.moves.move2_id,
@@ -480,14 +485,15 @@ class AdventureService:
                     is_special = move_damage_class == 3
 
                     # 只考虑与攻击类型匹配的招式
-                    if (skill_type == 'physical' and is_physical) or (skill_type == 'special' and is_special):
+                    if (preferred_user_atk_stat == 'attack' and is_physical) or \
+                       (preferred_user_atk_stat == 'sp_attack' and is_special):
                         move_power = move_info.get('power', 80)
                         move_type = move_info.get('type_name', '')
                         move_accuracy = move_info.get('accuracy', 100)  # 命中率，如果为None则默认100%
 
                         # 计算该招式的预期伤害
-                        damage_class_atk_val = user_pokemon.stats.attack if is_physical else user_pokemon.stats.sp_attack
-                        damage_class_def_val = wild_pokemon.stats.defense if is_physical else wild_pokemon.stats.sp_defense
+                        move_atk_val = user_pokemon.stats.attack if is_physical else user_pokemon.stats.sp_attack
+                        move_def_val = wild_pokemon.stats.defense if is_physical else wild_pokemon.stats.sp_defense
 
                         # 计算属性克制系数
                         move_type_effectiveness = self.calculate_type_effectiveness([move_type], wild_types)
@@ -496,7 +502,7 @@ class AdventureService:
                         stab_bonus = 1.5 if move_type in user_types else 1.0
 
                         # 计算预期伤害（考虑命中率）
-                        expected_damage = ((2 * user_pokemon.level / 5 + 2) * damage_class_atk_val * move_power / max(1, damage_class_def_val)) / 50 + 2
+                        expected_damage = ((2 * user_pokemon.level / 5 + 2) * move_atk_val * move_power / max(1, move_def_val)) / 50 + 2
                         expected_damage *= move_type_effectiveness * stab_bonus * 0.925  # 0.925是平均随机浮动值
                         # 对于非必中招式，还要乘以命中率
                         if move_accuracy < 100:  # 不是必中招式
@@ -510,6 +516,11 @@ class AdventureService:
                             user_stab_bonus = stab_bonus
                             user_type_mod = move_type_effectiveness  # 保存招式的属性克制系数
                             user_move_accuracy = move_accuracy  # 保存招式命中率
+                            # 保存该招式的攻防类型用于后续的伤害计算
+                            user_atk_val = user_pokemon.stats.attack if is_physical else user_pokemon.stats.sp_attack
+                            wild_def_val_for_user = wild_pokemon.stats.defense if is_physical else wild_pokemon.stats.sp_defense
+                            # Also store the move's damage class for later use
+                            user_best_move_is_physical = is_physical
 
         # 获取野生宝可梦的招式
         wild_moves = [wild_pokemon.moves.move1_id, wild_pokemon.moves.move2_id,
@@ -518,21 +529,33 @@ class AdventureService:
         # 过滤出有效的招式ID
         valid_wild_moves = [move_id for move_id in wild_moves if move_id and move_id > 0]
 
-        # 获取野怪招式信息，选择预期伤害最高的招式
+        # 重新初始化野怪的攻击和防御值
+        wild_atk_val = wild_pokemon.stats.attack if preferred_wild_atk_stat == 'attack' else wild_pokemon.stats.sp_attack
+        user_def_val_for_wild = user_pokemon.stats.defense if preferred_wild_atk_stat == 'attack' else user_pokemon.stats.sp_defense
+
+        # 获取野怪招式信息，计算综合伤害
         wild_move_power = 80  # 默认值
         wild_move_type = ''   # 默认值
         wild_stab_bonus = 1.0  # STAB加成
         wild_type_mod = 1.0  # 招式属性克制系数
         wild_move_accuracy = 100.0  # 招式命中率（0-100，转换为0-1之间的值）
 
+        # 初始化野怪的伤害计算所需的变量
+        min_damage_to_user = 0  # 最小伤害
+        avg_damage_to_user = 0  # 平均伤害
+        max_damage_to_user = 0  # 最大伤害
+        wild_damage_calculated = False  # 标记是否已经计算了野怪的伤害
+
         if self.move_repo and valid_wild_moves:
-            total_wild_damage = 0
+            total_min_damage = 0
+            total_avg_damage = 0
+            total_max_damage = 0
             valid_move_count = 0
+
             # 为了模拟野怪的攻击偏重，我们根据野怪的攻击属性来决定使用哪种类型的招式
             prefers_physical = wild_pokemon.stats.attack >= wild_pokemon.stats.sp_attack
             preferred_skill_type = 'physical' if prefers_physical else 'special'
 
-            selected_moves = []  # 存储所有有效的招式信息
             for move_id in valid_wild_moves:
                 move_info = self.move_repo.get_move_by_id(move_id)
                 if move_info:
@@ -546,9 +569,9 @@ class AdventureService:
                         move_type = move_info.get('type_name', '')
                         move_accuracy = move_info.get('accuracy', 100)  # 命中率，如果为None则默认100%
 
-                        # 计算该招式的预期伤害
-                        damage_class_atk_val = wild_pokemon.stats.attack if is_physical else wild_pokemon.stats.sp_attack
-                        damage_class_def_val = user_pokemon.stats.defense if is_physical else user_pokemon.stats.sp_defense
+                        # 根据招式的实际类型计算攻防值
+                        move_atk_val = wild_pokemon.stats.attack if is_physical else wild_pokemon.stats.sp_attack
+                        move_def_val = user_pokemon.stats.defense if is_physical else user_pokemon.stats.sp_defense
 
                         # 计算属性克制系数
                         move_type_effectiveness = self.calculate_type_effectiveness([move_type], user_types)
@@ -556,45 +579,59 @@ class AdventureService:
                         # 计算STAB加成
                         stab_bonus = 1.5 if move_type in wild_types else 1.0
 
-                        # 计算预期伤害（考虑命中率）
-                        expected_damage = ((2 * wild_pokemon.level / 5 + 2) * damage_class_atk_val * move_power / max(1, damage_class_def_val)) / 50 + 2
-                        expected_damage *= move_type_effectiveness * stab_bonus * 0.925  # 0.925是平均随机浮动值
+                        # 计算不同随机系数下的伤害
+                        min_damage = ((2 * wild_pokemon.level / 5 + 2) * move_atk_val * move_power / max(1, move_def_val)) / 50 + 2
+                        min_damage *= move_type_effectiveness * stab_bonus * 0.85  # 最小随机系数
                         # 对于非必中招式，还要乘以命中率
                         if move_accuracy < 100:  # 不是必中招式
-                            expected_damage *= move_accuracy / 100.0
+                            min_damage *= move_accuracy / 100.0
 
-                        # 保存招式信息用于后续的平均伤害计算
-                        selected_moves.append({
-                            'move_power': move_power,
-                            'move_type': move_type,
-                            'stab_bonus': stab_bonus,
-                            'type_mod': move_type_effectiveness,
-                            'accuracy': move_accuracy,
-                            'expected_damage': expected_damage
-                        })
-                        total_wild_damage += expected_damage
+                        avg_damage = ((2 * wild_pokemon.level / 5 + 2) * move_atk_val * move_power / max(1, move_def_val)) / 50 + 2
+                        avg_damage *= move_type_effectiveness * stab_bonus * 0.925  # 平均随机系数
+                        if move_accuracy < 100:
+                            avg_damage *= move_accuracy / 100.0
+
+                        max_damage = ((2 * wild_pokemon.level / 5 + 2) * move_atk_val * move_power / max(1, move_def_val)) / 50 + 2
+                        max_damage *= move_type_effectiveness * stab_bonus * 1.0  # 最大随机系数
+                        if move_accuracy < 100:
+                            max_damage *= move_accuracy / 100.0
+
+                        # 累加到总和中，用于后续平均
+                        total_min_damage += min_damage
+                        total_avg_damage += avg_damage
+                        total_max_damage += max_damage
                         valid_move_count += 1
 
             # 如果有有效的招式，使用平均伤害来反映野怪的真实攻击能力
-            if selected_moves:
-                # 计算平均伤害用于后续的伤害计算，模拟野怪随机使用技能的特性
-                avg_wild_damage = total_wild_damage / valid_move_count
+            if valid_move_count > 0:
+                # 计算平均伤害，模拟野怪随机使用技能的特性
+                min_damage_to_user = total_min_damage / valid_move_count
+                avg_damage_to_user = total_avg_damage / valid_move_count
+                max_damage_to_user = total_max_damage / valid_move_count
+                wild_damage_calculated = True
 
-                # 为了保持一致性，我们选择第一个招式作为代表（或随机选择一个）
-                # 这样可以保持单个招式的属性信息用于后续计算
-                first_move = selected_moves[0]  # 使用列表中的第一个招式作为代表
-                wild_move_power = first_move['move_power']
-                wild_move_type = first_move['move_type']
-                wild_stab_bonus = first_move['stab_bonus']
-                wild_type_mod = first_move['type_mod']  # 保存招式的属性克制系数
-                wild_move_accuracy = first_move['accuracy']  # 保存招式命中率
-            else:
-                # 如果没有有效招式，使用默认值
-                wild_move_power = 80
-                wild_move_type = 'normal'
-                wild_stab_bonus = 1.0
-                wild_type_mod = 1.0
-                wild_move_accuracy = 100.0
+                # 还是设置一个代表性的招式用于后面的属性克制等信息（为了保持兼容性）
+                # 选择第一个有效招式作为代表
+                first_move_id = [mid for mid in valid_wild_moves
+                                if self.move_repo.get_move_by_id(mid) and
+                                ((preferred_skill_type == 'physical' and self.move_repo.get_move_by_id(mid).get('damage_class_id', 3) == 2) or
+                                 (preferred_skill_type == 'special' and self.move_repo.get_move_by_id(mid).get('damage_class_id', 3) == 3))][0] if any(self.move_repo.get_move_by_id(mid) and
+                                ((preferred_skill_type == 'physical' and self.move_repo.get_move_by_id(mid).get('damage_class_id', 3) == 2) or
+                                 (preferred_skill_type == 'special' and self.move_repo.get_move_by_id(mid).get('damage_class_id', 3) == 3)) for mid in valid_wild_moves) else valid_wild_moves[0] if valid_wild_moves else None
+
+                if first_move_id and self.move_repo.get_move_by_id(first_move_id):
+                    first_move_info = self.move_repo.get_move_by_id(first_move_id)
+                    wild_move_power = first_move_info.get('power', 80)
+                    wild_move_type = first_move_info.get('type_name', '')
+                    wild_move_accuracy = first_move_info.get('accuracy', 100)
+                    # 重新计算该招式的属性加成
+                    wild_type_mod = self.calculate_type_effectiveness([wild_move_type], user_types)
+                    wild_stab_bonus = 1.5 if wild_move_type in wild_types else 1.0
+                    # 重新计算攻防值
+                    move_damage_class = first_move_info.get('damage_class_id', 3)  # 3通常代表特殊攻击，2代表物理攻击
+                    is_wild_move_physical = move_damage_class == 2
+                    wild_atk_val = wild_pokemon.stats.attack if is_wild_move_physical else wild_pokemon.stats.sp_attack
+                    user_def_val_for_wild = user_pokemon.stats.defense if is_wild_move_physical else user_pokemon.stats.sp_defense
         else:
             # 如果没有move_repo或野怪没有招式，使用原始逻辑
             # 模拟野怪使用其类型的招式
@@ -610,6 +647,9 @@ class AdventureService:
                     wild_type_mod = self.calculate_type_effectiveness(wild_types, user_types)
                 # 设置默认命中率
                 wild_move_accuracy = 100.0  # 默认为100%
+            # Default attack and defense values
+            wild_atk_val = wild_pokemon.stats.attack if preferred_wild_atk_stat == 'attack' else wild_pokemon.stats.sp_attack
+            user_def_val_for_wild = user_pokemon.stats.defense if preferred_wild_atk_stat == 'attack' else user_pokemon.stats.sp_defense
 
         # ----------------------
         # 2. 计算每回合伤害 (DPT) - 考虑随机波动
@@ -627,15 +667,19 @@ class AdventureService:
         )
 
         # 计算野怪对玩家的伤害：最小、平均、最大
-        min_damage_to_user = calculate_damage(
-            wild_pokemon.level, wild_atk_val, user_def_val_for_wild, wild_move_power, wild_type_mod, wild_stab_bonus, 0.85
-        )
-        avg_damage_to_user = calculate_damage(
-            wild_pokemon.level, wild_atk_val, user_def_val_for_wild, wild_move_power, wild_type_mod, wild_stab_bonus, 0.925
-        )
-        max_damage_to_user = calculate_damage(
-            wild_pokemon.level, wild_atk_val, user_def_val_for_wild, wild_move_power, wild_type_mod, wild_stab_bonus, 1.0
-        )
+        # 如果已计算过野怪伤害，则使用计算好的值，否则使用单次计算
+        if not wild_damage_calculated:
+            min_damage_to_user = calculate_damage(
+                wild_pokemon.level, wild_atk_val, user_def_val_for_wild, wild_move_power, wild_type_mod, wild_stab_bonus, 0.85
+            )
+            avg_damage_to_user = calculate_damage(
+                wild_pokemon.level, wild_atk_val, user_def_val_for_wild, wild_move_power, wild_type_mod, wild_stab_bonus, 0.925
+            )
+            max_damage_to_user = calculate_damage(
+                wild_pokemon.level, wild_atk_val, user_def_val_for_wild, wild_move_power, wild_type_mod, wild_stab_bonus, 1.0
+            )
+        # 否则，使用已经计算好的伤害值（在野怪招式循环中计算的）
+        # 此时 min_damage_to_user, avg_damage_to_user, max_damage_to_user 已经被设置
 
         # ----------------------
         # 3. 计算击杀所需回合数 (Turns to Kill) - 考虑斩杀线波动
