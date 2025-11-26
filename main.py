@@ -135,7 +135,8 @@ class PokemonPlugin(Star):
             pokemon_service=self.pokemon_service,
             user_repo=self.user_repo,
             exp_service=self.exp_service,
-            config=self.game_config
+            config=self.game_config,
+            move_repo=self.move_repo
         )
 
 

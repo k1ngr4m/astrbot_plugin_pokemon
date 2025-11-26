@@ -108,7 +108,7 @@ class SqliteMoveRepository(AbstractMoveRepository):
                 row = cursor.fetchone()
                 if row:
                     # 获取招式类型名称
-                    cursor.execute("SELECT name_zh FROM types WHERE id = ?", (row[3],))  # type_id
+                    cursor.execute("SELECT name_en FROM pokemon_types WHERE id = ?", (row[3],))  # type_id
                     type_row = cursor.fetchone()
                     type_name = type_row[0] if type_row else "normal"
 
