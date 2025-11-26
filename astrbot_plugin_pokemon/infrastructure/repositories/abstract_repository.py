@@ -250,3 +250,7 @@ class AbstractMoveRepository(ABC):
     # 添加宝可梦物种招式模板
     @abstractmethod
     def add_pokemon_species_move_template(self, pokemon_moves_data: Dict[str, Any]) -> None: pass
+
+    # 批量添加宝可梦物种招式模板
+    @abstractmethod
+    def add_pokemon_species_move_templates_batch(self, pokemon_moves_list: List[Dict[str, Any]]) -> None: pass

@@ -231,15 +231,40 @@ class DataSetupService:
                     continue
 
         if not pokemon_moves_df.empty:
-            for _, pokemon_move_row in pokemon_moves_df.iterrows():
-                try:
-                    pokemon_move_data = {
-                        "pokemon_species_id": int(pokemon_move_row['pokemon_id']),
-                        "move_id": int(pokemon_move_row['move_id']),
-                        "move_method_id": int(pokemon_move_row['pokemon_move_method_id']),
-                        "level": int(pokemon_move_row['level']) if pd.notna(pokemon_move_row['level']) else 0
-                    }
-                    self.move_repo.add_pokemon_species_move_template(pokemon_move_data)
-                except (ValueError, TypeError) as e:
-                    logger.error(f"处理宝可梦技能学习数据时出错 (ID: {pokemon_move_row.get('id', 'Unknown')}): {e}")
-                    continue
+            # 对数据进行排序，按 pokemon_species_id (pokemon_id) 和 level 排序，确保数据有序
+            pokemon_moves_df_sorted = pokemon_moves_df.sort_values(['pokemon_id', 'pokemon_move_method_id']).reset_index(drop=True)
+
+            # 分批处理数据以提高性能，使用批量插入方法
+            batch_size = 1000  # 设置批量大小为1000条记录
+            total_rows = len(pokemon_moves_df_sorted)
+
+            for i in range(0, total_rows, batch_size):
+                batch_df = pokemon_moves_df_sorted.iloc[i:i + batch_size]
+
+                # 收集批量数据
+                batch_data = []
+                for _, pokemon_move_row in batch_df.iterrows():
+                    try:
+                        pokemon_move_data = {
+                            "pokemon_species_id": int(pokemon_move_row['pokemon_id']),
+                            "move_id": int(pokemon_move_row['move_id']),
+                            "move_method_id": int(pokemon_move_row['pokemon_move_method_id']),
+                            "level": int(pokemon_move_row['level']) if pd.notna(pokemon_move_row['level']) else 0
+                        }
+                        batch_data.append(pokemon_move_data)
+                    except (ValueError, TypeError) as e:
+                        logger.error(f"处理宝可梦技能学习数据时出错 (Pokemon ID: {pokemon_move_row.get('pokemon_id', 'Unknown')}, Move ID: {pokemon_move_row.get('move_id', 'Unknown')}): {e}")
+                        continue
+
+                # 批量插入数据
+                if batch_data:
+                    try:
+                        self.move_repo.add_pokemon_species_move_templates_batch(batch_data)
+                    except Exception as e:
+                        logger.error(f"批量插入宝可梦技能学习数据时出错: {e}")
+                        # 如果批量插入失败，尝试逐条插入
+                        for data in batch_data:
+                            try:
+                                self.move_repo.add_pokemon_species_move_template(data)
+                            except Exception as single_e:
+                                logger.error(f"单条插入宝可梦技能学习数据失败: {data}, 错误: {single_e}")
