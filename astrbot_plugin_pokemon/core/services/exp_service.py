@@ -115,6 +115,7 @@ class ExpService:
             "success": True,
             "exp_gained": exp_gained,
             "level_up_info": level_up_info,
+            "pokemon_id": pokemon_id,
             "pokemon_name": pokemon_data.name or '未知宝可梦'
         }
 

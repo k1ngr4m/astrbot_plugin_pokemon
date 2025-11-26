@@ -149,18 +149,19 @@ class AdventureHandlers:
                 team_pokemon_results = exp_details.get("team_pokemon_results", [])
 
                 if team_pokemon_results:
-                    message += f"\n📈 经验值获取:\n"
+                    message += f"\n📈 经验值获取:\n\n"
                     for i, pokemon_result in enumerate(team_pokemon_results):
                         if pokemon_result.get("success"):
                             exp_gained = pokemon_result.get("exp_gained", 0)
                             pokemon_name = pokemon_result.get("pokemon_name", f"宝可梦{i + 1}")
-                            message += f"  {pokemon_name} 获得了 {exp_gained} 点经验值\n"
+                            pokemon_id = pokemon_result.get("pokemon_id", 0)
+                            message += f"  {pokemon_name} 获得了 {exp_gained} 点经验值\n\n"
 
                             level_up_info = pokemon_result.get("level_up_info", {})
                             if level_up_info.get("should_level_up"):
                                 levels_gained = level_up_info.get("levels_gained", 0)
                                 new_level = level_up_info.get("new_level", 0)
-                                message += f"  🎉 恭喜 {pokemon_name} 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n"
+                                message += f"  🎉 恭喜 {pokemon_name}[{pokemon_id}] 升级了！等级提升 {levels_gained} 级，现在是 {new_level} 级！\n\n"
             yield event.plain_result(message)
             return
 

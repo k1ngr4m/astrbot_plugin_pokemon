@@ -240,20 +240,70 @@ class AdventureService:
             包含战斗结果的字典
         """
 
-        user_pokemon_id = user_team_list[0]
-        user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
-        # 计算战斗胜率
-        user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
+        # 如果没有提供队伍列表，从用户数据获取
+        if user_team_list is None:
+            user_team_data: UserTeam = self.team_repo.get_user_team(user_id)
+            if not user_team_data or not user_team_data.team_pokemon_ids:
+                return BaseResult(
+                    success=False,
+                    message=AnswerEnum.USER_TEAM_NOT_SET.value
+                )
+            user_team_list = user_team_data.team_pokemon_ids
 
-        # 随机决定战斗结果
-        import random
-        result = "success" if random.random() * 100 < user_win_rate else "fail"
+        # 按顺序使用队伍中的宝可梦进行战斗
+        current_pokemon_index = 0
+        battle_result = None
+        battle_result_str = "fail"  # 默认设为失败
+        final_user_pokemon_info = None
+        all_user_win_rates = []  # 存储所有尝试过的宝可梦的胜率
+        all_wild_win_rates = []  # 存储所有尝试过的宝可梦对应的野生宝可梦胜率
+
+        # 循环使用队伍中的宝可梦，直到有宝可梦获胜或队伍全部用完
+        while current_pokemon_index < len(user_team_list):
+            user_pokemon_id = user_team_list[current_pokemon_index]
+            user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
+
+            if not user_pokemon_info:
+                current_pokemon_index += 1
+                continue  # 如果该宝可梦不存在，跳到下一个
+
+            final_user_pokemon_info = user_pokemon_info  # 记录当前战斗的宝可梦信息
+
+            # 计算战斗胜率
+            user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_pokemon_info, wild_pokemon_info)
+            all_user_win_rates.append(user_win_rate)
+            all_wild_win_rates.append(wild_win_rate)
+
+            # 随机决定战斗结果
+            import random
+            battle_result_str = "success" if random.random() * 100 < user_win_rate else "fail"
+
+            # 如果当前宝可梦获胜，跳出循环
+            if battle_result_str == "success":
+                battle_result = (user_win_rate, wild_win_rate)
+                break
+            else:
+                # 当前宝可梦失败，尝试下一个宝可梦
+                current_pokemon_index += 1
+
+        # 如果所有宝可梦都失败了，则战斗失败
+        if battle_result is None:
+            # 如果所有宝可梦都失败，使用所有尝试过的宝可梦的平均胜率
+            if all_user_win_rates:
+                user_win_rate = sum(all_user_win_rates) / len(all_user_win_rates)
+                wild_win_rate = sum(all_wild_win_rates) / len(all_wild_win_rates)
+            else:
+                # 如果没有找到有效的宝可梦，返回失败结果
+                user_win_rate, wild_win_rate = 0.0, 100.0
+                battle_result_str = "fail"
+        else:
+            user_win_rate, wild_win_rate = battle_result
 
         # 处理经验值（仅在胜利时）
         exp_details = {}
-        if self.exp_service and result == "success":
+        if self.exp_service and battle_result_str == "success":
             # 计算宝可梦获得的经验值
-            pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_id=wild_pokemon_info.id, wild_pokemon_level=wild_pokemon_info.level, battle_result=result)
+            pokemon_exp_gained = self.exp_service.calculate_pokemon_exp_gain(wild_pokemon_id=wild_pokemon_info.id, wild_pokemon_level=wild_pokemon_info.level, battle_result=battle_result_str)
             # 获取用户队伍中的所有宝可梦
             user_team_data:UserTeam = self.team_repo.get_user_team(user_id)
             team_pokemon_results = []
@@ -268,7 +318,7 @@ class AdventureService:
                 "team_pokemon_results": team_pokemon_results
             }
 
-        elif self.exp_service and result != "success":
+        elif self.exp_service and battle_result_str != "success":
             # 战斗失败时不获得经验
             exp_details = {
                 "pokemon_exp": {"success": True, "exp_gained": 0, "message": AnswerEnum.BATTLE_FAILURE_NO_EXP.value},
@@ -286,7 +336,7 @@ class AdventureService:
                 encounter_log_id = encounter.id
                 break
         if encounter_log_id:
-            battle_outcome = "win" if result == "success" else "lose"
+            battle_outcome = "win" if battle_result_str == "success" else "lose"
             self.pokemon_repo.update_encounter_log(
                 log_id=encounter_log_id,
                 is_battled=1,
@@ -298,13 +348,13 @@ class AdventureService:
             message=AnswerEnum.BATTLE_SUCCESS.value,
             data=BattleResult(
                 user_pokemon={
-                    "name": user_pokemon_info.name,
-                    "species": user_pokemon_info.species_id,
-                    "level": user_pokemon_info.level,
-                    "hp": user_pokemon_info.stats.hp,
-                    "attack": user_pokemon_info.stats.attack,
-                    "defense": user_pokemon_info.stats.defense,
-                    "speed": user_pokemon_info.stats.speed
+                    "name": final_user_pokemon_info.name if final_user_pokemon_info else "Unknown",
+                    "species": final_user_pokemon_info.species_id if final_user_pokemon_info else 0,
+                    "level": final_user_pokemon_info.level if final_user_pokemon_info else 0,
+                    "hp": final_user_pokemon_info.stats.hp if final_user_pokemon_info else 0,
+                    "attack": final_user_pokemon_info.stats.attack if final_user_pokemon_info else 0,
+                    "defense": final_user_pokemon_info.stats.defense if final_user_pokemon_info else 0,
+                    "speed": final_user_pokemon_info.stats.speed if final_user_pokemon_info else 0
                 },
                 wild_pokemon={
                     "name": wild_pokemon_info.name,
@@ -318,7 +368,7 @@ class AdventureService:
                     "user_win_rate": user_win_rate,
                     "wild_win_rate": wild_win_rate
                 },
-                result=result,
+                result=battle_result_str,
                 exp_details=exp_details
             )
         )
