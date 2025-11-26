@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
 from ...core.models.pokemon_models import PokemonSpecies, PokemonBaseStats, PokemonDetail, WildPokemonInfo, \
-    WildPokemonEncounterLog, PokemonIVs, PokemonEVs, PokemonStats
+    WildPokemonEncounterLog, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves
 
 
 class SqlitePokemonRepository(AbstractPokemonRepository):
@@ -427,10 +427,11 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             sp_defense = stats.sp_defense
             speed = stats.speed
 
-            move1_id = None
-            move2_id = None
-            move3_id = None
-            move4_id = None
+            moves: PokemonMoves = pokemon.moves
+            move1_id = moves.move1_id
+            move2_id = moves.move2_id
+            move3_id = moves.move3_id
+            move4_id = moves.move4_id
 
             cursor.execute(sql, (
                 species_id, nickname, level, exp, gender,

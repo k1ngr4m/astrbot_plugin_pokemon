@@ -77,7 +77,7 @@ class UserPokemonService:
             evs = new_pokemon_data["evs"],
             moves = new_pokemon_data["moves"],
         )
-
+        print(f"user_pokemon_info: {user_pokemon_info}")
         # 创建用户宝可梦记录，使用模板数据完善实例
         self.user_repo.create_user_pokemon(user_id, user_pokemon_info,)
 

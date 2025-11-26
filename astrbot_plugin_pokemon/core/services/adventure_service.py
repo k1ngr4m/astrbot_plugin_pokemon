@@ -8,7 +8,7 @@ from .pokemon_service import PokemonService
 from ..models.common_models import BaseResult
 from ...interface.response.answer_enum import AnswerEnum
 from ..models.pokemon_models import WildPokemonInfo, PokemonStats, PokemonIVs, PokemonEVs, \
-    UserPokemonInfo, WildPokemonEncounterLog
+    UserPokemonInfo, WildPokemonEncounterLog, PokemonMoves
 from ..models.user_models import UserTeam, UserItems
 from ...infrastructure.repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository
@@ -179,7 +179,12 @@ class AdventureService:
                     sp_defense_ev=wild_pokemon.evs.sp_defense_ev,
                     speed_ev=wild_pokemon.evs.speed_ev,
                 ),
-                moves = None,
+                moves=PokemonMoves(
+                    move1_id=wild_pokemon.moves.move1_id,
+                    move2_id=wild_pokemon.moves.move2_id,
+                    move3_id=wild_pokemon.moves.move3_id,
+                    move4_id=wild_pokemon.moves.move4_id,
+                )
         )
         wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
 

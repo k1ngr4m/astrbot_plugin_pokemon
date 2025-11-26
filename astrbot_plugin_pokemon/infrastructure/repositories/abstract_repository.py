@@ -162,7 +162,7 @@ class AbstractTeamRepository(ABC):
     # ==========查==========
     # 获取用户的队伍配置
     @abstractmethod
-    def get_user_team(self, user_id: str) -> UserTeam: pass
+    def get_user_team(self, user_id: str) -> UserTeam | None: pass
 
 
 class AbstractAdventureRepository(ABC):
@@ -254,3 +254,7 @@ class AbstractMoveRepository(ABC):
     # 批量添加宝可梦物种招式模板
     @abstractmethod
     def add_pokemon_species_move_templates_batch(self, pokemon_moves_list: List[Dict[str, Any]]) -> None: pass
+
+    # 获取宝可梦升级招式
+    @abstractmethod
+    def get_level_up_moves(self, pokemon_species_id: int, level: int) -> List[int]: pass

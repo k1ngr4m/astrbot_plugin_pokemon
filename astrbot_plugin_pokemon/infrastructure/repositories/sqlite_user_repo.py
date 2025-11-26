@@ -4,7 +4,7 @@ import dataclasses
 from typing import Optional, List
 from datetime import datetime
 
-from ...core.models.pokemon_models import PokemonIVs, PokemonEVs, PokemonStats
+from ...core.models.pokemon_models import PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves
 from ...core.models.user_models import User, UserItems, UserItemInfo
 from ...core.models.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserRepository
@@ -162,10 +162,11 @@ class SqliteUserRepository(AbstractUserRepository):
             sp_defense = stats["sp_defense"]
             speed = stats["speed"]
 
-            move1_id = None
-            move2_id = None
-            move3_id = None
-            move4_id = None
+            moves: PokemonMoves = pokemon["moves"]
+            move1_id = moves.move1_id
+            move2_id = moves.move2_id
+            move3_id = moves.move3_id
+            move4_id = moves.move4_id
             # 获取新记录的ID（先插入然后获取ID用于生成短码）
             cursor.execute(sql, (
                 user_id, species_id, nickname, level, exp, gender,

@@ -52,10 +52,10 @@ class PokemonEVs:
 @dataclass
 class PokemonMoves:
     """代表一个宝可梦的技能"""
-    move_1: int
-    move_2: int
-    move_3: int
-    move_4: int
+    move1_id: int
+    move2_id: int
+    move3_id: int
+    move4_id: int
 
 @dataclass
 class PokemonBaseStats:

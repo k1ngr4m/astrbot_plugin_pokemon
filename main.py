@@ -95,6 +95,7 @@ class PokemonPlugin(Star):
         # 3.3 实例化其他核心服务
         self.pokemon_service = PokemonService(
             pokemon_repo=self.pokemon_repo,
+            move_repo=self.move_repo,
             config=self.game_config
         )
 

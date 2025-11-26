@@ -1,10 +1,10 @@
 import random
 from typing import Dict, Any, Optional
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
-    AbstractPokemonRepository, )
+    AbstractPokemonRepository, AbstractMoveRepository)
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonCreateResult, PokemonDetail, PokemonStats, PokemonIVs, \
-    PokemonEVs, WildPokemonInfo
+    PokemonEVs, WildPokemonInfo, PokemonMoves
 
 
 class PokemonService:
@@ -16,9 +16,11 @@ class PokemonService:
     def __init__(
             self,
             pokemon_repo: AbstractPokemonRepository,
+            move_repo: AbstractMoveRepository,
             config: Dict[str, Any]
     ):
         self.pokemon_repo = pokemon_repo
+        self.move_repo = move_repo
         self.config = config
 
     def create_single_pokemon(self, species_id: int, max_level: int, min_level: int) -> PokemonCreateResult:
@@ -65,7 +67,19 @@ class PokemonService:
         gender = self.determine_pokemon_gender(pokemon_template.gender_rate)
         level = random.randint(min_level, max_level)
         exp = 0
-        moves = None
+        
+        # 获取招式
+        move_list = self.move_repo.get_level_up_moves(species_id, level)
+        # 填充到4个位置，不足的补None
+        while len(move_list) < 4:
+            move_list.append(None)
+            
+        moves = PokemonMoves(
+            move1_id=move_list[0],
+            move2_id=move_list[1],
+            move3_id=move_list[2],
+            move4_id=move_list[3]
+        )
 
         # 3. 生成IV和EV（使用局部函数简化）
         ivs = {

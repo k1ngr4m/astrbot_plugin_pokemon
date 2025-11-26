@@ -3,6 +3,7 @@ import sqlite3
 import threading
 import dataclasses
 
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.user_models import UserTeam
 from .abstract_repository import AbstractTeamRepository
 from ...core.models.user_models import UserTeam
 
@@ -22,7 +23,7 @@ class SqliteTeamRepository(AbstractTeamRepository):
             self._local.connection = conn
         return conn
 
-    def get_user_team(self, user_id: str) -> UserTeam:
+    def get_user_team(self, user_id: str) -> UserTeam | None:
         """
         获取用户的队伍配置
         Args:
@@ -37,7 +38,7 @@ class SqliteTeamRepository(AbstractTeamRepository):
             cursor.execute(sql, (user_id,))
             row = cursor.fetchone()
             if not row:
-                return UserTeam(user_id=user_id)
+                return None
 
             try:
                 # 将 JSON 字符串反序列化为字典
