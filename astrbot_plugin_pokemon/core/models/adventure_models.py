@@ -46,3 +46,4 @@ class BattleResult:
     win_rates: Dict[str, float]
     result: str
     exp_details: Dict[str, any]
+    battle_log: List[Dict[str, any]] = None  # 战斗日志，记录所有参与战斗的宝可梦及结果

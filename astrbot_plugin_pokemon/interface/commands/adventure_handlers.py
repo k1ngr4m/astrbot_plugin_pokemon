@@ -133,14 +133,22 @@ class AdventureHandlers:
             win_rates = d.win_rates
             battle_result = "胜利" if d.result == "success" else "失败"
             exp_details = d.exp_details
+            battle_log = d.battle_log if d.battle_log else []  # 获取战斗日志
 
             message = "⚔️ 宝可梦战斗开始！\n\n"
-            message += f"👤 我方宝可梦: {user_pokemon['name']} (Lv.{user_pokemon['level']})\n"
             message += f"野生宝可梦: {wild_pokemon_data['name']} (Lv.{wild_pokemon_data['level']})\n\n"
 
+            # 显示所有参与战斗的宝可梦
+            if battle_log:
+                message += "👥 参战宝可梦:\n"
+                for i, battle_record in enumerate(battle_log, 1):
+                    pokemon_result = "获胜" if battle_record['result'] == 'success' else "失败"
+                    message += f"  {i}. {battle_record['pokemon_name']} [{battle_record['pokemon_id']}] (Lv.{battle_record['level']}) - {pokemon_result} (胜率: {battle_record['win_rate']}%)\n"
+                message += "\n"
+
             message += "📊 战斗胜率分析:\n"
-            message += f"我方胜率: {win_rates['user_win_rate']}%\n"
-            message += f"野生胜率: {win_rates['wild_win_rate']}%\n\n"
+            message += f"最终我方胜率: {win_rates['user_win_rate']}%\n"
+            message += f"最终野生胜率: {win_rates['wild_win_rate']}%\n\n"
 
             message += f"🎯 战斗结果: {battle_result}\n"
 
@@ -155,7 +163,7 @@ class AdventureHandlers:
                             exp_gained = pokemon_result.get("exp_gained", 0)
                             pokemon_name = pokemon_result.get("pokemon_name", f"宝可梦{i + 1}")
                             pokemon_id = pokemon_result.get("pokemon_id", 0)
-                            message += f"  {pokemon_name} 获得了 {exp_gained} 点经验值\n\n"
+                            message += f"  {pokemon_name}[{pokemon_id}] 获得了 {exp_gained} 点经验值\n\n"
 
                             level_up_info = pokemon_result.get("level_up_info", {})
                             if level_up_info.get("should_level_up"):

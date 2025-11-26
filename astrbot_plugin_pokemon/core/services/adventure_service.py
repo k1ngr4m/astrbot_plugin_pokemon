@@ -257,6 +257,7 @@ class AdventureService:
         final_user_pokemon_info = None
         all_user_win_rates = []  # 存储所有尝试过的宝可梦的胜率
         all_wild_win_rates = []  # 存储所有尝试过的宝可梦对应的野生宝可梦胜率
+        battle_log = []  # 战斗日志，记录每个宝可梦的战斗情况
 
         # 循环使用队伍中的宝可梦，直到有宝可梦获胜或队伍全部用完
         while current_pokemon_index < len(user_team_list):
@@ -276,11 +277,22 @@ class AdventureService:
 
             # 随机决定战斗结果
             import random
-            battle_result_str = "success" if random.random() * 100 < user_win_rate else "fail"
+            current_battle_result_str = "success" if random.random() * 100 < user_win_rate else "fail"
+
+            # 记录当前宝可梦的战斗情况
+            battle_log.append({
+                "pokemon_id": user_pokemon_info.id,
+                "pokemon_name": user_pokemon_info.name,
+                "species_name": user_pokemon_info.species_id,  # 实际上应该是宝可梦的物种名称，这里暂时使用id
+                "level": user_pokemon_info.level,
+                "win_rate": user_win_rate,
+                "result": current_battle_result_str
+            })
 
             # 如果当前宝可梦获胜，跳出循环
-            if battle_result_str == "success":
+            if current_battle_result_str == "success":
                 battle_result = (user_win_rate, wild_win_rate)
+                battle_result_str = "success"
                 break
             else:
                 # 当前宝可梦失败，尝试下一个宝可梦
@@ -369,7 +381,8 @@ class AdventureService:
                     "wild_win_rate": wild_win_rate
                 },
                 result=battle_result_str,
-                exp_details=exp_details
+                exp_details=exp_details,
+                battle_log=battle_log
             )
         )
 
@@ -414,8 +427,7 @@ class AdventureService:
             base_damage = ((2 * attacker_level / 5 + 2) * power * atk_stat / max(1, def_stat)) / 50 + 2
             final_damage = base_damage * type_effectiveness * 0.925  # 0.925是随机浮动的平均值
             return final_damage
-        print(f"user_pokemon: {user_pokemon}")
-        print(f"wild_pokemon: {wild_pokemon}")
+
         # ----------------------
         # 1. 准备数据
         # ----------------------
