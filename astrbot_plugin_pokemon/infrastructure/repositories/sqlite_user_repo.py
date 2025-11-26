@@ -236,6 +236,12 @@ class SqliteUserRepository(AbstractUserRepository):
             speed_ev=row_dict['speed_ev']
         )
 
+        moves = PokemonMoves(
+            move1_id=row_dict['move1_id'],
+            move2_id=row_dict['move2_id'],
+            move3_id=row_dict['move3_id'],
+            move4_id=row_dict['move4_id'],
+        )
         # 获取宝可梦名称（优先使用昵称，否则使用物种名称）
         pokemon_name = row_dict['nickname'] or row_dict.get('species_name', 'Unknown')
 
@@ -249,7 +255,7 @@ class SqliteUserRepository(AbstractUserRepository):
             stats=stats,
             ivs=ivs,
             evs=evs,
-            moves=None,
+            moves=moves,
             caught_time=row_dict['caught_time'],
         )
 
