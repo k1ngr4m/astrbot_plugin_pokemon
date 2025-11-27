@@ -18,19 +18,28 @@ class ShopService:
         shops = self.shop_repo.get_active_shops()
         return [shop.to_dict() for shop in shops]
 
-    def get_shop_by_code(self, shop_code: str) -> Dict[str, Any]:
+    def get_shop_by_id(self, shop_id: int) -> Dict[str, Any]:
         """
-        根据商店短码获取商店信息和商品列表
+        根据商店ID获取商店信息和商品列表
         Args:
-            shop_code: 商店短码（如S001）
+            shop_id: 商店ID（现在直接是数字ID）
         Returns:
             包含商店信息和商品列表的字典
         """
-        shop = self.shop_repo.get_shop_by_code(shop_code)
+        try:
+            shop_id = int(shop_id)
+        except ValueError:
+            return {
+                "success": False,
+                "message": f"❌ 商店ID {shop_id} 必须是数字！"
+            }
+
+        # 根据ID获取商店
+        shop = self.shop_repo.get_shop_by_id(shop_id)
         if not shop:
             return {
                 "success": False,
-                "message": f"❌ 商店 {shop_code} 不存在或暂无商品出售！"
+                "message": f"❌ 商店 {shop_id} 不存在或暂无商品出售！"
             }
 
         shop_info = shop.to_dict()
@@ -40,18 +49,18 @@ class ShopService:
         if not items_list:
             return {
                 "success": False,
-                "message": f"❌ 商店 {shop_code} 当前没有商品出售！"
+                "message": f"❌ 商店 {shop_id} 当前没有商品出售！"
             }
-        print(f"items_list: {items_list}")
+
         items = []
         for item in items_list:
             items.append({
                 "price": item["price"],
                 "stock": item["stock"],
-                "name": item["name"],
-                "type": item["type"],
-                "description": item["description"],
-                "rarity": item["rarity"]
+                "name": item.get("name_zh", item.get("name_en", "未知物品")),
+                "type": item.get("category_id", "item"),
+                "description": item.get("description", ""),
+                "item_id": item["shop_item_id"]
             })
 
         shop_info["items"] = items
@@ -59,15 +68,15 @@ class ShopService:
         return {
             "success": True,
             "shop": shop_info,
-            "message": f"🏪 {shop_info['name']} - {shop_info['shop_code']}"
+            "message": f"🏪 {shop_info['name']} - ID: {shop_info['id']}"
         }
 
-    def purchase_item(self, user_id: str, shop_code: str, item_id: str, quantity: int) -> Dict[str, Any]:
+    def purchase_item(self, user_id: str, shop_id: int, item_id: str, quantity: int) -> Dict[str, Any]:
         """
         购买商店商品
         Args:
             user_id: 用户ID
-            shop_code: 商店短码
+            shop_id: 商店ID
             item_id: 商品ID
             quantity: 购买数量
         Returns:
@@ -88,13 +97,13 @@ class ShopService:
                 "message": "❌ 购买数量必须大于0！"
             }
 
-        shop = self.shop_repo.get_shop_by_code(shop_code)
+        shop = self.shop_repo.get_shop_by_id(shop_id)
+
         if not shop:
             return {
                 "success": False,
-                "message": f"❌ 商店 {shop_code} 不存在！"
+                "message": f"❌ 商店 {shop_id} 不存在！"
             }
-        shop_id = shop.id
 
         # 获取商店商品信息 -
         try:
@@ -108,14 +117,14 @@ class ShopService:
         if not shop_item:
             return {
                 "success": False,
-                "message": f"❌ 商品 {item_id} 在商店 {shop_code} 中不存在或已下架！"
+                "message": f"❌ 商品 {item_id} 在商店 {shop_id} 中不存在或已下架！"
             }
 
         shop_item_id = shop_item["shop_item_id"]
         unit_price = shop_item["price"]
         stock = shop_item["stock"]
         item_id = shop_item["item_id"]
-        item_name = shop_item["name"]
+        item_name = shop_item["name_zh"]
 
         # 检查库存
         if stock != -1 and stock < quantity:

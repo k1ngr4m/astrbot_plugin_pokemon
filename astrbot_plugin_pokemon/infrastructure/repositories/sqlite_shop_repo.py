@@ -39,8 +39,8 @@ class SqliteShopRepository(AbstractShopRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT OR IGNORE INTO shops
-                (shop_code, name, description)
-                VALUES (:shop_code, :name, :description)
+                    (id, name, description, shop_type, is_active)
+                VALUES (:id, :name, :description, :shop_type, :is_active)
             """, {**shop})
             conn.commit()
 
@@ -59,13 +59,13 @@ class SqliteShopRepository(AbstractShopRepository):
         conn = self._get_connection()
         cursor = conn.cursor()
         cursor.execute("""
-                SELECT shop_id, item_id, price, stock, is_active
-                FROM shop_items
+                SELECT id, name, description, shop_type, is_active, created_at, updated_at
+                FROM shops
                 WHERE is_active = 1
             """)
         rows = cursor.fetchall()
         return [Shop(
-            id=row["shop_id"],
+            id=row["id"],
             name=row["name"],
             description=row["description"],
             shop_type=row["shop_type"],
@@ -73,23 +73,26 @@ class SqliteShopRepository(AbstractShopRepository):
             created_at=row["created_at"],
             updated_at=row["updated_at"]
         ) for row in rows]
-    
-    def get_shop_by_code(self, shop_code: str) -> Optional[Shop]:
-        """根据商店代码获取商店信息"""
+
+    def get_shop_by_id(self, shop_id: int) -> Optional[Shop]:
+        """根据商店ID获取商店信息"""
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT *
+                SELECT id, name, description, shop_type, is_active, created_at, updated_at
                 FROM shops
-                WHERE shop_code = ?
-            """, (shop_code,))
+                WHERE id = ?
+            """, (shop_id,))
             row = cursor.fetchone()
             if row:
                 return Shop(
                     id=row["id"],
-                    shop_code=row["shop_code"],
                     name=row["name"],
                     description=row["description"],
+                    shop_type=row["shop_type"],
+                    is_active=row["is_active"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"]
                 )
             return None
 
@@ -98,7 +101,7 @@ class SqliteShopRepository(AbstractShopRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT s.shop_id, s.id as shop_item_id, i.name_en, i.name_zh, i.category_id, i.description, i.rarity, s.price, s.stock, s.is_active
+                SELECT s.shop_id, s.id as shop_item_id, i.name_en, i.name_zh, i.category_id, i.description, s.price, s.stock, s.is_active
                 FROM shop_items s 
                 JOIN items i ON s.item_id = i.id
                 WHERE s.shop_id = ?
@@ -106,9 +109,9 @@ class SqliteShopRepository(AbstractShopRepository):
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
 
-    def check_shop_exists_by_code(self, shop_code: str) -> bool:
+    def check_shop_exists_by_id(self, shop_id: int) -> bool:
         """检查商店是否存在"""
-        shop = self.get_shop_by_code(shop_code)
+        shop = self.get_shop_by_id(shop_id)
         return shop is not None
 
     def get_a_shop_item_by_id(self, shop_item_id: int, shop_id: int) -> Optional[Dict[str, Any]]:
@@ -119,7 +122,7 @@ class SqliteShopRepository(AbstractShopRepository):
                 SELECT si.id as shop_item_id, si.price, si.stock, i.id as item_id, i.name_en, i.name_zh, i.category_id, i.description
                 FROM shop_items si
                 JOIN items i ON si.item_id = i.id
-                WHERE si.shop_id = ? AND i.id = ? AND si.is_active = 1
+                WHERE si.shop_id = ? AND si.id = ? AND si.is_active = 1
             """, (shop_id, shop_item_id))
             row = cursor.fetchone()
             if row:

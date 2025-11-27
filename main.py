@@ -85,7 +85,6 @@ class PokemonPlugin(Star):
         self.team_repo = SqliteTeamRepository(db_path)
         self.adventure_repo = SqliteAdventureRepository(db_path)
         self.shop_repo = SqliteShopRepository(db_path)
-        self.shop_repo = SqliteShopRepository(db_path)
         self.item_repo = SqliteItemRepository(db_path)
         self.move_repo = SqliteMoveRepository(db_path)
         self.battle_repo = SqliteBattleRepository(db_path)

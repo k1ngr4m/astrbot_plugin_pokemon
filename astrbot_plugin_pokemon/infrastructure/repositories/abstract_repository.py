@@ -226,14 +226,16 @@ class AbstractShopRepository(ABC):
     @abstractmethod
     def get_active_shops(self) -> List[Shop]: pass
     # 根据商店编码获取商店
+
+    # 根据商店ID获取商店
     @abstractmethod
-    def get_shop_by_code(self, shop_code: str) -> Optional[Shop]: pass
+    def get_shop_by_id(self, shop_id: int) -> Optional[Shop]: pass
     # 根据商店ID获取商店内的物品
     @abstractmethod
     def get_shop_items_by_shop_id(self, shop_id: int) -> List[Dict[str, Any]]: pass
     # 检查商店是否存在
     @abstractmethod
-    def check_shop_exists_by_code(self, shop_code: str) -> bool: pass
+    def check_shop_exists_by_id(self, shop_id: int) -> bool: pass
     # 根据商店物品ID获取商店物品
     @abstractmethod
     def get_a_shop_item_by_id(self, shop_item_id: int, shop_id: int) -> Optional[Dict[str, Any]]: pass

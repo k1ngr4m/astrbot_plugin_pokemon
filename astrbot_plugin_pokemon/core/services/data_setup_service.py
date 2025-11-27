@@ -68,6 +68,9 @@ class DataSetupService:
         location_pokemon_df = self._read_csv_data("location_pokemon.csv")
         moves_df = self._read_csv_data("moves.csv")
         pokemon_moves_df = self._read_csv_data("pokemon_moves.csv")
+        shops_df = self._read_csv_data("shops.csv")
+        shop_items_df = self._read_csv_data("shop_items.csv")
+
         # 注意：初始数据中的其他数据（如技能、冒险区域等）可能仍需要从其他来源获取
         # 我们假设这些数据仍然在initial_data.py中，或者需要创建对应的CSV文件
 
@@ -268,3 +271,38 @@ class DataSetupService:
                                 self.move_repo.add_pokemon_species_move_template(data)
                             except Exception as single_e:
                                 logger.error(f"单条插入宝可梦技能学习数据失败: {data}, 错误: {single_e}")
+
+        # 填充商店数据
+        if not shops_df.empty:
+            for _, shop_row in shops_df.iterrows():
+                try:
+                    shop_data = {
+                        "id": int(shop_row['id']),
+                        "name": str(shop_row['name']),
+                        "description": str(shop_row['description']) if pd.notna(shop_row['description']) else "",
+                        "shop_type": str(shop_row['shop_type']),
+                        "is_active": int(shop_row['is_active']),
+                        "created_at": str(shop_row['created_at']) if pd.notna(shop_row['created_at']) else None,
+                        "updated_at": str(shop_row['updated_at']) if pd.notna(shop_row['updated_at']) else None
+                    }
+                    self.shop_repo.add_shop_template(shop_data)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"处理商店数据时出错 (ID: {shop_row.get('id', 'Unknown')}): {e}")
+                    continue
+
+        # 填充商店物品数据
+        if not shop_items_df.empty:
+            for _, shop_item_row in shop_items_df.iterrows():
+                try:
+                    shop_item_data = {
+                        "id": int(shop_item_row['id']),
+                        "shop_id": int(shop_item_row['shop_id']),
+                        "item_id": int(shop_item_row['item_id']),
+                        "price": int(shop_item_row['price']),
+                        "stock": int(shop_item_row['stock']),
+                        "is_active": int(shop_item_row['is_active'])
+                    }
+                    self.shop_repo.add_shop_item_template(shop_item_data)
+                except (ValueError, TypeError) as e:
+                    logger.error(f"处理商店物品数据时出错 (ID: {shop_item_row.get('id', 'Unknown')}): {e}")
+                    continue
