@@ -3,6 +3,8 @@ import os
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star
 from astrbot.api import logger, AstrBotConfig
+
+# --- Imports 保持不变 ---
 from .astrbot_plugin_pokemon.core.services.user_pokemon_service import UserPokemonService
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
 
@@ -10,7 +12,6 @@ from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_item_repo import
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_team_repo import SqliteTeamRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_battle_repo import SqliteBattleRepository
 from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
@@ -23,6 +24,7 @@ from .astrbot_plugin_pokemon.interface.commands.adventure_handlers import Advent
 from .astrbot_plugin_pokemon.interface.commands.item_handlers import ItemHandlers
 from .astrbot_plugin_pokemon.interface.commands.shop_handlers import ShopHandlers
 from .astrbot_plugin_pokemon.interface.commands.user_handlers import UserHandlers
+from .astrbot_plugin_pokemon.interface.commands.user_pokemon_handles import UserPokemonHandlers
 
 from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
 from .astrbot_plugin_pokemon.core.services.pokemon_service import PokemonService
@@ -33,124 +35,83 @@ from .astrbot_plugin_pokemon.core.services.user_service import UserService
 from .astrbot_plugin_pokemon.core.services.item_service import ItemService
 from .astrbot_plugin_pokemon.core.services.shop_service import ShopService
 from .astrbot_plugin_pokemon.core.services.move_service import MoveService
-from .astrbot_plugin_pokemon.interface.commands.user_pokemon_handles import UserPokemonHandlers
 
 
 class PokemonPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
-
-        # 插件ID
         self.plugin_id = "astrbot_plugin_pokemon"
 
-        # --- 1.1. 数据与临时文件路径管理 ---
+        # 1. 基础配置与路径
         self.data_dir = "data"
+        self.db_path = os.path.join(self.data_dir, "pokemon.db")
 
-        self.tmp_dir = os.path.join(self.data_dir, "tmp")
-        os.makedirs(self.tmp_dir, exist_ok=True)
+        # 确保目录存在
+        os.makedirs(os.path.join(self.data_dir, "tmp"), exist_ok=True)
+        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
 
-        db_path = os.path.join(self.data_dir, "pokemon.db")
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-        # --- 1.2. 配置数据完整性检查注释 ---
-        # 以下配置项必须在此处从 AstrBotConfig 中提取并放入 game_config，
-        # 以确保所有服务在接收 game_config 时能够正确读取配置值
-        #
-        # 配置数据流：_conf_schema.json → AstrBotConfig (config) → game_config → 各个服务
-        #
-        # 从框架读取嵌套配置
-        # 注意：框架会自动解析 _conf_schema.json 中的嵌套对象
+        # 2. 读取配置
         user_config = config.get("user", {})
         adventure_config = config.get("adventure", {})
-
         self.game_config = {
-            "user": {
-                "initial_coins": user_config.get("initial_coins", 200)
-            },
-            "adventure": {
-                "cooldown": adventure_config.get("cooldown_seconds", 10)
-            }
+            "user": {"initial_coins": user_config.get("initial_coins", 200)},
+            "adventure": {"cooldown": adventure_config.get("cooldown_seconds", 10)}
         }
 
+        webui_config = config.get("webui", {})
+        self.secret_key = webui_config.get("secret_key")
+        self.port = webui_config.get("port", 7777)
 
-        # 初始化数据库模式
-        plugin_root_dir = os.path.dirname(__file__)
-        migrations_path = os.path.join(plugin_root_dir, self.plugin_id, "infrastructure", "database", "migrations")
-        print(migrations_path)
-        run_migrations(db_path, migrations_path)
+        # 3. 初始化核心组件 (Repos, Services, Handlers)
+        # 将几十行实例化代码移入私有方法，保持 __init__ 清爽
+        self._init_components()
 
-        # --- 2. 组合根：实例化所有仓储层 ---
-        self.user_repo = SqliteUserRepository(db_path)
-        self.pokemon_repo = SqlitePokemonRepository(db_path)
-        self.team_repo = SqliteTeamRepository(db_path)
-        self.adventure_repo = SqliteAdventureRepository(db_path)
-        self.shop_repo = SqliteShopRepository(db_path)
-        self.item_repo = SqliteItemRepository(db_path)
-        self.move_repo = SqliteMoveRepository(db_path)
-        self.battle_repo = SqliteBattleRepository(db_path)
+        # 4. 其他状态管理
+        self.impersonation_map = {}
+        self.adventure_cooldown = self.game_config["adventure"]["cooldown"]
 
+    def _init_components(self):
+        """负责实例化所有的 Repository, Service 和 Handler"""
 
-        # --- 3. 组合根：实例化所有服务层，并注入依赖 ---
-        # 3.1 核心服务必须在效果管理器之前实例化，以解决依赖问题
+        # --- Repositories (只存路径，不连接数据库) ---
+        self.user_repo = SqliteUserRepository(self.db_path)
+        self.pokemon_repo = SqlitePokemonRepository(self.db_path)
+        self.team_repo = SqliteTeamRepository(self.db_path)
+        self.adventure_repo = SqliteAdventureRepository(self.db_path)
+        self.shop_repo = SqliteShopRepository(self.db_path)
+        self.item_repo = SqliteItemRepository(self.db_path)
+        self.move_repo = SqliteMoveRepository(self.db_path)
+        self.battle_repo = SqliteBattleRepository(self.db_path)
 
-        # 3.3 实例化其他核心服务
+        # --- Services (依赖注入) ---
         self.pokemon_service = PokemonService(
-            pokemon_repo=self.pokemon_repo,
-            move_repo=self.move_repo,
-            config=self.game_config
+            pokemon_repo=self.pokemon_repo, move_repo=self.move_repo, config=self.game_config
         )
-
         self.user_service = UserService(
-            user_repo=self.user_repo,
-            pokemon_repo=self.pokemon_repo,
-            item_repo=self.item_repo,
-            pokemon_service=self.pokemon_service,
-            config=self.game_config
+            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
+            pokemon_service=self.pokemon_service, config=self.game_config
         )
-
         self.user_pokemon_service = UserPokemonService(
-            user_repo=self.user_repo,
-            pokemon_repo=self.pokemon_repo,
-            item_repo=self.item_repo,
-            pokemon_service=self.pokemon_service,
-            config=self.game_config
+            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
+            pokemon_service=self.pokemon_service, config=self.game_config
         )
         self.team_service = TeamService(
-            user_repo=self.user_repo,
-            pokemon_repo=self.pokemon_repo,
-            team_repo=self.team_repo,
-            config=self.game_config
+            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo, config=self.game_config
         )
-
         self.exp_service = ExpService(
-            user_repo=self.user_repo,
-            pokemon_repo=self.pokemon_repo,
-            team_repo=self.team_repo,
-            move_repo=self.move_repo,
-            config=self.game_config
+            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
+            move_repo=self.move_repo, config=self.game_config
         )
-
         self.adventure_service = AdventureService(
-            adventure_repo=self.adventure_repo,
-            pokemon_repo=self.pokemon_repo,
-            team_repo=self.team_repo,
-            pokemon_service=self.pokemon_service,
-            user_repo=self.user_repo,
-            exp_service=self.exp_service,
-            config=self.game_config,
-            move_repo=self.move_repo,
-            battle_repo=self.battle_repo
+            adventure_repo=self.adventure_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
+            pokemon_service=self.pokemon_service, user_repo=self.user_repo, exp_service=self.exp_service,
+            config=self.game_config, move_repo=self.move_repo, battle_repo=self.battle_repo
         )
-        self.item_service = ItemService(
-            user_repo=self.user_repo
-        )
-        self.shop_service = ShopService(
-            user_repo=self.user_repo,
-            shop_repo=self.shop_repo
-        )
-        self.move_service = MoveService(
-            move_repo=self.move_repo
-        )
+        self.item_service = ItemService(user_repo=self.user_repo)
+        self.shop_service = ShopService(user_repo=self.user_repo, shop_repo=self.shop_repo)
+        self.move_service = MoveService(move_repo=self.move_repo)
+
+        # --- Handlers (注入 Plugin self) ---
         self.common_handlers = CommonHandlers(self)
         self.user_handlers = UserHandlers(self)
         self.user_pokemon_handlers = UserPokemonHandlers(self)
@@ -159,38 +120,47 @@ class PokemonPlugin(Star):
         self.adventure_handlers = AdventureHandlers(self)
         self.item_handlers = ItemHandlers(self)
         self.shop_handlers = ShopHandlers(self)
-        # --- 4. 启动后台任务 ---
 
-        # --- 5. 初始化核心游戏数据 ---
-        data_setup_service = DataSetupService(self.pokemon_repo, self.adventure_repo, self.shop_repo, self.move_repo)
-        data_setup_service.setup_initial_data()
+    async def initialize(self):
+        """
+        框架会在插件加载完成后自动 await 调用此方法。
+        在这里执行耗时的数据库迁移和初始化。
+        """
+        logger.info(f"[{self.plugin_id}] 正在初始化数据...")
 
-        # --- Web后台配置 ---
-        self.web_admin_task = None
-        webui_config = config.get("webui", {})
-        self.secret_key = webui_config.get("secret_key")
-        if not self.secret_key:
-            logger.error("安全警告：Web后台管理的'secret_key'未在配置中设置！强烈建议您设置一个长且随机的字符串以保证安全。")
-            self.secret_key = None
-        self.port = webui_config.get("port", 7777)
+        # 1. 准备路径
+        plugin_root_dir = os.path.dirname(__file__)
+        migrations_path = os.path.join(plugin_root_dir, self.plugin_id, "infrastructure", "database", "migrations")
 
-        # 管理员扮演功能
-        self.impersonation_map = {}
+        # 2. 执行数据库迁移
+        try:
+            run_migrations(self.db_path, migrations_path)
+            logger.info(f"[{self.plugin_id}] 数据库迁移完成。")
+        except Exception as e:
+            logger.error(f"[{self.plugin_id}] 数据库迁移失败: {e}")
+            return
 
-        # 冒险冷却时间管理
-        self.adventure_cooldown = self.game_config["adventure"]["cooldown"]
+        # 3. 初始化核心游戏数据
+        try:
+            data_setup_service = DataSetupService(
+                self.pokemon_repo,
+                self.adventure_repo,
+                self.shop_repo,
+                self.move_repo
+            )
+            data_setup_service.setup_initial_data()
+            logger.info(f"[{self.plugin_id}] 初始数据检查/写入完成。")
+        except Exception as e:
+            logger.error(f"[{self.plugin_id}] 初始数据设置失败: {e}")
+
+        logger.info(f"[{self.plugin_id}] 插件初始化完毕，准备就绪！")
 
     def _get_effective_user_id(self, event: AstrMessageEvent):
-        """获取在当前上下文中应当作为指令执行者的用户ID。
-        - 默认返回消息发送者ID
-        - 若发送者是管理员且已开启代理，则返回被代理用户ID
-        注意：仅在非管理员指令中调用该方法；管理员指令应使用真实管理员ID。
-        """
+        """获取在当前上下文中应当作为指令执行者的用户ID"""
         admin_id = event.get_sender_id()
         return self.impersonation_map.get(admin_id, admin_id)
 
-    async def initialize(self):
-        """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
+    # ====================== 指令注册区 ======================
 
     @filter.command("宝可梦注册")
     async def register(self, event: AstrMessageEvent):
@@ -218,7 +188,7 @@ class PokemonPlugin(Star):
 
     @filter.command("设置队伍")
     async def set_team(self, event: AstrMessageEvent):
-        """设置队伍中的宝可梦，最多6只宝可梦，第一个为出战宝可梦"""
+        """设置队伍中的宝可梦"""
         async for r in self.team_handlers.set_team(event):
             yield r
 
@@ -227,8 +197,6 @@ class PokemonPlugin(Star):
         """查看当前队伍配置"""
         async for r in self.team_handlers.view_team(event):
             yield r
-
-    # ====================== 冒险相关指令 ======================
 
     @filter.command("查看区域")
     async def view_locations(self, event: AstrMessageEvent):
@@ -272,7 +240,6 @@ class PokemonPlugin(Star):
         async for r in self.adventure_handlers.learn_move(event):
             yield r
 
-    # ====================== 道具相关指令 ======================
     @filter.command("宝可梦背包")
     async def view_items(self, event: AstrMessageEvent):
         """查看用户背包中的所有道具"""
@@ -291,7 +258,6 @@ class PokemonPlugin(Star):
         async for r in self.shop_handlers.purchase_item(event):
             yield r
 
-
-
     async def terminate(self):
-        """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
+        """可选择实现异步的插件销毁方法"""
+        pass
