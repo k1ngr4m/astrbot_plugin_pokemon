@@ -77,7 +77,6 @@ class UserPokemonService:
             evs = new_pokemon_data["evs"],
             moves = new_pokemon_data["moves"],
         )
-        print(f"user_pokemon_info: {user_pokemon_info}")
         # 创建用户宝可梦记录，使用模板数据完善实例
         self.user_repo.create_user_pokemon(user_id, user_pokemon_info,)
 
@@ -92,7 +91,7 @@ class UserPokemonService:
             }
         )
 
-    def get_user_specific_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult[UserPokemonInfo]:
+    def get_user_pokemon_by_id(self, user_id: str, pokemon_id: int) -> BaseResult[UserPokemonInfo]:
         """
         获取用户特定宝可梦的详细信息
         Args:

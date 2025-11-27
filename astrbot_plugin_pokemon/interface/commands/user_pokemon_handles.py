@@ -60,7 +60,7 @@ class UserPokemonHandlers:
         if len(args) >= 2:
             if not args[1].isdigit():
                 yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
-            result = self.user_pokemon_service.get_user_specific_pokemon(user_id, int(args[1]))
+            result = self.user_pokemon_service.get_user_pokemon_by_id(user_id, int(args[1]))
             if not result.success:
                 yield event.plain_result(result.message)
                 return
@@ -103,6 +103,45 @@ class UserPokemonHandlers:
             message += f"  特攻: {pokemon_data['evs']['sp_attack_ev']}\t\n"
             message += f"  特防: {pokemon_data['evs']['sp_defense_ev']}\t\n"
             message += f"  速度: {pokemon_data['evs']['speed_ev']}\n\n"
+
+            # 招式信息
+            message += "⚔️ 招式:\n\n"
+            moves = pokemon_data['moves']
+            move_names = []
+
+            # 获取招式1名称
+            if moves['move1_id']:
+                move_info = self.plugin.move_repo.get_move_by_id(moves['move1_id'])
+                move_name = move_info['name_zh'] if move_info else f"技能{moves['move1_id']}"
+                move_names.append(f"  1. {move_name}")
+            else:
+                move_names.append("  1. (空)")
+
+            # 获取招式2名称
+            if moves['move2_id']:
+                move_info = self.plugin.move_repo.get_move_by_id(moves['move2_id'])
+                move_name = move_info['name_zh'] if move_info else f"技能{moves['move2_id']}"
+                move_names.append(f"  2. {move_name}")
+            else:
+                move_names.append("  2. (空)")
+
+            # 获取招式3名称
+            if moves['move3_id']:
+                move_info = self.plugin.move_repo.get_move_by_id(moves['move3_id'])
+                move_name = move_info['name_zh'] if move_info else f"技能{moves['move3_id']}"
+                move_names.append(f"  3. {move_name}")
+            else:
+                move_names.append("  3. (空)")
+
+            # 获取招式4名称
+            if moves['move4_id']:
+                move_info = self.plugin.move_repo.get_move_by_id(moves['move4_id'])
+                move_name = move_info['name_zh'] if move_info else f"技能{moves['move4_id']}"
+                move_names.append(f"  4. {move_name}")
+            else:
+                move_names.append("  4. (空)")
+
+            message += "\n".join(move_names) + "\n\n"
 
             message += f"捕获时间: {pokemon_data['caught_time']}"
             yield event.plain_result(message)

@@ -3,6 +3,8 @@ from typing import List
 
 from astrbot.api.event import AstrMessageEvent
 from ...core.models.adventure_models import LocationInfo, AdventureResult, BattleResult
+from ...core.models.common_models import BaseResult
+from ...core.models.user_models import UserTeam
 from ...interface.response.answer_enum import AnswerEnum
 from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog
 from ...utils.utils import userid_to_base32
@@ -14,6 +16,7 @@ class AdventureHandlers:
         self.user_service = plugin.user_service
         self.adventure_service = plugin.adventure_service
         self.pokemon_service = plugin.pokemon_service
+        self.user_pokemon_service = plugin.user_pokemon_service
         self.team_service = plugin.team_service
 
     async def view_locations(self, event: AstrMessageEvent):
@@ -217,9 +220,9 @@ class AdventureHandlers:
 
         # Check permission? Usually logs are public or user specific.
         # If user specific:
-        # if log['user_id'] != user_id:
-        #     yield event.plain_result("❌ 你只能查看自己的战斗日志")
-        #     return
+        if log['user_id'] != user_id:
+            yield event.plain_result("❌ 你只能查看自己的战斗日志")
+            return
         # For now, let's allow viewing any log if they have the ID.
 
         message = f"📜 战斗日志 #{log['id']}\n\n"
@@ -333,33 +336,32 @@ class AdventureHandlers:
             message += f"剩余精灵球: {pokeball_item.quantity - 1}\n\n"
             message += "你也可以使用 /逃跑 指令离开这只野生宝可梦。"
 
-            # 更新野生宝可梦遇到日志 - 捕捉失败（仍然标记为已交互）
-            try:
-                # 获取最近的野生宝可梦遇到记录（未被捕捉的记录）
-                recent_encounters: List[WildPokemonEncounterLog] = self.plugin.pokemon_repo.get_user_encounters(user_id, limit=5)
-                encounter_log_id = None
-                for encounter in recent_encounters:
-                    if (encounter.wild_pokemon_id == wild_pokemon.id and
-                        encounter.is_captured == 0):  # 未捕捉的记录
-                        encounter_log_id = encounter.id
-                        break
-                if encounter_log_id:
-                    self.plugin.pokemon_repo.update_encounter_log(
-                        log_id=encounter_log_id,
-                        is_captured=0  # 捕捉失败
-                    )
-            except Exception as e:
-                print(f"更新野生宝可梦遇到日志（捕捉失败）时出错: {e}")
+            # # 更新野生宝可梦遇到日志 - 捕捉失败（仍然标记为已交互）
+            # try:
+            #     # 获取最近的野生宝可梦遇到记录（未被捕捉的记录）
+            #     recent_encounters: List[WildPokemonEncounterLog] = self.plugin.pokemon_repo.get_user_encounters(user_id, limit=5)
+            #     encounter_log_id = None
+            #     for encounter in recent_encounters:
+            #         if (encounter.wild_pokemon_id == wild_pokemon.id and
+            #             encounter.is_captured == 0):  # 未捕捉的记录
+            #             encounter_log_id = encounter.id
+            #             break
+            #     if encounter_log_id:
+            #         self.plugin.pokemon_repo.update_encounter_log(
+            #             log_id=encounter_log_id,
+            #             is_captured=0  # 捕捉失败
+            #         )
+            # except Exception as e:
+            #     print(f"更新野生宝可梦遇到日志（捕捉失败）时出错: {e}")
 
         yield event.plain_result(message)
 
     async def run(self, event: AstrMessageEvent):
         """处理逃跑指令"""
         user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_user_by_id(user_id)
-
-        if not user:
-            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+        result = self.user_service.check_user_registered(user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
             return
 
         # 检查是否有遇到的野生宝可梦信息（使用PokemonService方法）
@@ -403,156 +405,148 @@ class AdventureHandlers:
 
         yield event.plain_result(message)
 
-    async def learn_move(self, event: AstrMessageEvent):
-        """处理学习新技能的指令"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
-        user = self.plugin.user_repo.get_user_by_id(user_id)
 
-        if not user:
-            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+    async def learn_move(self, event: AstrMessageEvent):
+        """处理学习新技能的指令 (主入口)"""
+        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        check_result = self.user_service.check_user_registered(user_id)
+        if not check_result.success:
+            yield event.plain_result(check_result.message)
             return
 
         args = event.message_str.split()
 
-        # 如果没有参数，显示用户可以学习的新技能
+        # 路由分发
         if len(args) == 1:
-            # 获取用户队伍中所有宝可梦
-            user_team = self.plugin.team_repo.get_user_team(user_id)
-            if not user_team:
-                yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
-                return
+            async for res in self._handle_show_learnable_moves(event, user_id):
+                yield res
+        elif len(args) >= 3:
+            async for res in self._handle_learn_move_action(event, user_id, args):
+                yield res
+        # --- 修正点结束 ---
+        else:
+            yield event.plain_result("❌ 格式错误！正确格式: /学习技能 [宝可梦ID] [技能ID] [槽位编号(可选)]")
 
-            message = "🔍 检查队伍中是否有宝可梦可以学习新技能：\n\n"
-            has_pokemon_with_new_move = False
+    # ----------------- 辅助方法 -----------------
 
-            for pokemon_id in [user_team.pokemon1_id, user_team.pokemon2_id, user_team.pokemon3_id,
-                               user_team.pokemon4_id, user_team.pokemon5_id, user_team.pokemon6_id]:
-                if pokemon_id:
-                    pokemon_data = self.plugin.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
-                    if pokemon_data:
-                        # 检查是否可以学习新技能
-                        all_learnable_moves, new_learned_moves = self.plugin.exp_service._check_and_learn_new_moves(
-                            pokemon_data.species_id, pokemon_data.level, pokemon_data.level, pokemon_data.moves
-                        )
-                        if new_learned_moves:
-                            has_pokemon_with_new_move = True
-                            move_names = []
-                            for move_id in new_learned_moves:
-                                move_info = self.plugin.move_repo.get_move_by_id(move_id)
-                                if move_info:
-                                    move_names.append(f"{move_info['name_zh']}")
-                                else:
-                                    move_names.append(f"技能{move_id}")
-                            message += f"  🌟 {pokemon_data.name} (Lv.{pokemon_data.level}) 可以学习: {', '.join(move_names)}\n"
+    def _get_move_name_str(self, move_id: int) -> str:
+        """辅助函数：安全获取技能名称"""
+        if not move_id:
+            return "未知技能"
+        move_info = self.plugin.move_repo.get_move_by_id(move_id)
+        return move_info['name_zh'] if move_info else f"技能{move_id}"
 
-            if not has_pokemon_with_new_move:
-                message += "  ✅ 没有宝可梦有待学习的新技能！\n"
-            yield event.plain_result(message)
+    async def _handle_show_learnable_moves(self, event, user_id):
+        """子逻辑：显示队伍中可学习的技能"""
+        user_team = self.plugin.team_repo.get_user_team(user_id)
+        if not user_team:
+            yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
             return
 
-        # 如果有参数，处理学习指令
-        if len(args) >= 3:
-            try:
-                pokemon_id = int(args[1])
-                move_id = int(args[2])
-            except ValueError:
-                yield event.plain_result("❌ 请提供正确的宝可梦ID和技能ID，格式: /学习技能 <宝可梦ID> <技能ID>")
-                return
+        message = ["🔍 检查队伍中是否有宝可梦可以学习新技能：\n"]
+        has_new_move = False
 
-            pokemon_data = self.plugin.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
-            if not pokemon_data:
-                yield event.plain_result("❌ 找不到指定的宝可梦！")
-                return
+        # 使用列表推导式获取非空的宝可梦ID
+        pokemon_ids = [getattr(user_team, f"pokemon{i}_id") for i in range(1, 7)]
+        valid_ids = [pid for pid in pokemon_ids if pid]
 
-            # 检查该技能是否是该宝可梦可以学习的技能
-            all_learnable_moves, new_learned_moves = self.plugin.exp_service._check_and_learn_new_moves(
-                pokemon_data.species_id, pokemon_data.level, pokemon_data.level, pokemon_data.moves
+        for pid in valid_ids:
+            p_data = self.plugin.user_repo.get_user_pokemon_by_id(user_id, pid)
+            if not p_data: continue
+
+            _, new_moves = self.plugin.exp_service._check_and_learn_new_moves(
+                p_data.species_id, p_data.level, p_data.level, p_data.moves
             )
 
-            if move_id not in new_learned_moves:
-                # 检查是否在当前等级可以学习的技能中
-                all_current_level_moves = self.plugin.move_repo.get_level_up_moves(pokemon_data.species_id, pokemon_data.level)
-                if move_id not in all_current_level_moves:
-                    yield event.plain_result(f"❌ {pokemon_data.name} 无法学习这个技能！")
-                    return
+            if new_moves:
+                has_new_move = True
+                move_names = [self._get_move_name_str(mid) for mid in new_moves]
+                message.append(f"  🌟 {p_data.name} (Lv.{p_data.level}) 可以学习: {', '.join(move_names)}")
 
-            # 检查技能槽是否已满
-            current_move_list = [pokemon_data.moves.move1_id, pokemon_data.moves.move2_id,
-                                pokemon_data.moves.move3_id, pokemon_data.moves.move4_id]
-            empty_slots_count = sum(1 for move_id in current_move_list if move_id is None or move_id == 0)
+        if not has_new_move:
+            message.append("  ✅ 没有宝可梦有待学习的新技能！")
 
-            if empty_slots_count > 0:
-                # 如果有空槽位，直接添加
-                updated_moves = self.plugin.exp_service._add_move_to_pokemon(pokemon_data.moves, move_id)[0]
-                self.plugin.pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
-                move_info = self.plugin.move_repo.get_move_by_id(move_id)
-                move_name = move_info['name_zh'] if move_info else f"技能{move_id}"
-                yield event.plain_result(f"🎉 {pokemon_data.name} 学会了技能 {move_name}！")
+        yield event.plain_result("\n".join(message))
+
+    async def _handle_learn_move_action(self, event, user_id, args):
+        """子逻辑：执行学习技能操作"""
+        try:
+            pokemon_id = int(args[1])
+            move_id = int(args[2])
+        except ValueError:
+            yield event.plain_result("❌ ID必须是数字")
+            return
+
+        p_data = self.plugin.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not p_data:
+            yield event.plain_result("❌ 找不到指定的宝可梦！")
+            return
+
+        # 1. 校验合法性
+        _, new_moves = self.plugin.exp_service._check_and_learn_new_moves(
+            p_data.species_id, p_data.level, p_data.level, p_data.moves
+        )
+        # 允许学习 "新解锁技能" 或者 "当前等级本来就该有的技能"
+        if move_id not in new_moves:
+            current_lvl_moves = self.plugin.move_repo.get_level_up_moves(p_data.species_id, p_data.level)
+            if move_id not in current_lvl_moves:
+                yield event.plain_result(f"❌ {p_data.name} 无法学习这个技能！")
                 return
-            else:
-                # 如果技能槽已满，需要用户选择替换哪个技能
-                if len(args) < 4:
-                    # 显示宝可梦当前的技能列表，让用户选择替换哪个
-                    message = f"💥 {pokemon_data.name} 的技能槽已满！请选择要替换的技能：\n\n"
-                    moves = pokemon_data.moves
-                    move_list = [
-                        (moves.move1_id, "技能1"),
-                        (moves.move2_id, "技能2"),
-                        (moves.move3_id, "技能3"),
-                        (moves.move4_id, "技能4")
-                    ]
 
-                    for move_id_val, slot_name in move_list:
-                        if move_id_val:
-                            move_info = self.plugin.move_repo.get_move_by_id(move_id_val)
-                            move_name = move_info['name_zh'] if move_info else f"技能{move_id_val}"
-                            message += f"  {slot_name}: {move_name}\n"
+        target_move_name = self._get_move_name_str(move_id)
 
-                    move_info = self.plugin.move_repo.get_move_by_id(move_id)
-                    new_move_name = move_info['name_zh'] if move_info else f"技能{move_id}"
-                    message += f"\n💡 使用格式: /学习技能 {pokemon_id} {move_id} <槽位编号> 来替换技能"
-                    message += f"\n例如: /学习技能 {pokemon_id} {move_id} 1 (替换技能1)"
-                    yield event.plain_result(message)
-                    return
-                else:
-                    # 用户选择了要替换的槽位
-                    try:
-                        slot_num = int(args[3])
-                        if slot_num < 1 or slot_num > 4:
-                            yield event.plain_result("❌ 槽位编号必须是1-4！")
-                            return
+        # 2. 获取当前技能状态
+        # current_moves_ids 示例: [10, 20, 0, 0] (0代表空槽位)
+        current_moves_ids = [getattr(p_data.moves, f"move{i}_id") or 0 for i in range(1, 5)]
 
-                        # 创建新的技能集合
-                        updated_moves = pokemon_data.moves
-                        move_info = self.plugin.move_repo.get_move_by_id(move_id)
-                        new_move_name = move_info['name_zh'] if move_info else f"技能{move_id}"
+        if move_id in current_moves_ids:
+            yield event.plain_result(f"❌ {p_data.name} 已经拥有技能 {target_move_name}，不能重复学习！")
+            return
 
-                        if slot_num == 1:
-                            old_move_id = updated_moves.move1_id
-                            updated_moves.move1_id = move_id
-                        elif slot_num == 2:
-                            old_move_id = updated_moves.move2_id
-                            updated_moves.move2_id = move_id
-                        elif slot_num == 3:
-                            old_move_id = updated_moves.move3_id
-                            updated_moves.move3_id = move_id
-                        elif slot_num == 4:
-                            old_move_id = updated_moves.move4_id
-                            updated_moves.move4_id = move_id
+        # 3. 寻找空槽位
+        try:
+            empty_slot_index = current_moves_ids.index(0)  # 找到第一个为0的索引 (0-3)
+            # 有空位，直接学习
+            updated_moves = self.plugin.exp_service._add_move_to_pokemon(p_data.moves, move_id)[0]
+            self.plugin.pokemon_repo.update_pokemon_moves(updated_moves, p_data.id, user_id)
+            yield event.plain_result(f"🎉 {p_data.name} 学会了技能 {target_move_name}！")
+            return
+        except ValueError:
+            # 没有空位 (ValueError: 0 is not in list)
+            pass
 
-                        # 更新数据库
-                        self.plugin.pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
+        # 4. 技能槽已满的处理
+        if len(args) < 4:
+            # 显示替换菜单
+            lines = [f"💥 {p_data.name} 的技能槽已满！请选择要替换的技能：\n"]
+            for i, mid in enumerate(current_moves_ids, 1):
+                lines.append(f"  技能{i}: {self._get_move_name_str(mid)}")
 
-                        old_move_info = self.plugin.move_repo.get_move_by_id(old_move_id)
-                        old_move_name = old_move_info['name_zh'] if old_move_info else f"技能{old_move_id}"
+            lines.append(f"\n💡 替换指令: /学习技能 {pokemon_id} {move_id} <槽位1-4>")
+            yield event.plain_result("\n".join(lines))
+            return
 
-                        message = f"✅ {pokemon_data.name} 成功替换了技能！\n"
-                        message += f"  - 移除了: {old_move_name}\n"
-                        message += f"  - 学会了: {new_move_name}"
-                        yield event.plain_result(message)
-                        return
-                    except ValueError:
-                        yield event.plain_result("❌ 请提供正确的槽位编号！")
-                        return
+        # 5. 执行替换逻辑
+        try:
+            slot_num = int(args[3])
+            if not (1 <= slot_num <= 4): raise ValueError
+        except ValueError:
+            yield event.plain_result("❌ 槽位编号必须是1-4！")
+            return
 
-        yield event.plain_result("❌ 格式错误！正确格式: /学习技能 [宝可梦ID] [技能ID] [槽位编号]")
+        old_move_id = getattr(p_data.moves, f"move{slot_num}_id")
+        if old_move_id == move_id:
+            yield event.plain_result(f"❌ 该槽位已经是 {target_move_name}！")
+            return
+
+        # 动态设置属性
+        setattr(p_data.moves, f"move{slot_num}_id", move_id)
+
+        self.plugin.pokemon_repo.update_pokemon_moves(p_data.moves, p_data.id, user_id)
+
+        old_move_name = self._get_move_name_str(old_move_id)
+        yield event.plain_result(
+            f"✅ {p_data.name} 成功替换技能！\n"
+            f"  - 遗忘: {old_move_name}\n"
+            f"  - 学会: {target_move_name}"
+        )

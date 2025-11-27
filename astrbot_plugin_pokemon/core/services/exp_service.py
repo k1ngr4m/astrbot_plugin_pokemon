@@ -265,12 +265,27 @@ class ExpService:
             }
 
         # 检查当前技能槽是否还有空位
-        current_move_list = [pokemon_data.moves.move1_id, pokemon_data.moves.move2_id,
+        current_moves_list = [pokemon_data.moves.move1_id, pokemon_data.moves.move2_id,
                             pokemon_data.moves.move3_id, pokemon_data.moves.move4_id]
 
-        empty_slots_count = sum(1 for move_id in current_move_list if move_id is None or move_id == 0)
+        # 检查是否有重复技能，过滤掉已经拥有的技能
+        filtered_new_moves = []
+        for new_move_id in new_learned_moves:
+            if new_move_id not in current_moves_list and new_move_id is not None and new_move_id != 0:
+                filtered_new_moves.append(new_move_id)
 
-        if empty_slots_count >= len(new_learned_moves):
+        empty_slots_count = sum(1 for move_id in current_moves_list if move_id is None or move_id == 0)
+
+        if empty_slots_count >= len(filtered_new_moves):
+            if not filtered_new_moves:
+                # 如果所有新技能都已经拥有，返回没有新技能学习
+                return {
+                    "success": True,
+                    "message": "没有新技能可以学习",
+                    "new_moves": [],
+                    "requires_choice": False
+                }
+
             # 如果有足够空位，直接添加所有新技能
             updated_moves = PokemonMoves(
                 move1_id=pokemon_data.moves.move1_id,
@@ -279,7 +294,7 @@ class ExpService:
                 move4_id=pokemon_data.moves.move4_id
             )
 
-            for new_move_id in new_learned_moves:
+            for new_move_id in filtered_new_moves:
                 updated_moves, success = self._add_move_to_pokemon(updated_moves, new_move_id)
                 if success:
                     # 获取技能信息用于返回
@@ -292,22 +307,31 @@ class ExpService:
 
             return {
                 "success": True,
-                "message": f"已自动学习{len(new_learned_moves)}个新技能",
+                "message": f"已自动学习{len(filtered_new_moves)}个新技能",
                 "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
                               if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
-                              for move_id in new_learned_moves],
+                              for move_id in filtered_new_moves],
                 "requires_choice": False
             }
         else:
-            # 如果技能槽满了，需要玩家选择替换哪个技能
-            return {
-                "success": True,
-                "message": "有新技能可以学习，但技能槽已满，需要选择替换",
-                "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
-                              if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
-                              for move_id in new_learned_moves],
-                "requires_choice": True
-            }
+            # 如果技能槽满了，需要玩家选择替换哪个技能（同样过滤掉重复的技能）
+            if not filtered_new_moves:
+                # 如果所有新技能都已经拥有，返回没有新技能学习
+                return {
+                    "success": True,
+                    "message": "没有新技能可以学习",
+                    "new_moves": [],
+                    "requires_choice": False
+                }
+            else:
+                return {
+                    "success": True,
+                    "message": "有新技能可以学习，但技能槽已满，需要选择替换",
+                    "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
+                                  if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
+                                  for move_id in filtered_new_moves],
+                    "requires_choice": True
+                }
 
     def learn_new_moves_after_level_up(self, user_id: str, pokemon_id: int, new_level: int) -> Dict[str, Any]:
         """
@@ -334,12 +358,27 @@ class ExpService:
             }
 
         # 检查当前技能槽是否还有空位
-        current_move_list = [pokemon_data.moves.move1_id, pokemon_data.moves.move2_id,
+        current_moves_list = [pokemon_data.moves.move1_id, pokemon_data.moves.move2_id,
                             pokemon_data.moves.move3_id, pokemon_data.moves.move4_id]
 
-        empty_slots_count = sum(1 for move_id in current_move_list if move_id is None or move_id == 0)
+        # 检查是否有重复技能，过滤掉已经拥有的技能
+        filtered_new_moves = []
+        for new_move_id in new_learned_moves:
+            if new_move_id not in current_moves_list and new_move_id is not None and new_move_id != 0:
+                filtered_new_moves.append(new_move_id)
 
-        if empty_slots_count >= len(new_learned_moves):
+        empty_slots_count = sum(1 for move_id in current_moves_list if move_id is None or move_id == 0)
+
+        if empty_slots_count >= len(filtered_new_moves):
+            if not filtered_new_moves:
+                # 如果所有新技能都已经拥有，返回没有新技能学习
+                return {
+                    "success": True,
+                    "message": "没有新技能可以学习",
+                    "new_moves": [],
+                    "requires_choice": False
+                }
+
             # 如果有足够空位，直接添加所有新技能
             updated_moves = PokemonMoves(
                 move1_id=pokemon_data.moves.move1_id,
@@ -348,7 +387,7 @@ class ExpService:
                 move4_id=pokemon_data.moves.move4_id
             )
 
-            for new_move_id in new_learned_moves:
+            for new_move_id in filtered_new_moves:
                 updated_moves, success = self._add_move_to_pokemon(updated_moves, new_move_id)
                 if success:
                     # 获取技能信息用于返回
@@ -361,22 +400,31 @@ class ExpService:
 
             return {
                 "success": True,
-                "message": f"已自动学习{len(new_learned_moves)}个新技能",
+                "message": f"已自动学习{len(filtered_new_moves)}个新技能",
                 "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
                               if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
-                              for move_id in new_learned_moves],
+                              for move_id in filtered_new_moves],
                 "requires_choice": False
             }
         else:
-            # 如果技能槽满了，需要玩家选择替换哪个技能
-            return {
-                "success": True,
-                "message": "有新技能可以学习，但技能槽已满，需要选择替换",
-                "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
-                              if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
-                              for move_id in new_learned_moves],
-                "requires_choice": True
-            }
+            # 如果技能槽满了，需要玩家选择替换哪个技能（同样过滤掉重复的技能）
+            if not filtered_new_moves:
+                # 如果所有新技能都已经拥有，返回没有新技能学习
+                return {
+                    "success": True,
+                    "message": "没有新技能可以学习",
+                    "new_moves": [],
+                    "requires_choice": False
+                }
+            else:
+                return {
+                    "success": True,
+                    "message": "有新技能可以学习，但技能槽已满，需要选择替换",
+                    "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
+                                  if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
+                                  for move_id in filtered_new_moves],
+                    "requires_choice": True
+                }
 
     def update_team_pokemon_after_battle(self, user_id: str, team_pokemon_ids: list, exp_gained: int) -> list:
         """

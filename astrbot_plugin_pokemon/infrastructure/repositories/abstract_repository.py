@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 from ...core.models.user_models import User, UserTeam, UserItems
 from ...core.models.pokemon_models import PokemonSpecies, UserPokemonInfo, \
-    WildPokemonInfo, WildPokemonEncounterLog
+    WildPokemonInfo, WildPokemonEncounterLog, PokemonMoves
 from ...core.models.adventure_models import LocationTemplate, LocationPokemon
 from ...core.models.shop_models import Shop
 
@@ -107,6 +107,10 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def update_encounter_log(self, log_id: int, is_captured: int = None,
                             is_battled: int = None, battle_result: str = None) -> None: pass
+
+    @abstractmethod
+    def update_pokemon_moves(self, moves: PokemonMoves, pokemon_id: int, user_id: str) -> None: pass
+
 
     # ==========查==========
     # 获取宝可梦模板
