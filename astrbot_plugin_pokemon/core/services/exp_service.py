@@ -1,8 +1,8 @@
 from typing import Dict, Any
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats, PokemonMoves
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
-    AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
+    AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository, AbstractMoveRepository,
 )
 
 class ExpService:
@@ -13,11 +13,13 @@ class ExpService:
         user_repo: AbstractUserRepository,
         pokemon_repo: AbstractPokemonRepository,
         team_repo: AbstractTeamRepository,
+        move_repo: AbstractMoveRepository,
         config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.team_repo = team_repo
+        self.move_repo = move_repo
         self.config = config
 
     def get_required_exp_for_level(self, level: int) -> int:
@@ -111,6 +113,10 @@ class ExpService:
         if level_up_info.get("levels_gained", 0) > 0:
             self._calculate_and_update_pokemon_stats(pokemon_id, pokemon_data.species_id, level_up_info["new_level"], user_id)
 
+            # 升级后检查并学习新技能 - 使用升级前和升级后的等级
+            move_learning_result = self.learn_moves_after_level_up_with_levels(user_id, pokemon_data.id, current_level, level_up_info["new_level"])
+            level_up_info["move_learning_result"] = move_learning_result
+
         return {
             "success": True,
             "exp_gained": exp_gained,
@@ -190,6 +196,187 @@ class ExpService:
         # 更新宝可梦的属性
         self.pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
         return True
+
+    def _check_and_learn_new_moves(self, species_id: int, current_level: int, new_level: int, current_moves: PokemonMoves) -> tuple[list, list]:
+        """
+        检查宝可梦在升级过程中可以学习的新技能
+        返回：(所有可学习的技能列表, 新学会的技能列表)
+        """
+        # 获取从current_level到new_level之间可以学会的所有技能
+        all_learnable_moves = self.move_repo.get_level_up_moves(species_id, new_level)
+
+        # 获取在升级过程中新学会的技能（在当前等级+1到新等级之间新增的技能）
+        new_learned_moves = []
+        if current_level < new_level:
+            new_learned_moves = self.move_repo.get_moves_learned_in_level_range(species_id, current_level, new_level)
+        else:
+            # 如果等级没变，没有新技能
+            new_learned_moves = []
+
+        return all_learnable_moves, new_learned_moves
+
+    def _add_move_to_pokemon(self, moves: PokemonMoves, new_move_id: int) -> tuple[PokemonMoves, bool]:
+        """
+        将新技能添加到宝可梦的技能列表中
+        返回：(更新后的PokemonMoves对象, 是否成功添加)
+        """
+        # 检查是否已经有4个技能
+        current_moves = [moves.move1_id, moves.move2_id, moves.move3_id, moves.move4_id]
+
+        # 查找空槽位
+        for i, move_id in enumerate(current_moves):
+            if move_id is None or move_id == 0:
+                # 找到空槽位，添加新技能
+                if i == 0:
+                    moves.move1_id = new_move_id
+                elif i == 1:
+                    moves.move2_id = new_move_id
+                elif i == 2:
+                    moves.move3_id = new_move_id
+                elif i == 3:
+                    moves.move4_id = new_move_id
+                return moves, True
+
+        # 如果没有空槽位，返回False，表示无法直接添加
+        return moves, False
+
+    def learn_moves_after_level_up_with_levels(self, user_id: str, pokemon_id: int, old_level: int, new_level: int) -> Dict[str, Any]:
+        """
+        宝可梦升级后检查并学习新技能（使用升级前和升级后的等级）
+        返回包含学习的新技能信息的字典
+        """
+        # 获取用户宝可梦信息
+        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_data:
+            return {"success": False, "message": "宝可梦不存在", "new_moves": []}
+
+        # 检查可以学习的新技能
+        all_learnable_moves, new_learned_moves = self._check_and_learn_new_moves(
+            pokemon_data.species_id, old_level, new_level, pokemon_data.moves
+        )
+
+        if not new_learned_moves:
+            # 没有新技能要学习
+            return {
+                "success": True,
+                "message": "没有新技能可以学习",
+                "new_moves": [],
+                "requires_choice": False
+            }
+
+        # 检查当前技能槽是否还有空位
+        current_move_list = [pokemon_data.moves.move1_id, pokemon_data.moves.move2_id,
+                            pokemon_data.moves.move3_id, pokemon_data.moves.move4_id]
+
+        empty_slots_count = sum(1 for move_id in current_move_list if move_id is None or move_id == 0)
+
+        if empty_slots_count >= len(new_learned_moves):
+            # 如果有足够空位，直接添加所有新技能
+            updated_moves = PokemonMoves(
+                move1_id=pokemon_data.moves.move1_id,
+                move2_id=pokemon_data.moves.move2_id,
+                move3_id=pokemon_data.moves.move3_id,
+                move4_id=pokemon_data.moves.move4_id
+            )
+
+            for new_move_id in new_learned_moves:
+                updated_moves, success = self._add_move_to_pokemon(updated_moves, new_move_id)
+                if success:
+                    # 获取技能信息用于返回
+                    move_info = self.move_repo.get_move_by_id(new_move_id)
+                    if not move_info:
+                        move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
+
+            # 更新宝可梦的技能
+            self.pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
+
+            return {
+                "success": True,
+                "message": f"已自动学习{len(new_learned_moves)}个新技能",
+                "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
+                              if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
+                              for move_id in new_learned_moves],
+                "requires_choice": False
+            }
+        else:
+            # 如果技能槽满了，需要玩家选择替换哪个技能
+            return {
+                "success": True,
+                "message": "有新技能可以学习，但技能槽已满，需要选择替换",
+                "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
+                              if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
+                              for move_id in new_learned_moves],
+                "requires_choice": True
+            }
+
+    def learn_new_moves_after_level_up(self, user_id: str, pokemon_id: int, new_level: int) -> Dict[str, Any]:
+        """
+        宝可梦升级后检查并学习新技能
+        返回包含学习的新技能信息的字典
+        """
+        # 获取用户宝可梦信息
+        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_data:
+            return {"success": False, "message": "宝可梦不存在", "new_moves": []}
+
+        # 检查可以学习的新技能 - 使用宝可梦当前的等级（这在等级已更新后使用）
+        all_learnable_moves, new_learned_moves = self._check_and_learn_new_moves(
+            pokemon_data.species_id, pokemon_data.level, new_level, pokemon_data.moves
+        )
+
+        if not new_learned_moves:
+            # 没有新技能要学习
+            return {
+                "success": True,
+                "message": "没有新技能可以学习",
+                "new_moves": [],
+                "requires_choice": False
+            }
+
+        # 检查当前技能槽是否还有空位
+        current_move_list = [pokemon_data.moves.move1_id, pokemon_data.moves.move2_id,
+                            pokemon_data.moves.move3_id, pokemon_data.moves.move4_id]
+
+        empty_slots_count = sum(1 for move_id in current_move_list if move_id is None or move_id == 0)
+
+        if empty_slots_count >= len(new_learned_moves):
+            # 如果有足够空位，直接添加所有新技能
+            updated_moves = PokemonMoves(
+                move1_id=pokemon_data.moves.move1_id,
+                move2_id=pokemon_data.moves.move2_id,
+                move3_id=pokemon_data.moves.move3_id,
+                move4_id=pokemon_data.moves.move4_id
+            )
+
+            for new_move_id in new_learned_moves:
+                updated_moves, success = self._add_move_to_pokemon(updated_moves, new_move_id)
+                if success:
+                    # 获取技能信息用于返回
+                    move_info = self.move_repo.get_move_by_id(new_move_id)
+                    if not move_info:
+                        move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
+
+            # 更新宝可梦的技能
+            self.pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
+
+            return {
+                "success": True,
+                "message": f"已自动学习{len(new_learned_moves)}个新技能",
+                "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
+                              if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
+                              for move_id in new_learned_moves],
+                "requires_choice": False
+            }
+        else:
+            # 如果技能槽满了，需要玩家选择替换哪个技能
+            return {
+                "success": True,
+                "message": "有新技能可以学习，但技能槽已满，需要选择替换",
+                "new_moves": [{"id": move_id, "name": self.move_repo.get_move_by_id(move_id)["name_zh"]
+                              if self.move_repo.get_move_by_id(move_id) else f"技能{move_id}"}
+                              for move_id in new_learned_moves],
+                "requires_choice": True
+            }
 
     def update_team_pokemon_after_battle(self, user_id: str, team_pokemon_ids: list, exp_gained: int) -> list:
         """

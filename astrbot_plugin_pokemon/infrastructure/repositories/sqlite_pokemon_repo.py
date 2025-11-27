@@ -463,3 +463,17 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             """, (pokemon_id,))
             row = cursor.fetchone()
             return row['capture_rate'] if row else 0
+
+    def update_pokemon_moves(self, moves: PokemonMoves, pokemon_id: int, user_id: str) -> None:
+        """更新宝可梦的技能"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE user_pokemon
+                SET move1_id = ?, move2_id = ?, move3_id = ?, move4_id = ?
+                WHERE id = ? AND user_id = ?
+            """, (
+                moves.move1_id, moves.move2_id, moves.move3_id, moves.move4_id,
+                pokemon_id, user_id
+            ))
+            conn.commit()

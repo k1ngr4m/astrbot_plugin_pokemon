@@ -92,6 +92,28 @@ class SqliteMoveRepository(AbstractMoveRepository):
             logger.error(f"获取宝可梦升级招式失败: {e}")
             return []
 
+    def get_moves_learned_in_level_range(self, pokemon_species_id: int, min_level: int, max_level: int) -> List[int]:
+        """
+        获取宝可梦在指定等级范围内新学会的升级招式
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT DISTINCT pm.move_id
+                    FROM pokemon_moves pm
+                    WHERE pm.pokemon_species_id = ?
+                      AND pm.move_method_id = 1
+                      AND pm.level > ?
+                      AND pm.level <= ?
+                    ORDER BY pm.level ASC
+                """, (pokemon_species_id, min_level, max_level))
+                rows = cursor.fetchall()
+                return [row[0] for row in rows if row[0] is not None]
+        except Exception as e:
+            logger.error(f"获取宝可梦在等级范围内学会的招式失败: {e}")
+            return []
+
     def get_move_by_id(self, move_id: int) -> Dict[str, Any] | None:
         """
         获取招式详细信息

@@ -259,6 +259,10 @@ class AbstractMoveRepository(ABC):
     @abstractmethod
     def get_level_up_moves(self, pokemon_species_id: int, level: int) -> List[int]: pass
 
+    # 获取宝可梦在指定等级范围内新学会的升级招式
+    @abstractmethod
+    def get_moves_learned_in_level_range(self, pokemon_species_id: int, min_level: int, max_level: int) -> List[int]: pass
+
     # 获取招式详细信息
     @abstractmethod
     def get_move_by_id(self, move_id: int) -> Dict[str, Any] | None: pass

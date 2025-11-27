@@ -126,6 +126,7 @@ class PokemonPlugin(Star):
             user_repo=self.user_repo,
             pokemon_repo=self.pokemon_repo,
             team_repo=self.team_repo,
+            move_repo=self.move_repo,
             config=self.game_config
         )
 
@@ -260,6 +261,12 @@ class PokemonPlugin(Star):
     async def view_battle_log(self, event: AstrMessageEvent):
         """查看战斗日志。用法：/查看战斗 <日志ID>"""
         async for r in self.adventure_handlers.view_battle_log(event):
+            yield r
+
+    @filter.command("学习技能")
+    async def learn_move(self, event: AstrMessageEvent):
+        """学习新技能。用法：/学习技能 [宝可梦ID] [技能ID] [槽位编号]"""
+        async for r in self.adventure_handlers.learn_move(event):
             yield r
 
     # ====================== 道具相关指令 ======================
