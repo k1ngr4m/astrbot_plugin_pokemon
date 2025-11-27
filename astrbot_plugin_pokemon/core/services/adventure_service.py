@@ -1,7 +1,7 @@
 import math
 import random
 from itertools import accumulate
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass
 
 from .exp_service import ExpService
@@ -751,3 +751,7 @@ class AdventureService:
                 "pokeball_item": pokeball_item,
             }
         }
+
+    def get_battle_log_by_id(self, log_id: int) -> Optional[Dict[str, Any]]:
+        """根据战斗日志ID获取战斗日志"""
+        return self.battle_repo.get_battle_log_by_id(log_id)

@@ -6,16 +6,17 @@ from ...utils.utils import userid_to_base32
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
+    from ...core.container import GameContainer
 
 class ShopHandlers:
-    def __init__(self, plugin: "PokemonPlugin"):
+    def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
-        self.user_service = plugin.user_service
-        self.shop_service = plugin.shop_service
+        self.user_service = container.user_service
+        self.shop_service = container.shop_service
 
     async def view_shop(self, event: AstrMessageEvent):
         """宝可梦商店查看命令处理器"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         result = self.user_service.check_user_registered(user_id)
         if not result.success:
             yield event.plain_result(result.message)
@@ -77,14 +78,14 @@ class ShopHandlers:
                 # 显示物品ID
                 message += f"    [物品ID: {item.get('item_id', '未知')}]"
                 message += f"\n\n"
-            message += "💡 用法：宝可梦商店 [商店ID]\n例如：宝可梦商店 1\n"
+            message += "💡 用法：宝可梦商店购买 [商店ID] [物品ID] [数量]\n例如：宝可梦商店购买 1 4 5\n"
             message += "\n"
 
         yield event.plain_result(message.strip())
 
     async def purchase_item(self, event: AstrMessageEvent):
         """购买商品命令处理器"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         result = self.user_service.check_user_registered(user_id)
         if not result.success:
             yield event.plain_result(result.message)

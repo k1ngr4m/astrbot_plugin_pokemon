@@ -66,6 +66,9 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def get_user_items(self, user_id: str) -> UserItems: pass
 
+    @abstractmethod
+    def update_user_last_adventure_time(self, user_id, last_adventure_time): pass
+
 
 class AbstractPokemonRepository(ABC):
     """宝可梦数据仓储接口"""
@@ -106,7 +109,7 @@ class AbstractPokemonRepository(ABC):
     # 更新野生宝可梦遇到记录（如捕捉或战斗结果）
     @abstractmethod
     def update_encounter_log(self, log_id: int, is_captured: int = None,
-                            is_battled: int = None, battle_result: str = None) -> None: pass
+                            is_battled: int = None, battle_result: str = None, isdel: int = None) -> None: pass
 
     @abstractmethod
     def update_pokemon_moves(self, moves: PokemonMoves, pokemon_id: int, user_id: str) -> None: pass

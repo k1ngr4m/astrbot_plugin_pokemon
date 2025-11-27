@@ -5,10 +5,8 @@ from ...utils.utils import userid_to_base32
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
+    from ...core.container import GameContainer
 
 class PokemonHandlers:
-    def __init__(self, plugin: "PokemonPlugin"):
+    def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
-        self.user_service = plugin.user_service
-        self.team_service = plugin.team_service
-        self.pokemon_service = plugin.pokemon_service

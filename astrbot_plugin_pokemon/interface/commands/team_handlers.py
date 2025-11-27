@@ -7,16 +7,17 @@ from ...utils.utils import userid_to_base32
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
+    from ...core.container import GameContainer
 
 class TeamHandlers:
-    def __init__(self, plugin: "PokemonPlugin"):
+    def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
-        self.user_service = plugin.user_service
-        self.team_service = plugin.team_service
+        self.user_service = container.user_service
+        self.team_service = container.team_service
 
     async def set_team(self, event: AstrMessageEvent):
         """设置队伍中的宝可梦"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         result = self.user_service.check_user_registered(user_id)
         if not result.success:
             yield event.plain_result(result.message)
@@ -54,7 +55,7 @@ class TeamHandlers:
 
     async def view_team(self, event: AstrMessageEvent):
         """查看当前队伍配置"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         user = self.plugin.user_repo.get_user_by_id(user_id)
 
         if not user:

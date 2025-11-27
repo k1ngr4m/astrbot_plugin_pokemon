@@ -1,27 +1,28 @@
-from astrbot.api.event import AstrMessageEvent
 from typing import TYPE_CHECKING
-
+from astrbot.api.event import AstrMessageEvent
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
+    from ...core.container import GameContainer
 
 class UserHandlers:
-    def __init__(self, plugin: "PokemonPlugin"):
+    def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
-        self.user_service = plugin.user_service
+        self.user_service = container.user_service
 
     async def register_user(self, event: AstrMessageEvent):
         """注册用户命令"""
-        user_id = self.plugin._get_effective_user_id(event)
+        user_id = event.get_sender_id()
+
         nickname = event.get_sender_name() if event.get_sender_name() is not None else user_id
         result = self.user_service.register(user_id, nickname)
         yield event.plain_result(result.message)
 
     async def checkin(self, event: AstrMessageEvent):
         """签到命令处理器"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         result = self.user_service.check_user_registered(user_id)
         if not result.success:
             yield event.plain_result(result.message)

@@ -6,15 +6,16 @@ from ...utils.utils import userid_to_base32
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
+    from ...core.container import GameContainer
 
 class ItemHandlers:
-    def __init__(self, plugin: "PokemonPlugin"):
+    def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
-        self.item_service = plugin.item_service
+        self.item_service = container.item_service
 
     async def view_items(self, event: AstrMessageEvent):
         """查看用户道具命令处理器"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         user = self.plugin.user_repo.get_user_by_id(user_id)
 
         if not user:

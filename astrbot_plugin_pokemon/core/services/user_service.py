@@ -1,6 +1,7 @@
 import random
-from typing import Dict, Any
+from typing import Dict, Any, List
 
+from astrbot.api import logger
 from .pokemon_service import PokemonService
 from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
@@ -9,7 +10,7 @@ from ...infrastructure.repositories.abstract_repository import (
 
 from ...utils.utils import get_today, userid_to_base32
 from ...core.models.user_models import User
-from ...core.models.pokemon_models import UserPokemonInfo, PokemonDetail
+from ...core.models.pokemon_models import UserPokemonInfo, PokemonDetail, WildPokemonEncounterLog
 from ...interface.response.answer_enum import AnswerEnum
 
 class UserService:
@@ -143,3 +144,125 @@ class UserService:
             data=user
         )
 
+    def get_user_by_id(self, user_id: str) -> BaseResult[User]:
+        """
+        根据用户ID获取用户信息。
+        Args:
+            user_id: 用户ID
+        Returns:
+            如果用户存在则返回{"success": True, "message": AnswerEnum.USER_ALREADY_REGISTERED.value, "data": user}，
+            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
+        """
+        user = self.user_repo.get_user_by_id(user_id)
+        if not user:
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_NOT_REGISTERED.value
+            )
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_ALREADY_REGISTERED.value,
+            data=user
+        )
+
+    def update_user_last_adventure_time(self, user_id: str, last_adventure_time: float) -> BaseResult:
+        """
+        更新用户上次冒险时间。
+        Args:
+            user_id: 用户ID
+            last_adventure_time: 上次冒险时间
+        Returns:
+            如果更新成功则返回{"success": True, "message": AnswerEnum.USER_ADVENTURE_TIME_UPDATED.value}，
+            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
+        """
+        user = self.user_repo.get_user_by_id(user_id)
+        if not user:
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_NOT_REGISTERED.value
+            )
+        self.user_repo.update_user_last_adventure_time(user_id, last_adventure_time)
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_ADVENTURE_TIME_UPDATED.value
+        )
+
+    def add_user_item(self, user_id: str, item_id: int, quantity: int) -> BaseResult:
+        """
+        为用户添加道具。
+        Args:
+            user_id: 用户ID
+            item_id: 道具ID
+            quantity: 道具数量
+        Returns:
+            如果添加成功则返回{"success": True, "message": AnswerEnum.USER_ITEM_ADDED.value}，
+            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
+        """
+        user = self.user_repo.get_user_by_id(user_id)
+        if not user:
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_NOT_REGISTERED.value
+            )
+        self.user_repo.add_user_item(user_id, item_id, quantity)
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_ITEM_ADDED.value
+        )
+
+    def _update_encounter_log(self, user_id: str, wild_id: int, captured: bool = False, deleted: bool = False):
+        """更新遭遇日志 (封装Repo操作)"""
+        try:
+            logs = self.pokemon_repo.get_user_encounters(user_id, limit=5)
+            # 找到最近一条匹配且未处理的记录
+            target_log = next((l for l in logs if l.wild_pokemon_id == wild_id and l.is_captured == 0), None)
+
+            if target_log:
+                self.pokemon_repo.update_encounter_log(
+                    log_id=target_log.id,
+                    is_captured=1 if captured else 0,
+                    isdel=1 if deleted else 0
+                )
+        except Exception as e:
+            # 日志更新失败不应阻断主流程，打印错误即可
+            logger.error(f"Error updating encounter log: {e}")
+
+    def get_user_encounters(self, user_id: str, limit: int = 5) -> BaseResult[List[WildPokemonEncounterLog]]:
+        """
+        获取用户最近的遭遇记录。
+        Args:
+            user_id: 用户ID
+            limit: 返回记录数量，默认5条
+        Returns:
+            如果用户存在则返回{"success": True, "message": AnswerEnum.USER_ENCOUNTERS.value, "data": encounters}，
+            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
+        """
+        user = self.user_repo.get_user_by_id(user_id)
+        if not user:
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_NOT_REGISTERED.value
+            )
+        encounters = self.pokemon_repo.get_user_encounters(user_id, limit=limit)
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_ENCOUNTERS.value,
+            data=encounters
+        )
+
+    def update_encounter_log(self, log_id: int, is_captured: int, isdel: int) -> BaseResult:
+        """
+        更新遭遇记录。
+        Args:
+            log_id: 遭遇记录ID
+            is_captured: 是否被捕获
+            isdel: 是否删除
+        Returns:
+            如果更新成功则返回{"success": True, "message": AnswerEnum.USER_ENCOUNTERS_UPDATED.value}，
+            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
+        """
+        self.pokemon_repo.update_encounter_log(log_id, is_captured, isdel)
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_ENCOUNTERS_UPDATED.value
+        )

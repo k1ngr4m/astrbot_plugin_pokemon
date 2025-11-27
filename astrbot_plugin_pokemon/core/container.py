@@ -22,7 +22,6 @@ class GameContainer:
     """
     依赖注入容器：负责管理所有游戏核心组件的生命周期和依赖关系。
     """
-
     def __init__(self, db_path: str, config: dict):
         self.db_path = db_path
         self.config = config

@@ -9,7 +9,7 @@ from ...infrastructure.repositories.abstract_repository import (
 
 from ...utils.utils import get_today, userid_to_base32
 from ...core.models.user_models import User
-from ...core.models.pokemon_models import UserPokemonInfo, PokemonDetail, PokemonStats
+from ...core.models.pokemon_models import UserPokemonInfo, PokemonDetail, PokemonStats, WildPokemonInfo
 from ...interface.response.answer_enum import AnswerEnum
 
 class UserPokemonService:
@@ -174,3 +174,35 @@ class UserPokemonService:
                 success=False,
                 message=f"更新技能失败: {str(e)}"
             )
+
+    def create_user_pokemon(self, user_id: str, pokemon_info: UserPokemonInfo) -> BaseResult:
+        """
+        创建用户宝可梦记录
+        Args:
+            user_id: 用户ID
+            pokemon_info: 宝可梦信息
+        Returns:
+            BaseResult
+        """
+        try:
+            pid = self.user_repo.create_user_pokemon(user_id, pokemon_info)
+            return BaseResult(
+                success=True,
+                message=AnswerEnum.USER_POKEMON_CREATED.value,
+                data = pid
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"创建用户宝可梦失败: {str(e)}"
+            )
+
+    def _create_and_save_caught_pokemon(self, user_id: str, wild: WildPokemonInfo) -> Any | None:
+        """创建并保存捕捉到的宝可梦 (封装Repo操作)"""
+        info = UserPokemonInfo(
+            id=0, species_id=wild.species_id, name=wild.name,
+            level=wild.level, exp=wild.exp, gender=wild.gender,
+            stats=wild.stats, ivs=wild.ivs, evs=wild.evs, moves=wild.moves
+        )
+        pid = self.user_repo.create_user_pokemon(user_id, info)
+        return self.user_repo.get_user_pokemon_by_id(user_id, pid)

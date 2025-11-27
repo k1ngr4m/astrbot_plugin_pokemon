@@ -9,7 +9,6 @@ from .astrbot_plugin_pokemon.core.container import GameContainer
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
 from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
 
-from .astrbot_plugin_pokemon.interface.commands.common_handlers import CommonHandlers
 from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers
 from .astrbot_plugin_pokemon.interface.commands.team_handlers import TeamHandlers
 from .astrbot_plugin_pokemon.interface.commands.adventure_handlers import AdventureHandlers
@@ -55,22 +54,17 @@ class PokemonPlugin(Star):
         # 5. 初始化 Handlers
         self._init_handlers()
 
-        # 6. 其他状态管理
-        self.impersonation_map = {}
-        self.adventure_cooldown = self.game_config["adventure"]["cooldown"]
-
     def _init_handlers(self):
         """负责实例化所有的 Repository, Service 和 Handler"""
 
         # --- Handlers (注入 Plugin self) ---
-        self.common_handlers = CommonHandlers(self)
-        self.user_handlers = UserHandlers(self)
-        self.user_pokemon_handlers = UserPokemonHandlers(self)
-        self.team_handlers = TeamHandlers(self)
-        self.pokemon_handlers = PokemonHandlers(self)
-        self.adventure_handlers = AdventureHandlers(self)
-        self.item_handlers = ItemHandlers(self)
-        self.shop_handlers = ShopHandlers(self)
+        self.user_handlers = UserHandlers(self, self.container)
+        self.user_pokemon_handlers = UserPokemonHandlers(self, self.container)
+        self.team_handlers = TeamHandlers(self, self.container)
+        self.pokemon_handlers = PokemonHandlers(self, self.container)
+        self.adventure_handlers = AdventureHandlers(self, self.container)
+        self.item_handlers = ItemHandlers(self, self.container)
+        self.shop_handlers = ShopHandlers(self, self.container)
 
     def _bridge_compatibility(self):
         """
@@ -129,11 +123,6 @@ class PokemonPlugin(Star):
             logger.error(f"[{self.plugin_id}] 初始数据设置失败: {e}")
 
         logger.info(f"[{self.plugin_id}] 插件初始化完毕，准备就绪！")
-
-    def _get_effective_user_id(self, event: AstrMessageEvent):
-        """获取在当前上下文中应当作为指令执行者的用户ID"""
-        admin_id = event.get_sender_id()
-        return self.impersonation_map.get(admin_id, admin_id)
 
     # ====================== 指令注册区 ======================
 

@@ -1,36 +1,37 @@
 import time
 import random
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING, Any
 
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api import logger
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import UserPokemonInfo
 from ...core.models.adventure_models import LocationInfo, AdventureResult, BattleResult
 from ...core.models.common_models import BaseResult
 from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
 
+if TYPE_CHECKING:
+    from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
+    from ...core.container import GameContainer
 
 class AdventureHandlers:
-    def __init__(self, plugin):
+    def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
         # 提取常用 Service，减少 self.plugin.xxx 的调用链长度
-        self.user_service = plugin.user_service
-        self.adventure_service = plugin.adventure_service
-        self.pokemon_service = plugin.pokemon_service
-        self.user_pokemon_service = plugin.user_pokemon_service
-        self.team_service = plugin.team_service
-        self.exp_service = plugin.exp_service
-        self.move_service = plugin.move_service
-        # Repo 引用
-        self.user_repo = plugin.user_repo
-        self.pokemon_repo = plugin.pokemon_repo
-        self.team_repo = plugin.team_repo
-        self.battle_repo = plugin.battle_repo
+        self.user_service = container.user_service
+        self.adventure_service = container.adventure_service
+        self.pokemon_service = container.pokemon_service
+        self.user_pokemon_service = container.user_pokemon_service
+        self.team_service = container.team_service
+        self.exp_service = container.exp_service
+        self.move_service = container.move_service
+
+        self.adventure_cooldown = self.plugin.game_config["adventure"]["cooldown"]
 
     async def view_locations(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = await self._check_registered(user_id)
         if not check_res.success:
@@ -59,7 +60,7 @@ class AdventureHandlers:
 
     async def adventure(self, event: AstrMessageEvent):
         """进入指定区域冒险"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = await self._check_registered(user_id)
         if not check_res.success:
@@ -71,16 +72,20 @@ class AdventureHandlers:
             yield event.plain_result(AnswerEnum.USER_ADVENTURE_ALREADY_ENCOUNTERED.value)
             return
 
-        user = self.user_repo.get_user_by_id(user_id)
+        user = self.user_service.get_user_by_id(user_id)
+        if not user.success:
+            yield event.plain_result(user.message)
+            return
+        user = user.data
         current_time = time.time()
         last_time = user.last_adventure_time if user and user.last_adventure_time else 0
-        cooldown_remaining = (last_time + self.plugin.adventure_cooldown) - current_time
+        cooldown_remaining = (last_time + self.adventure_cooldown) - current_time
 
         if cooldown_remaining > 0:
             yield event.plain_result(AnswerEnum.USER_ADVENTURE_COOLDOWN.value.format(cooldown=int(cooldown_remaining)))
             return
 
-        if not self.team_repo.get_user_team(user_id):
+        if not self.team_service.get_user_team(user_id).success:
             yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
             return
 
@@ -105,7 +110,7 @@ class AdventureHandlers:
 
         # 4. 成功后处理
         d: AdventureResult = result.data
-        self.user_repo.update_user_last_adventure_time(user_id, time.time())  # 更新冷却
+        self.user_service.update_user_last_adventure_time(user_id, time.time())  # 更新冷却
 
         message = (
             f"🌳 在 {d.location.name} 中冒险！\n\n"
@@ -117,7 +122,7 @@ class AdventureHandlers:
 
     async def battle(self, event: AstrMessageEvent):
         """处理战斗指令"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = await self._check_registered(user_id)
         if not check_res.success:
@@ -141,7 +146,7 @@ class AdventureHandlers:
 
     async def view_battle_log(self, event: AstrMessageEvent):
         """查看战斗日志"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = await self._check_registered(user_id)
         if not check_res.success:
@@ -155,11 +160,8 @@ class AdventureHandlers:
             return
 
         log_id = int(args[1])
-        if not self.battle_repo:
-            yield event.plain_result("❌ 战斗日志系统未启用")
-            return
 
-        log = self.battle_repo.get_battle_log_by_id(log_id)
+        log = self.adventure_service.get_battle_log_by_id(log_id)
         if not log:
             yield event.plain_result("❌ 找不到该战斗日志")
             return
@@ -184,7 +186,7 @@ class AdventureHandlers:
 
     async def catch_pokemon(self, event: AstrMessageEvent):
         """处理捕捉野生宝可梦的指令"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = await self._check_registered(user_id)
         if not check_res.success:
@@ -214,7 +216,7 @@ class AdventureHandlers:
         pokeball = data['pokeball_item']
 
         # 消耗道具
-        self.user_repo.add_user_item(user_id, pokeball.item_id, -1)
+        self.user_service.add_user_item(user_id, pokeball.item_id, -1)
 
         # 判定结果
         is_success = random.random() < success_rate
@@ -222,14 +224,15 @@ class AdventureHandlers:
 
         if is_success:
             # 构造并保存宝可梦
-            new_pokemon = self._create_and_save_caught_pokemon(user_id, wild_pokemon)
-            self._update_encounter_log(user_id, wild_pokemon.id, captured=True)
+            new_pokemon = self.user_pokemon_service._create_and_save_caught_pokemon(user_id, wild_pokemon)
+            self.user_service._update_encounter_log(user_id, wild_pokemon.id, captured=True)
 
             message += (
                 f"🎉 捕捉成功！\n"
                 f"已添加 {wild_pokemon.name} 到收藏 (ID: {new_pokemon.id})。\n"
                 f"消耗: [{pokeball.item_id}] {pokeball.name_zh} (剩余: {pokeball.quantity - 1})"
             )
+
         else:
             message += (
                 f"❌ 捕捉失败！{wild_pokemon.name} 挣脱了！\n"
@@ -241,7 +244,7 @@ class AdventureHandlers:
 
     async def run(self, event: AstrMessageEvent):
         """处理逃跑指令"""
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = await self._check_registered(user_id)
         if not check_res.success:
@@ -253,7 +256,7 @@ class AdventureHandlers:
             return
 
         if random.random() < 0.8:  # 80% 几率逃跑
-            self._update_encounter_log(user_id, wild_pokemon.id, deleted=True)
+            self.user_service._update_encounter_log(user_id, wild_pokemon.id, deleted=True)
             yield event.plain_result(f"🏃 您成功从 {wild_pokemon.name} 身边逃跑了！")
         else:
             yield event.plain_result(f"😅 逃跑失败！{wild_pokemon.name} 还在盯着你...\n请选择 /战斗 或再次 /逃跑。")
@@ -261,7 +264,7 @@ class AdventureHandlers:
     async def learn_move(self, event: AstrMessageEvent):
         """处理学习新技能指令 (入口)"""
         # 复用之前优化好的代码逻辑
-        user_id = userid_to_base32(self.plugin._get_effective_user_id(event))
+        user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = await self._check_registered(user_id)
         if not check_res.success:
@@ -318,48 +321,22 @@ class AdventureHandlers:
                     move_res = lvl_info.get("move_learning_result")
                     if move_res and move_res.get("new_moves"):
                         moves = ", ".join(m.get('name', '未知') for m in move_res['new_moves'])
+                        moves_id = [m.get('id') for m in move_res['new_moves']]
                         if move_res.get("requires_choice"):
                             lines.append(f"  ⚡ 领悟新技能: {moves} (技能槽已满，请使用 /学习技能)")
                         else:
-                            lines.append(f"  ⚡ 学会新技能: {moves}")
+                            lines.append(f"  ⚡ 学会新技能: {moves}[{', '.join(map(str, moves_id))}]")
                 lines.append("")
 
         return "\n".join(lines)
 
-    def _create_and_save_caught_pokemon(self, user_id: str, wild: WildPokemonInfo) -> UserPokemonInfo:
-        """创建并保存捕捉到的宝可梦 (封装Repo操作)"""
-        info = UserPokemonInfo(
-            id=0, species_id=wild.species_id, name=wild.name,
-            level=wild.level, exp=wild.exp, gender=wild.gender,
-            stats=wild.stats, ivs=wild.ivs, evs=wild.evs, moves=wild.moves
-        )
-        pid = self.user_repo.create_user_pokemon(user_id, info)
-        return self.user_repo.get_user_pokemon_by_id(user_id, pid)
-
-    def _update_encounter_log(self, user_id: str, wild_id: int, captured: bool = False, deleted: bool = False):
-        """更新遭遇日志 (封装Repo操作)"""
-        try:
-            logs = self.pokemon_repo.get_user_encounters(user_id, limit=5)
-            # 找到最近一条匹配且未处理的记录
-            target_log = next((l for l in logs if l.wild_pokemon_id == wild_id and l.is_captured == 0), None)
-
-            if target_log:
-                self.pokemon_repo.update_encounter_log(
-                    log_id=target_log.id,
-                    is_captured=1 if captured else 0,
-                    isdel=1 if deleted else 0
-                )
-        except Exception as e:
-            # 日志更新失败不应阻断主流程，打印错误即可
-            logger.error(f"Error updating encounter log: {e}")
-
     async def _handle_show_learnable_moves(self, event, user_id):
         """子逻辑：显示队伍中可学习的技能"""
-        user_team = self.plugin.team_repo.get_user_team(user_id)
-        if not user_team:
+        result = self.team_service.get_user_team(user_id)
+        if not result.success or not result.data:
             yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
             return
-
+        user_team = result.data
         message = ["🔍 检查队伍中是否有宝可梦可以学习新技能：\n"]
         has_new_move = False
 

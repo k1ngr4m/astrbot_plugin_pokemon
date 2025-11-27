@@ -25,6 +25,12 @@ class AnswerEnum(Enum):
     USER_POKEMONS_NOT_FOUND = "❌ 您还没有获得任何宝可梦。\n\n请先使用 /冒险 <区域ID> 指令去冒险遇到野生宝可梦，或使用 /捕捉 指令捕捉野生宝可梦。"
     USER_POKEMON_ALL_POKEMON_SUCCESS = "✅ 您当前已获得的所有宝可梦如下：\n\n{pokemon_list}"
     USER_ADVENTURE_COOLDOWN = "❌ 冒险冷却中，请等待 {cooldown} 秒后再试。"
+    USER_ADVENTURE_TIME_UPDATED = "✅ 冒险时间已更新。"
+    USER_ITEM_ADDED = "✅ 道具已添加到您的背包中。"
+    USER_POKEMON_CREATED = "✅ 宝可梦已创建。"
+    USER_ENCOUNTERS = "您最近的遭遇记录：\n{encounters}"
+    USER_ENCOUNTERS_UPDATED = "✅ 遭遇记录已更新。"
+
 
     # 宝可梦相关提示
     POKEMON_INIT_SELECT_USAGE_ERROR = "❌ 请输入宝可梦ID。\n\n用法：初始选择 <宝可梦ID>"
