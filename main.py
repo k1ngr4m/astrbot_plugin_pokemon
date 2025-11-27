@@ -3,19 +3,11 @@ import os
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star
 from astrbot.api import logger, AstrBotConfig
+from .astrbot_plugin_pokemon.core.container import GameContainer
 
 # --- Imports 保持不变 ---
-from .astrbot_plugin_pokemon.core.services.user_pokemon_service import UserPokemonService
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
-
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_team_repo import SqliteTeamRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_battle_repo import SqliteBattleRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
-from .astrbot_plugin_pokemon.infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
+from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
 
 from .astrbot_plugin_pokemon.interface.commands.common_handlers import CommonHandlers
 from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers
@@ -26,15 +18,6 @@ from .astrbot_plugin_pokemon.interface.commands.shop_handlers import ShopHandler
 from .astrbot_plugin_pokemon.interface.commands.user_handlers import UserHandlers
 from .astrbot_plugin_pokemon.interface.commands.user_pokemon_handles import UserPokemonHandlers
 
-from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
-from .astrbot_plugin_pokemon.core.services.pokemon_service import PokemonService
-from .astrbot_plugin_pokemon.core.services.team_service import TeamService
-from .astrbot_plugin_pokemon.core.services.adventure_service import AdventureService
-from .astrbot_plugin_pokemon.core.services.exp_service import ExpService
-from .astrbot_plugin_pokemon.core.services.user_service import UserService
-from .astrbot_plugin_pokemon.core.services.item_service import ItemService
-from .astrbot_plugin_pokemon.core.services.shop_service import ShopService
-from .astrbot_plugin_pokemon.core.services.move_service import MoveService
 
 
 class PokemonPlugin(Star):
@@ -62,54 +45,22 @@ class PokemonPlugin(Star):
         self.secret_key = webui_config.get("secret_key")
         self.port = webui_config.get("port", 7777)
 
-        # 3. 初始化核心组件 (Repos, Services, Handlers)
-        # 将几十行实例化代码移入私有方法，保持 __init__ 清爽
-        self._init_components()
+        # 3. 初始化容器 (结构优化的核心)
+        # 所有的脏活累活都交给 Container，main.py 瞬间清爽
+        self.container = GameContainer(str(self.db_path), self.game_config)
 
-        # 4. 其他状态管理
+        # 4. 兼容性桥接 (解决 IDE 杂乱与兼容旧代码)
+        self._bridge_compatibility()
+
+        # 5. 初始化 Handlers
+        self._init_handlers()
+
+        # 6. 其他状态管理
         self.impersonation_map = {}
         self.adventure_cooldown = self.game_config["adventure"]["cooldown"]
 
-    def _init_components(self):
+    def _init_handlers(self):
         """负责实例化所有的 Repository, Service 和 Handler"""
-
-        # --- Repositories (只存路径，不连接数据库) ---
-        self.user_repo = SqliteUserRepository(self.db_path)
-        self.pokemon_repo = SqlitePokemonRepository(self.db_path)
-        self.team_repo = SqliteTeamRepository(self.db_path)
-        self.adventure_repo = SqliteAdventureRepository(self.db_path)
-        self.shop_repo = SqliteShopRepository(self.db_path)
-        self.item_repo = SqliteItemRepository(self.db_path)
-        self.move_repo = SqliteMoveRepository(self.db_path)
-        self.battle_repo = SqliteBattleRepository(self.db_path)
-
-        # --- Services (依赖注入) ---
-        self.pokemon_service = PokemonService(
-            pokemon_repo=self.pokemon_repo, move_repo=self.move_repo, config=self.game_config
-        )
-        self.user_service = UserService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
-            pokemon_service=self.pokemon_service, config=self.game_config
-        )
-        self.user_pokemon_service = UserPokemonService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
-            pokemon_service=self.pokemon_service, config=self.game_config
-        )
-        self.team_service = TeamService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo, config=self.game_config
-        )
-        self.exp_service = ExpService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
-            move_repo=self.move_repo, config=self.game_config
-        )
-        self.adventure_service = AdventureService(
-            adventure_repo=self.adventure_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
-            pokemon_service=self.pokemon_service, user_repo=self.user_repo, exp_service=self.exp_service,
-            config=self.game_config, move_repo=self.move_repo, battle_repo=self.battle_repo
-        )
-        self.item_service = ItemService(user_repo=self.user_repo)
-        self.shop_service = ShopService(user_repo=self.user_repo, shop_repo=self.shop_repo)
-        self.move_service = MoveService(move_repo=self.move_repo)
 
         # --- Handlers (注入 Plugin self) ---
         self.common_handlers = CommonHandlers(self)
@@ -120,6 +71,30 @@ class PokemonPlugin(Star):
         self.adventure_handlers = AdventureHandlers(self)
         self.item_handlers = ItemHandlers(self)
         self.shop_handlers = ShopHandlers(self)
+
+    def _bridge_compatibility(self):
+        """
+        将容器中的 Service 映射到 self 上，以兼容现有的 Handler 代码。
+        现有的 Handler 可能通过 self.plugin.user_service 调用。
+        """
+        self.pokemon_service = self.container.pokemon_service
+        self.user_service = self.container.user_service
+        self.user_pokemon_service = self.container.user_pokemon_service
+        self.team_service = self.container.team_service
+        self.exp_service = self.container.exp_service
+        self.adventure_service = self.container.adventure_service
+        self.item_service = self.container.item_service
+        self.shop_service = self.container.shop_service
+        self.move_service = self.container.move_service
+
+        self.user_repo = self.container.user_repo
+        self.pokemon_repo = self.container.pokemon_repo
+        self.team_repo = self.container.team_repo
+        self.adventure_repo = self.container.adventure_repo
+        self.shop_repo = self.container.shop_repo
+        self.item_repo = self.container.item_repo
+        self.move_repo = self.container.move_repo
+        self.battle_repo = self.container.battle_repo
 
     async def initialize(self):
         """
