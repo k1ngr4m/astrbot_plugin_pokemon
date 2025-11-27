@@ -14,22 +14,8 @@ from ..models.user_models import UserTeam, UserItems
 from ...infrastructure.repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository
 )
-from ..models.adventure_models import AdventureResult, LocationInfo, BattleResult
+from ..models.adventure_models import AdventureResult, LocationInfo, BattleResult, BattleMoveInfo
 from astrbot.api import logger
-
-
-@dataclass
-class BattleMoveInfo:
-    power: int
-    accuracy: float
-    type_name: str
-    damage_class_id: int  # 2 for physical, 3 for special
-    priority: int
-    type_effectiveness: float
-    stab_bonus: float
-    move_id: int = 0
-    move_name: str = ""
-
 
 class AdventureService:
     """冒险区域相关的业务逻辑服务"""

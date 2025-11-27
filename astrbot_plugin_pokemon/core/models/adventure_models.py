@@ -48,3 +48,15 @@ class BattleResult:
     exp_details: Dict[str, any]
     battle_log: List[Dict[str, any]] = None  # 战斗日志，记录所有参与战斗的宝可梦及结果
     log_id: int = 0  # 战斗日志ID
+
+@dataclass
+class BattleMoveInfo:
+    power: int
+    accuracy: float
+    type_name: str
+    damage_class_id: int  # 2 for physical, 3 for special
+    priority: int
+    type_effectiveness: float
+    stab_bonus: float
+    move_id: int = 0
+    move_name: str = ""

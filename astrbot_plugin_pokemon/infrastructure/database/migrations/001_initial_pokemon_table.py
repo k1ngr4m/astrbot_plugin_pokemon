@@ -91,9 +91,11 @@ def up(cursor: sqlite3.Cursor):
     """)
 
     # pokemon_moves表索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_name ON pokemon_moves(pokemon_species_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(move_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(move_method)")
+    # pokemon_species_id和move_id唯一索引
+    cursor.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_moves_unique ON pokemon_moves(pokemon_species_id, move_id, move_method_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_species_id ON pokemon_moves(pokemon_species_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_id ON pokemon_moves(move_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pokemon_moves_type_id ON pokemon_moves(move_method_id)")
 
 
     # --- 4. 道具系统 ---
