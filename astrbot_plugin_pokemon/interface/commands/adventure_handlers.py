@@ -141,7 +141,7 @@ class AdventureHandlers:
             if battle_log:
                 message += "👥 参战宝可梦:\n"
                 for i, battle_record in enumerate(battle_log, 1):
-                    pokemon_result = "获胜" if battle_record['result'] == 'success' else "失败"
+                    pokemon_result = "获胜" if battle_record['result'] == 'win' else "失败"
                     message += f"  {i}. {battle_record['pokemon_name']} [{battle_record['pokemon_id']}] (Lv.{battle_record['level']}) - {pokemon_result} (胜率: {battle_record['win_rate']}%)\n"
                 message += "\n"
 
