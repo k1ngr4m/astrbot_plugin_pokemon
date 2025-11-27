@@ -436,6 +436,18 @@ class ExpService:
             results.append(result)
         return results
 
+    def check_learnable_moves(self, species_id: int, current_level: int, new_level: int, current_moves) -> tuple[list, list]:
+        """
+        检查宝可梦在升级过程中可以学习的新技能
+        """
+        return self._check_and_learn_new_moves(species_id, current_level, new_level, current_moves)
+
+    def add_move_to_pokemon(self, moves, new_move_id: int) -> tuple:
+        """
+        将新技能添加到宝可梦的技能列表中
+        """
+        return self._add_move_to_pokemon(moves, new_move_id)
+
     def update_user_after_battle(self, user_id: str, exp_gained: int) -> Dict[str, Any]:
         """
         战斗后更新用户的经验值和等级

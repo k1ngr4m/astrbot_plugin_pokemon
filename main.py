@@ -32,6 +32,7 @@ from .astrbot_plugin_pokemon.core.services.exp_service import ExpService
 from .astrbot_plugin_pokemon.core.services.user_service import UserService
 from .astrbot_plugin_pokemon.core.services.item_service import ItemService
 from .astrbot_plugin_pokemon.core.services.shop_service import ShopService
+from .astrbot_plugin_pokemon.core.services.move_service import MoveService
 from .astrbot_plugin_pokemon.interface.commands.user_pokemon_handles import UserPokemonHandlers
 
 
@@ -147,6 +148,9 @@ class PokemonPlugin(Star):
         self.shop_service = ShopService(
             user_repo=self.user_repo,
             shop_repo=self.shop_repo
+        )
+        self.move_service = MoveService(
+            move_repo=self.move_repo
         )
         self.common_handlers = CommonHandlers(self)
         self.user_handlers = UserHandlers(self)

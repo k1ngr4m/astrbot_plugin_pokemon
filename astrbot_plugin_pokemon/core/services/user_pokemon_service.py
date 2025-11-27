@@ -152,3 +152,25 @@ class UserPokemonService:
             message=AnswerEnum.USER_POKEMON_ALL_POKEMON_SUCCESS.value,
             data=formatted_pokemon
         )
+
+    def update_user_pokemon_moves(self, user_id: str, pokemon_id: int, moves) -> BaseResult:
+        """
+        更新用户宝可梦的技能
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+            moves: 技能对象
+        Returns:
+            BaseResult
+        """
+        try:
+            self.pokemon_repo.update_pokemon_moves(moves, pokemon_id, user_id)
+            return BaseResult(
+                success=True,
+                message="技能更新成功"
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"更新技能失败: {str(e)}"
+            )
