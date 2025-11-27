@@ -77,6 +77,7 @@ class ShopHandlers:
                 # 显示物品ID
                 message += f"    [物品ID: {item.get('item_id', '未知')}]"
                 message += f"\n\n"
+            message += "💡 用法：宝可梦商店 [商店ID]\n例如：宝可梦商店 1\n"
             message += "\n"
 
         yield event.plain_result(message.strip())
