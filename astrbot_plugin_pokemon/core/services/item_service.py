@@ -34,7 +34,7 @@ class ItemService:
         total_items = 0
 
         for item in user_items.items:
-            item_type = item.type
+            item_type = item.category_id
             if item_type not in items_by_type:
                 items_by_type[item_type] = []
             items_by_type[item_type].append(item)
@@ -67,11 +67,7 @@ class ItemService:
 
         items_by_type = items_result["items_by_type"]
         type_names = {
-            "Pokeball": "精灵球",
-            "Healing": "回复道具",
-            "Battle": "对战道具",
-            "Evolution": "进化道具",
-            "Misc": "其他道具"
+            34: "精灵球",
         }
 
         for item_type, items in items_by_type.items():
@@ -79,7 +75,7 @@ class ItemService:
             formatted_text += f"🔸 {type_name}:\n"
 
             for item in items:
-                formatted_text += f"  • [{item.item_id}] {item.name} x{item.quantity}\n"
+                formatted_text += f"  • [{item.item_id}] {item.name_zh} x{item.quantity}\n"
                 if item.description:
                     formatted_text += f"    {item.description}\n"
             formatted_text += "\n"
