@@ -13,7 +13,6 @@ class AdventureHandlers:
         self.plugin = plugin
         self.user_service = plugin.user_service
         self.adventure_service = plugin.adventure_service
-        self.battle_service = plugin.battle_service
         self.pokemon_service = plugin.pokemon_service
         self.team_service = plugin.team_service
 

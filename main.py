@@ -28,7 +28,6 @@ from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupSe
 from .astrbot_plugin_pokemon.core.services.pokemon_service import PokemonService
 from .astrbot_plugin_pokemon.core.services.team_service import TeamService
 from .astrbot_plugin_pokemon.core.services.adventure_service import AdventureService
-from .astrbot_plugin_pokemon.core.services.battle_service import BattleService
 from .astrbot_plugin_pokemon.core.services.exp_service import ExpService
 from .astrbot_plugin_pokemon.core.services.user_service import UserService
 from .astrbot_plugin_pokemon.core.services.item_service import ItemService
@@ -140,15 +139,6 @@ class PokemonPlugin(Star):
             config=self.game_config,
             move_repo=self.move_repo,
             battle_repo=self.battle_repo
-        )
-
-
-        self.battle_service = BattleService(
-            user_repo=self.user_repo,
-            pokemon_repo=self.pokemon_repo,
-            team_repo=self.team_repo,
-            config=self.game_config,
-            exp_service=self.exp_service
         )
         self.item_service = ItemService(
             user_repo=self.user_repo
