@@ -94,12 +94,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             move4_id=row_dict['move4_id']
         )
 
-        row_dict = dict(row)
-
-        row_dict.pop('created_at', None)
-        row_dict.pop('updated_at', None)
-        row_dict.pop('isdel', None)
-
         return WildPokemonInfo(
             id=row_dict['id'],
             species_id=row_dict['species_id'],
@@ -205,17 +199,6 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 'base_form_id': data.get('base_form_id', 0)
             })
             conn.commit()
-
-    def add_pokemon_move_template(self, data: Dict[str, Any]) -> None:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT OR IGNORE INTO pokemon_moves
-                (id, name, type_id, category, power, accuracy, pp, description)
-                VALUES (:id, :name, :type_id, :category, :power, :accuracy, :pp, :description)
-            """, {**data})
-            conn.commit()
-
 
     def get_pokemon_types(self, species_id: int) -> List[str]:
         with self._get_connection() as conn:
@@ -476,4 +459,48 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 moves.move1_id, moves.move2_id, moves.move3_id, moves.move4_id,
                 pokemon_id, user_id
             ))
+            conn.commit()
+
+    # 新增批量插入方法
+    def add_pokemon_templates_batch(self, data_list: List[Dict[str, Any]]) -> None:
+        if not data_list:
+            return
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # 使用 executemany 进行批量插入
+            cursor.executemany("""
+                               INSERT OR IGNORE INTO pokemon_species
+                               (id, name_en, name_zh, generation_id, base_hp, base_attack,
+                                base_defense, base_sp_attack, base_sp_defense, base_speed,
+                                height, weight, base_experience, gender_rate, capture_rate,
+                                growth_rate_id, description, orders)
+                               VALUES (:id, :name_en, :name_zh, :generation_id, :base_hp,
+                                       :base_attack, :base_defense, :base_sp_attack,
+                                       :base_sp_defense, :base_speed, :height, :weight,
+                                       :base_experience, :gender_rate, :capture_rate,
+                                       :growth_rate_id, :description, :orders)
+                               """, data_list)
+            conn.commit()
+
+    # 同理，可以为 evolution, type 等添加 batch 方法
+    def add_pokemon_evolutions_batch(self, data_list: List[Dict[str, Any]]) -> None:
+        if not data_list:
+            return
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany("""
+                               INSERT OR IGNORE INTO pokemon_evolutions
+                               (pre_species_id, evolved_species_id, evolution_trigger_id, trigger_item_id,
+                                minimum_level, gender_id, held_item_id, time_of_day, known_move_id,
+                                minimum_happiness, minimum_beauty, minimum_affection,
+                                relative_physical_stats, party_species_id, trade_species_id,
+                                needs_overworld_rain)
+                               VALUES (:pre_species_id, :evolved_species_id, :evolution_trigger_id,
+                                       :trigger_item_id,
+                                       :minimum_level, :gender_id, :held_item_id, :time_of_day, :known_move_id,
+                                       :minimum_happiness, :minimum_beauty, :minimum_affection,
+                                       :relative_physical_stats, :party_species_id, :trade_species_id,
+                                       :needs_overworld_rain)
+                               """, data_list)
             conn.commit()

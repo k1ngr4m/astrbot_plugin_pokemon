@@ -95,8 +95,15 @@ class AbstractPokemonRepository(ABC):
     def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon_id: int, location_id: int, encounter_rate: float) -> None: pass
 
     # 添加野生宝可梦
+    @abstractmethod
     def add_wild_pokemon(self, wild_pokemon_info: WildPokemonInfo) -> int: pass
 
+    # 添加宝可梦模板批量
+    @abstractmethod
+    def add_pokemon_templates_batch(self, pokemon_data_list: List[Dict[str, Any]]) -> None: pass
+
+    @abstractmethod
+    def add_pokemon_evolutions_batch(self, type_data_list: List[Dict[str, Any]]) -> None: pass
     # ==========改==========
     # 更新宝可梦经验
     @abstractmethod

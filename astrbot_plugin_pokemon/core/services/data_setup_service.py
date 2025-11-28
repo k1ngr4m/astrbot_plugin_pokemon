@@ -74,31 +74,43 @@ class DataSetupService:
         # 注意：初始数据中的其他数据（如技能、冒险区域等）可能仍需要从其他来源获取
         # 我们假设这些数据仍然在initial_data.py中，或者需要创建对应的CSV文件
 
-        # 填充Pokemon数据
+        # 1. 填充 Pokemon 数据 (批量)
         if not pokemon_species_df.empty:
-            for _, pokemon_row in pokemon_species_df.iterrows():
-                self.pokemon_repo.add_pokemon_template(
-                    {
-                        "id": pokemon_row['id'],
-                        "name_en": pokemon_row['name_en'],
-                        "name_zh": pokemon_row['name_zh'],
-                        "generation_id": pokemon_row['generation_id'],
-                        "base_hp": pokemon_row['base_hp'],
-                        "base_attack": pokemon_row['base_attack'],
-                        "base_defense": pokemon_row['base_defense'],
-                        "base_sp_attack": pokemon_row['base_sp_attack'],
-                        "base_sp_defense": pokemon_row['base_sp_defense'],
-                        "base_speed": pokemon_row['base_speed'],
-                        "height": pokemon_row['height'],
-                        "weight": pokemon_row['weight'],
-                        "base_experience": pokemon_row['base_experience'],
-                        "gender_rate": pokemon_row['gender_rate'],
-                        "capture_rate": pokemon_row['capture_rate'],
-                        "growth_rate_id": pokemon_row['growth_rate_id'],
-                        "description": pokemon_row['description'],
-                        "orders": pokemon_row['order'] if 'order' in pokemon_species_df.columns else pokemon_row['id']
-                    }
-                )
+            # 将 DataFrame 中的 NaN 替换为 None，以适配 SQL
+            pokemon_species_df = pokemon_species_df.where(pd.notnull(pokemon_species_df), None)
+
+            # 构造数据列表
+            pokemon_data_list = []
+            for _, row in pokemon_species_df.iterrows():  # 或者直接用 to_dict('records') 后处理键名映射
+                # 这里的映射逻辑比较简单，可以直接构造
+                pokemon_data_list.append({
+                    "id": row['id'],
+                    "name_en": row['name_en'],
+                    "name_zh": row['name_zh'],
+                    "generation_id": row['generation_id'],
+                    "base_hp": row['base_hp'],
+                    "base_attack": row['base_attack'],
+                    "base_defense": row['base_defense'],
+                    "base_sp_attack": row['base_sp_attack'],
+                    "base_sp_defense": row['base_sp_defense'],
+                    "base_speed": row['base_speed'],
+                    "height": row['height'],
+                    "weight": row['weight'],
+                    "base_experience": row['base_experience'],
+                    "gender_rate": row['gender_rate'],
+                    "capture_rate": row['capture_rate'],
+                    "growth_rate_id": row['growth_rate_id'],
+                    "description": row['description'],
+                    "orders": row.get('order', row['id'])
+                })
+
+            # 调用批量插入接口 (需要确保 Repo 中实现了该方法，如上一步所示)
+            if hasattr(self.pokemon_repo, 'add_pokemon_templates_batch'):
+                self.pokemon_repo.add_pokemon_templates_batch(pokemon_data_list)
+            else:
+                # 兼容旧代码，但建议升级 Repo
+                for data in pokemon_data_list:
+                    self.pokemon_repo.add_pokemon_template(data)
 
         # 填充Pokemon类型数据
         if not pokemon_types_df.empty:
@@ -123,9 +135,12 @@ class DataSetupService:
 
         # 填充Pokemon进化数据
         if not pokemon_evolution_df.empty:
+            pokemon_evolution_df = pokemon_evolution_df.where(pd.notnull(pokemon_evolution_df), None)
+
+            pokemon_evolution_data_list = []
             for _, evolution_row in pokemon_evolution_df.iterrows():
                 # 直接使用CSV中的字段映射到数据库字段
-                evolution_data = {
+                pokemon_evolution_data_list.append({
                     "id": evolution_row['id'],
                     "pre_species_id": evolution_row['pre_species_id'],
                     "evolved_species_id": evolution_row['evolved_species_id'],
@@ -149,9 +164,14 @@ class DataSetupService:
                     "turn_upside_down": evolution_row.get('turn_upside_down', 0),
                     "region_id": evolution_row.get('region_id', 0),
                     "base_form_id": evolution_row.get('base_form_id', 0)
-                }
+                })
 
-                self.pokemon_repo.add_pokemon_evolution_template(evolution_data)
+            if hasattr(self.pokemon_repo, 'add_pokemon_evolutions_batch'):
+                self.pokemon_repo.add_pokemon_evolutions_batch(pokemon_evolution_data_list)
+
+            else:
+                for data in pokemon_evolution_data_list:
+                    self.pokemon_repo.add_pokemon_evolution_template(data)
 
         # 填充物品数据
         if not items_df.empty:

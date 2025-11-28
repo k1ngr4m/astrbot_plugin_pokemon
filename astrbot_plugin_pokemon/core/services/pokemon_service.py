@@ -23,6 +23,18 @@ class PokemonService:
         self.move_repo = move_repo
         self.config = config
 
+    @staticmethod
+    # 静态方法：生成0-31的随机IV
+    def generate_iv() -> int:
+        return random.randint(0, 31)
+
+    # 移出内部函数，改为方法
+    def _calculate_stat(self, base: int, iv: int, ev: int, level: int, is_hp: bool = False) -> int:
+        base_calculation = (base * 2 + iv + ev // 4) * level / 100
+        if is_hp:
+            return int(base_calculation) + level + self.HP_FORMULA_CONSTANT
+        return int(base_calculation) + self.NON_HP_FORMULA_CONSTANT
+
     def create_single_pokemon(self, species_id: int, max_level: int, min_level: int) -> PokemonCreateResult:
         """
         创建一个新的宝可梦实例，使用指定的宝可梦ID和等级范围
@@ -33,27 +45,6 @@ class PokemonService:
         Returns:
             包含宝可梦信息的字典
         """
-
-        # 局部函数：生成0-31的随机IV
-        def generate_iv() -> int:
-            return random.randint(0, 31)
-
-        # 局部函数：计算属性值（提取重复的计算公式）
-        def calculate_stat(base: int, iv: int, ev: int, level: int, is_hp: bool = False) -> int:
-            """
-            根据种族值、IV、EV、等级计算最终属性值
-            Args:
-                base: 种族值
-                iv: 个体值
-                ev: 努力值
-                level: 等级
-                is_hp: 是否为HP属性（HP公式不同）
-            """
-            base_calculation = (base * 2 + iv + ev // 4) * level / 100
-            if is_hp:
-                return int(base_calculation) + level + self.HP_FORMULA_CONSTANT
-            return int(base_calculation) + self.NON_HP_FORMULA_CONSTANT
-
         # 1. 获取宝可梦模板
         pokemon_template = self.pokemon_repo.get_pokemon_by_id(species_id)
         if not pokemon_template:
@@ -83,12 +74,12 @@ class PokemonService:
 
         # 3. 生成IV和EV（使用局部函数简化）
         ivs = {
-            "hp": generate_iv(),
-            "attack": generate_iv(),
-            "defense": generate_iv(),
-            "sp_attack": generate_iv(),
-            "sp_defense": generate_iv(),
-            "speed": generate_iv()
+            "hp": self.generate_iv(),
+            "attack": self.generate_iv(),
+            "defense": self.generate_iv(),
+            "sp_attack": self.generate_iv(),
+            "sp_defense": self.generate_iv(),
+            "speed": self.generate_iv()
         }
         evs = {key: 0 for key in ivs.keys()}  # 简化EV初始化（与IV键一致）
 
@@ -104,12 +95,12 @@ class PokemonService:
 
         # 5. 计算最终属性（使用局部函数，避免重复代码）
         stats = {
-            "hp": calculate_stat(base_stats["hp"], ivs["hp"], evs["hp"], level, is_hp=True),
-            "attack": calculate_stat(base_stats["attack"], ivs["attack"], evs["attack"], level),
-            "defense": calculate_stat(base_stats["defense"], ivs["defense"], evs["defense"], level),
-            "sp_attack": calculate_stat(base_stats["sp_attack"], ivs["sp_attack"], evs["sp_attack"], level),
-            "sp_defense": calculate_stat(base_stats["sp_defense"], ivs["sp_defense"], evs["sp_defense"], level),
-            "speed": calculate_stat(base_stats["speed"], ivs["speed"], evs["speed"], level)
+            "hp": self._calculate_stat(base_stats["hp"], ivs["hp"], evs["hp"], level, is_hp=True),
+            "attack": self._calculate_stat(base_stats["attack"], ivs["attack"], evs["attack"], level),
+            "defense": self._calculate_stat(base_stats["defense"], ivs["defense"], evs["defense"], level),
+            "sp_attack": self._calculate_stat(base_stats["sp_attack"], ivs["sp_attack"], evs["sp_attack"], level),
+            "sp_defense": self._calculate_stat(base_stats["sp_defense"], ivs["sp_defense"], evs["sp_defense"], level),
+            "speed": self._calculate_stat(base_stats["speed"], ivs["speed"], evs["speed"], level)
         }
 
         # 6. 确保HP最小值（原逻辑保留，优化写法）
