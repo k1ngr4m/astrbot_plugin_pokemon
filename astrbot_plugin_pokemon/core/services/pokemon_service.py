@@ -240,7 +240,7 @@ class PokemonService:
             lines.append(f"#{sp_id:04d} {icon} {name}")
 
         lines.append("-" * 20)
-        lines.append("提示: 输入 /图鉴 <名字/ID> 查看详细资料")
+        lines.append("提示: 输入 /图鉴 [M名字/ID] 查看详细资料")
 
         return "\n\n".join(lines)
 

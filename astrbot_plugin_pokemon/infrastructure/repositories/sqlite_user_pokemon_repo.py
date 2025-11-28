@@ -322,7 +322,7 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                 SELECT DISTINCT w.species_id
                 FROM wild_pokemon_encounter_log log
                 JOIN wild_pokemon w ON log.wild_pokemon_id = w.id
-                WHERE log.user_id = ? AND log.isdel = 0 AND w.isdel = 0
+                WHERE log.user_id = ? AND w.isdel = 0
             """, (user_id,))
             seen_ids = {row[0] for row in cursor.fetchall()}
 
