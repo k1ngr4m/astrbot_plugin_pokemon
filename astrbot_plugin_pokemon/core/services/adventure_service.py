@@ -371,7 +371,7 @@ class AdventureService:
 
         # 更新野生宝可梦遇到日志 - 标记为已战斗
         # 获取最近的野生宝可梦遇到记录
-        recent_encounters: List[WildPokemonEncounterLog] = self.pokemon_repo.get_user_encounters(user_id, limit=5)
+        recent_encounters: List[WildPokemonEncounterLog] = self.user_pokemon_repo.get_user_encounters(user_id, limit=5)
         encounter_log_id = None
         for encounter in recent_encounters:
             if (encounter.wild_pokemon_id == wild_pokemon_info.id and
@@ -380,7 +380,7 @@ class AdventureService:
                 break
         if encounter_log_id:
             battle_outcome = "win" if battle_result_str == "success" else "lose"
-            self.pokemon_repo.update_encounter_log(
+            self.user_pokemon_repo.update_encounter_log(
                 log_id=encounter_log_id,
                 is_battled=1,
                 battle_result=battle_outcome

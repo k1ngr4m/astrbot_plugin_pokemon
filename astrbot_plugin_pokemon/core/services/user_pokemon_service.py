@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
@@ -200,3 +200,18 @@ class UserPokemonService:
             message=AnswerEnum.USER_POKEMON_POKEDEX_IDS_SUCCESS.value,
             data=user_progress
         )
+
+    def get_user_encountered_wild_pokemon(self, user_id: str) -> Optional[WildPokemonInfo]:
+        """
+        获取用户当前遇到的野生宝可梦
+        Args:
+            user_id (str): 用户ID
+        Returns:
+            Optional[WildPokemonInfo]: 野生宝可梦的详细信息，如果不存在则返回None
+        """
+        encountered_wild_pokemon = self.user_pokemon_repo.get_user_encountered_wild_pokemon(user_id)
+        if not encountered_wild_pokemon:
+            return None
+        wild_pokemon_id = encountered_wild_pokemon.wild_pokemon_id
+        wild_pokemon_info = self.pokemon_repo.get_wild_pokemon_by_id(wild_pokemon_id)
+        return wild_pokemon_info
