@@ -115,7 +115,8 @@ class PokemonPlugin(Star):
                 self.pokemon_repo,
                 self.adventure_repo,
                 self.shop_repo,
-                self.move_repo
+                self.move_repo,
+                self.item_repo,
             )
             data_setup_service.setup_initial_data()
             logger.info(f"[{self.plugin_id}] 初始数据检查/写入完成。")
