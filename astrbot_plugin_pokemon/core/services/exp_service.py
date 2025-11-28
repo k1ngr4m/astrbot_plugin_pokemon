@@ -3,6 +3,7 @@ from typing import Dict, Any
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats, PokemonMoves
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository, AbstractMoveRepository,
+    AbstractUserPokemonRepository,
 )
 
 class ExpService:
@@ -14,12 +15,14 @@ class ExpService:
         pokemon_repo: AbstractPokemonRepository,
         team_repo: AbstractTeamRepository,
         move_repo: AbstractMoveRepository,
+        user_pokemon_repo: AbstractUserPokemonRepository,
         config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.team_repo = team_repo
         self.move_repo = move_repo
+        self.user_pokemon_repo = user_pokemon_repo
         self.config = config
 
     def get_required_exp_for_level(self, level: int) -> int:
@@ -92,7 +95,7 @@ class ExpService:
         战斗后更新宝可梦的经验值和等级
         """
         # 获取用户宝可梦信息
-        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        pokemon_data = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
         if not pokemon_data:
             return {"success": False, "message": "宝可梦不存在"}
 
@@ -107,7 +110,7 @@ class ExpService:
         pokemon_id = pokemon_data.id
 
         # 更新宝可梦数据
-        self.pokemon_repo.update_pokemon_exp(level_up_info["new_level"], level_up_info["new_exp"], pokemon_id, user_id)
+        self.user_pokemon_repo.update_user_pokemon_exp(level_up_info["new_level"], level_up_info["new_exp"], pokemon_id, user_id)
 
         # 如果有升级，更新属性
         if level_up_info.get("levels_gained", 0) > 0:
@@ -149,7 +152,7 @@ class ExpService:
         if not species_data:
             return False
         # 获取宝可梦的IV和EV值
-        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        pokemon_data = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
         if not pokemon_data:
             return False
         # 获取各种族值
@@ -194,7 +197,7 @@ class ExpService:
             'speed': new_speed,
         }
         # 更新宝可梦的属性
-        self.pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
+        self.user_pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
         return True
 
     def _check_and_learn_new_moves(self, species_id: int, current_level: int, new_level: int, current_moves: PokemonMoves) -> tuple[list, list]:
@@ -246,7 +249,7 @@ class ExpService:
         返回包含学习的新技能信息的字典
         """
         # 获取用户宝可梦信息
-        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        pokemon_data = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
         if not pokemon_data:
             return {"success": False, "message": "宝可梦不存在", "new_moves": []}
 
@@ -303,7 +306,7 @@ class ExpService:
                         move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
 
             # 更新宝可梦的技能
-            self.pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
+            self.user_pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
 
             return {
                 "success": True,
@@ -339,7 +342,7 @@ class ExpService:
         返回包含学习的新技能信息的字典
         """
         # 获取用户宝可梦信息
-        pokemon_data = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        pokemon_data = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
         if not pokemon_data:
             return {"success": False, "message": "宝可梦不存在", "new_moves": []}
 
@@ -396,7 +399,7 @@ class ExpService:
                         move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
 
             # 更新宝可梦的技能
-            self.pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
+            self.user_pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
 
             return {
                 "success": True,

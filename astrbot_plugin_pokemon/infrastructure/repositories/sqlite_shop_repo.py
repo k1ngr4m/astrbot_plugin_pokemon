@@ -22,17 +22,6 @@ class SqliteShopRepository(AbstractShopRepository):
             self._local.connection = conn
         return conn
 
-    def add_item_template(self, item_data: Dict[str, Any]) -> None:
-        # 添加物品模板
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                           INSERT OR IGNORE INTO items
-                               (id, name_en, name_zh, category_id, cost, description)
-                           VALUES (:id, :name_en, :name_zh, :category_id, :cost, :description)
-                           """, {**item_data})
-            conn.commit()
-
     def add_shop_template(self, shop: Dict[str, Any]) -> None:
         """添加商店"""
         with self._get_connection() as conn:
@@ -108,11 +97,6 @@ class SqliteShopRepository(AbstractShopRepository):
             """, (shop_id,))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]
-
-    def check_shop_exists_by_id(self, shop_id: int) -> bool:
-        """检查商店是否存在"""
-        shop = self.get_shop_by_id(shop_id)
-        return shop is not None
 
     def get_a_shop_item_by_id(self, shop_item_id: int, shop_id: int) -> Optional[Dict[str, Any]]:
         """根据商店商品ID获取商店商品信息"""

@@ -50,7 +50,7 @@ class UserPokemonService:
             moves = new_pokemon.moves,
         )
         # 创建用户宝可梦记录，使用模板数据完善实例
-        pokemon_new_id = self.user_repo.create_user_pokemon(user_id, user_pokemon_info,)
+        pokemon_new_id = self.user_pokemon_repo.create_user_pokemon(user_id, user_pokemon_info)
 
         # 更新用户的初始选择状态
         pokemon_id = new_pokemon.base_pokemon.id
@@ -75,7 +75,7 @@ class UserPokemonService:
             包含宝可梦详细信息的字典
         """
         # 获取特定宝可梦的信息
-        pokemon_data: UserPokemonInfo = self.user_repo.get_user_pokemon_by_id(user_id, int(pokemon_id))
+        pokemon_data: UserPokemonInfo = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, int(pokemon_id))
         if not pokemon_data:
             return BaseResult(
                 success=False,
@@ -97,7 +97,7 @@ class UserPokemonService:
         Returns:
             包含用户宝可梦信息的字典
         """
-        user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
+        user_pokemon_list = self.user_pokemon_repo.get_user_pokemon(user_id)
 
         if not user_pokemon_list:
             return BaseResult(
@@ -138,7 +138,7 @@ class UserPokemonService:
             BaseResult
         """
         try:
-            self.pokemon_repo.update_pokemon_moves(moves, pokemon_id, user_id)
+            self.user_pokemon_repo.update_pokemon_moves(moves, pokemon_id, user_id)
             return BaseResult(
                 success=True,
                 message="技能更新成功"
@@ -159,7 +159,7 @@ class UserPokemonService:
             BaseResult
         """
         try:
-            pid = self.user_repo.create_user_pokemon(user_id, pokemon_info)
+            pid = self.user_pokemon_repo.create_user_pokemon(user_id, pokemon_info)
             return BaseResult(
                 success=True,
                 message=AnswerEnum.USER_POKEMON_CREATED.value,
@@ -178,8 +178,8 @@ class UserPokemonService:
             level=wild.level, exp=wild.exp, gender=wild.gender,
             stats=wild.stats, ivs=wild.ivs, evs=wild.evs, moves=wild.moves
         )
-        pid = self.user_repo.create_user_pokemon(user_id, info)
-        return self.user_repo.get_user_pokemon_by_id(user_id, pid)
+        pid = self.user_pokemon_repo.create_user_pokemon(user_id, info)
+        return self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
 
     def get_user_pokedex_ids(self, user_id: str) -> BaseResult[dict]:
         """

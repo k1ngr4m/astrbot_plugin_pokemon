@@ -1,6 +1,6 @@
 import sqlite3
 import threading
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from .abstract_repository import AbstractItemRepository
 
@@ -21,6 +21,19 @@ class SqliteItemRepository(AbstractItemRepository):
             self._local.connection = conn
         return conn
 
+    # ==========增==========
+    def add_item_template(self, item_data: Dict[str, Any]) -> None:
+        # 添加物品模板
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                           INSERT OR IGNORE INTO items
+                               (id, name_en, name_zh, category_id, cost, description)
+                           VALUES (:id, :name_en, :name_zh, :category_id, :cost, :description)
+                           """, {**item_data})
+            conn.commit()
+
+    # ==========查==========
     def get_item_name(self, item_id: int) -> Optional[str]:
         conn = self._get_connection()
         cursor = conn.cursor()

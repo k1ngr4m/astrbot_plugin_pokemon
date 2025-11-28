@@ -11,6 +11,7 @@ from ..core.services.move_service import MoveService
 from ..infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
 from ..infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from ..infrastructure.repositories.sqlite_team_repo import SqliteTeamRepository
+from ..infrastructure.repositories.sqlite_user_item_repo import SqliteUserItemRepository
 from ..infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
 from ..infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureRepository
 from ..infrastructure.repositories.sqlite_battle_repo import SqliteBattleRepository
@@ -37,6 +38,7 @@ class GameContainer:
         self.move_repo = SqliteMoveRepository(self.db_path)
         self.battle_repo = SqliteBattleRepository(self.db_path)
         self.user_pokemon_repo = SqliteUserPokemonRepository(self.db_path)
+        self.user_item_repo = SqliteUserItemRepository(self.db_path)
 
 
 
@@ -46,29 +48,42 @@ class GameContainer:
         )
         self.user_service = UserService(
             user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
-            pokemon_service=self.pokemon_service, config=self.config
+            user_item_repo=self.user_item_repo, pokemon_service=self.pokemon_service,
+            user_pokemon_repo=self.user_pokemon_repo, config=self.config
         )
         self.user_pokemon_service = UserPokemonService(
             user_repo=self.user_repo, pokemon_repo=self.pokemon_repo,
             user_pokemon_repo=self.user_pokemon_repo, item_repo=self.item_repo, config=self.config
         )
         self.team_service = TeamService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo, config=self.config
+            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
+            user_pokemon_repo=self.user_pokemon_repo, config=self.config
         )
         self.exp_service = ExpService(
             user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
-            move_repo=self.move_repo, config=self.config
+            move_repo=self.move_repo, user_pokemon_repo=self.user_pokemon_repo, config=self.config
         )
         self.adventure_service = AdventureService(
-            adventure_repo=self.adventure_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
-            pokemon_service=self.pokemon_service, user_repo=self.user_repo, exp_service=self.exp_service,
-            config=self.config, move_repo=self.move_repo, battle_repo=self.battle_repo
+            adventure_repo=self.adventure_repo,
+            pokemon_repo=self.pokemon_repo,
+            team_repo=self.team_repo,
+            pokemon_service=self.pokemon_service,
+            user_repo=self.user_repo,
+            move_repo=self.move_repo,
+            battle_repo=self.battle_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            user_item_repo=self.user_item_repo,
+            exp_service=self.exp_service,
+            config=self.config
         )
         self.item_service = ItemService(
-            user_repo=self.user_repo
+            user_repo=self.user_repo,
+            user_item_repo=self.user_item_repo
         )
         self.shop_service = ShopService(
-            user_repo=self.user_repo, shop_repo=self.shop_repo
+            user_repo=self.user_repo,
+            shop_repo=self.shop_repo,
+            user_item_repo=self.user_item_repo
         )
         self.move_service = MoveService(
             move_repo=self.move_repo

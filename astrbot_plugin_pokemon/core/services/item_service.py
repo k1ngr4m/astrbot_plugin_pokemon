@@ -2,14 +2,19 @@ from typing import Dict, Any
 
 from ...interface.response.answer_enum import AnswerEnum
 from ...core.models.user_models import UserItems
-from ...infrastructure.repositories.abstract_repository import AbstractUserRepository
+from ...infrastructure.repositories.abstract_repository import AbstractUserRepository, AbstractUserItemRepository
 
 
 class ItemService:
     """处理用户道具业务逻辑"""
 
-    def __init__(self, user_repo: AbstractUserRepository):
+    def __init__(
+            self,
+            user_repo: AbstractUserRepository,
+            user_item_repo: AbstractUserItemRepository
+    ):
         self.user_repo = user_repo
+        self.user_item_repo = user_item_repo
 
     def get_user_items(self, user_id: str) -> Dict[str, Any]:
         """
@@ -20,7 +25,7 @@ class ItemService:
             包含用户道具信息的字典
         """
         # 获取用户道具
-        user_items: UserItems = self.user_repo.get_user_items(user_id)
+        user_items: UserItems = self.user_item_repo.get_user_items(user_id)
 
         if not user_items:
             return {

@@ -4,6 +4,7 @@ from itertools import accumulate
 from typing import Dict, Any, List, Tuple, Optional
 from dataclasses import dataclass
 
+from . import user_pokemon_service
 from .exp_service import ExpService
 from .pokemon_service import PokemonService
 from ..models.common_models import BaseResult
@@ -12,7 +13,8 @@ from ..models.pokemon_models import WildPokemonInfo, PokemonStats, PokemonIVs, P
     UserPokemonInfo, WildPokemonEncounterLog, PokemonMoves
 from ..models.user_models import UserTeam, UserItems
 from ...infrastructure.repositories.abstract_repository import (
-    AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository
+    AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository,
+    AbstractUserPokemonRepository, AbstractBattleRepository, AbstractUserItemRepository
 )
 from ..models.adventure_models import AdventureResult, LocationInfo, BattleResult, BattleMoveInfo
 from astrbot.api import logger
@@ -27,10 +29,13 @@ class AdventureService:
             team_repo: AbstractTeamRepository,
             pokemon_service: PokemonService,
             user_repo: AbstractUserRepository,
+            user_pokemon_repo: AbstractUserPokemonRepository,
+            battle_repo: AbstractBattleRepository,
+            user_item_repo: AbstractUserItemRepository,
             exp_service: ExpService,
             config: Dict[str, Any],
             move_repo = None,
-            battle_repo = None
+
     ):
         self.adventure_repo = adventure_repo
         self.pokemon_repo = pokemon_repo
@@ -38,6 +43,8 @@ class AdventureService:
         self.pokemon_service = pokemon_service
         self.user_repo = user_repo
         self.exp_service = exp_service
+        self.user_pokemon_repo = user_pokemon_repo
+        self.user_item_repo = user_item_repo
         self.config = config
         self.move_repo = move_repo
         self.battle_repo = battle_repo
@@ -192,7 +199,7 @@ class AdventureService:
         )
         wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
 
-        self.pokemon_repo.add_user_encountered_wild_pokemon(
+        self.user_pokemon_repo.add_user_encountered_wild_pokemon(
             user_id=user_id,
             wild_pokemon_id = wild_pokemon_id,
             location_id=location.id,
@@ -266,7 +273,7 @@ class AdventureService:
         # 循环使用队伍中的宝可梦，直到有宝可梦获胜或队伍全部用完
         while current_pokemon_index < len(user_team_list):
             user_pokemon_id = user_team_list[current_pokemon_index]
-            user_pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
+            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
 
             if not user_pokemon_info:
                 current_pokemon_index += 1
@@ -677,7 +684,7 @@ class AdventureService:
             float: 捕捉成功率（0-1之间）
         """
         # 检查用户背包中的道具
-        user_items:UserItems = self.user_repo.get_user_items(user_id)
+        user_items: UserItems = self.user_item_repo.get_user_items(user_id)
         pokeball_item = None
         user_item_list = user_items.items
         if item_id is not None:

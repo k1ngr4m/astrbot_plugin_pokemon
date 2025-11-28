@@ -155,9 +155,9 @@ class PokemonService:
         Args:
             user_id (str): 用户ID
         Returns:
-            WildPokemonInfo: 野生宝可梦的详细信息
+            Optional[WildPokemonInfo]: 野生宝可梦的详细信息，如果不存在则返回None
         """
-        encountered_wild_pokemon = self.pokemon_repo.get_user_encountered_wild_pokemon(user_id)
+        encountered_wild_pokemon = self.user_pokemon_repo.get_user_encountered_wild_pokemon(user_id)
         if not encountered_wild_pokemon:
             return None
         wild_pokemon_id = encountered_wild_pokemon.wild_pokemon_id

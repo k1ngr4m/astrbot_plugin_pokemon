@@ -80,13 +80,7 @@ class SqliteUserRepository(AbstractUserRepository):
             row = cursor.fetchone()
             return self._row_to_user(row)
 
-    def check_exists(self, user_id: str) -> bool:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,))
-            return cursor.fetchone() is not None
-
-    def create_user(self, user: User) -> None:
+    def add_pokemon_user(self, user: User) -> None:
         # 使用与 update 相同的动态方法，确保 add 也是完整的
         # 排除 created_at 和 updated_at 字段，以便使用数据库的默认 CURRENT_TIMESTAMP
         # 排除 isdel 字段，使用数据库默认值
@@ -104,87 +98,6 @@ class SqliteUserRepository(AbstractUserRepository):
             cursor.execute(sql, tuple(values))
             conn.commit()
 
-    def create_user_pokemon(self, user_id: str, pokemon: UserPokemonInfo) -> int:
-        """
-        创建用户宝可梦记录，使用模板数据完善实例
-        Args:
-            user_id: 用户ID
-            species_id: 宝可梦种族ID
-            nickname: 宝可梦昵称（可选）
-        Returns:
-            新创建的宝可梦实例ID
-        """
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            sql = """
-            INSERT INTO user_pokemon (
-                user_id, species_id, nickname, level, exp, gender,
-                hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
-                hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-                hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id, shortcode
-            )
-            VALUES (?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
-            )
-            """
-
-            species_id = pokemon["species_id"]
-            nickname = pokemon["name"]
-            level = pokemon["level"]
-            exp = pokemon["exp"]
-            gender = pokemon["gender"]
-
-            ivs: PokemonIVs = pokemon["ivs"]
-            hp_iv = ivs["hp_iv"]
-            attack_iv = ivs["attack_iv"]
-            defense_iv = ivs["defense_iv"]
-            sp_attack_iv = ivs["sp_attack_iv"]
-            sp_defense_iv = ivs["sp_defense_iv"]
-            speed_iv = ivs["speed_iv"]
-
-            evs: PokemonEVs = pokemon["evs"]
-            hp_ev = evs["hp_ev"]
-            attack_ev = evs["attack_ev"]
-            defense_ev = evs["defense_ev"]
-            sp_attack_ev = evs["sp_attack_ev"]
-            sp_defense_ev = evs["sp_defense_ev"]
-            speed_ev = evs["speed_ev"]
-
-            stats: PokemonStats = pokemon["stats"]
-            hp = stats["hp"]
-            attack = stats["attack"]
-            defense = stats["defense"]
-            sp_attack = stats["sp_attack"]
-            sp_defense = stats["sp_defense"]
-            speed = stats["speed"]
-
-            moves: PokemonMoves = pokemon["moves"]
-            move1_id = moves["move1_id"]
-            move2_id = moves["move2_id"]
-            move3_id = moves["move3_id"]
-            move4_id = moves["move4_id"]
-            # 获取新记录的ID（先插入然后获取ID用于生成短码）
-            cursor.execute(sql, (
-                user_id, species_id, nickname, level, exp, gender,
-                hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
-                hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
-                hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id, f"P{0:04d}"
-            ))
-            new_id = cursor.lastrowid
-            conn.commit()
-
-            # 更新记录的shortcode字段
-            shortcode = f"P{new_id:04d}"
-            update_shortcode_sql = "UPDATE user_pokemon SET shortcode = ? WHERE id = ?"
-            cursor.execute(update_shortcode_sql, (shortcode, new_id))
-            conn.commit()
-
-        return new_id
 
     def update_init_select(self, user_id: str, pokemon_id: int) -> None:
         """
@@ -259,52 +172,6 @@ class SqliteUserRepository(AbstractUserRepository):
             caught_time=row_dict['caught_time'],
         )
 
-    def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
-        """
-        获取用户的所有宝可梦
-        Args:
-            user_id: 用户ID
-        Returns:
-            用户宝可梦列表
-        """
-        sql = """
-        SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
-        FROM user_pokemon up
-        JOIN pokemon_species ps ON up.species_id = ps.id
-        WHERE up.user_id = ?
-        ORDER BY up.id
-        """
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (user_id,))
-            rows = cursor.fetchall()
-            result = []
-            for row in rows:
-                result.append(self._row_to_user_pokemon(row))
-            return result
-
-    def get_user_pokemon_by_id(self, user_id: str, pokemon_id: int) -> Optional[UserPokemonInfo]:
-        """
-        通过ID获取用户的宝可梦实例
-        Args:
-            pokemon_id: 宝可梦实例ID
-        Returns:
-            宝可梦实例信息（如果存在）
-        """
-        sql = """
-        SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
-        FROM user_pokemon up
-        JOIN pokemon_species ps ON up.species_id = ps.id
-        WHERE up.id = ? AND up.user_id = ?
-        """
-
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(sql, (pokemon_id, user_id))
-            row = cursor.fetchone()
-            return self._row_to_user_pokemon(row) if row else None
-
     def update_user_exp(self, level: int, exp: int, user_id: str) -> None:
         with self._get_connection() as conn:
             cursor = conn.cursor()
@@ -365,74 +232,6 @@ class SqliteUserRepository(AbstractUserRepository):
                 WHERE user_id = ?
             """, (coins, user_id))
             conn.commit()
-
-    def add_user_item(self, user_id: str, item_id: int, quantity: int) -> None:
-        """
-        为用户添加物品
-        Args:
-            user_id: 用户ID
-            item_id: 物品ID
-            quantity: 物品数量
-        """
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # 检查用户是否已经有该物品
-            cursor.execute("""
-                SELECT quantity FROM user_items
-                WHERE user_id = ? AND item_id = ?
-            """, (user_id, item_id))
-            row = cursor.fetchone()
-
-            if row:
-                # 如果已有该物品，更新数量
-                new_quantity = row[0] + quantity
-                cursor.execute("""
-                    UPDATE user_items
-                    SET quantity = ?
-                    WHERE user_id = ? AND item_id = ?
-                """, (new_quantity, user_id, item_id))
-            else:
-                # 如果没有该物品，插入新记录
-                cursor.execute("""
-                    INSERT INTO user_items (user_id, item_id, quantity)
-                    VALUES (?, ?, ?)
-                """, (user_id, item_id, quantity))
-            conn.commit()
-
-    def get_user_items(self, user_id: str) -> UserItems:
-        """
-        获取用户的所有物品
-        Args:
-            user_id: 用户ID
-        Returns:
-            用户物品列表，每个物品包含item_id, item_name, quantity等信息
-        """
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # 查询用户物品及其详细信息
-            sql = """
-            SELECT ui.item_id, ui.quantity, i.name_zh, i.category_id, i.description
-            FROM user_items ui
-            JOIN items i ON ui.item_id = i.id
-            WHERE ui.user_id = ? and ui.quantity > 0
-            ORDER BY i.category_id DESC, i.name_zh
-            """
-            cursor.execute(sql, (user_id,))
-            rows = cursor.fetchall()
-            items_list = []
-            for row in rows:
-                items_list.append(UserItemInfo(
-                        item_id=row[0],
-                        quantity=row[1],
-                        name_zh=row[2],
-                        category_id=row[3],
-                        description=row[4]
-                ))
-            user_items: UserItems = UserItems(
-                user_id=user_id,
-                items=items_list
-            )
-            return user_items
 
     def update_user_last_adventure_time(self, user_id: str, last_adventure_time: float) -> None:
         """

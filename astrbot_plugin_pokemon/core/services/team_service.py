@@ -3,7 +3,7 @@ from typing import Dict, Any, List
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import UserPokemonInfo
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
-    AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository,
+    AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository, AbstractUserPokemonRepository,
 )
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.user_models import UserTeam
@@ -17,11 +17,13 @@ class TeamService:
             user_repo: AbstractUserRepository,
             pokemon_repo: AbstractPokemonRepository,
             team_repo: AbstractTeamRepository,
+            user_pokemon_repo: AbstractUserPokemonRepository,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.team_repo = team_repo
+        self.user_pokemon_repo = user_pokemon_repo
         self.config = config
 
     def set_team_pokemon(self, user_id: str, pokemon_ids: List[int]) -> BaseResult:
@@ -34,7 +36,7 @@ class TeamService:
             包含操作结果的字典
         """
         # 获取用户所有的宝可梦
-        user_pokemon_list = self.user_repo.get_user_pokemon(user_id)
+        user_pokemon_list = self.user_pokemon_repo.get_user_pokemon(user_id)
         user_pokemon_dict = {str(pokemon.id): pokemon for pokemon in user_pokemon_list}
 
         # 检查输入的宝可梦是否都在用户拥有的宝可梦列表中
@@ -47,7 +49,7 @@ class TeamService:
         user_team_pokemon_list = []
         user_team_pokemon_name_list = []
         for id in pokemon_ids:
-            pokemon = self.user_repo.get_user_pokemon_by_id(user_id, id)
+            pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, id)
             pokemon_id = pokemon.id
             pokemon_name = pokemon.name
             user_team_pokemon_list.append(pokemon_id)
@@ -83,7 +85,7 @@ class TeamService:
         team_pokemon_ids = user_team.team_pokemon_ids
         team_info: List[UserPokemonInfo] = []
         for pokemon_id in team_pokemon_ids:
-            pokemon_info = self.user_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+            pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
             if not pokemon_info:
                 return BaseResult(success=False, message=AnswerEnum.TEAM_GET_INVALID_POKEMON_ID.value.format(id=pokemon_id), data=None)
             team_info.append(pokemon_info)

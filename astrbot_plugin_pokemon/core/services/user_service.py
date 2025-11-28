@@ -5,7 +5,8 @@ from astrbot.api import logger
 from .pokemon_service import PokemonService
 from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
-    AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository,
+    AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserItemRepository,
+    AbstractUserPokemonRepository,
 )
 
 from ...utils.utils import get_today, userid_to_base32
@@ -20,13 +21,17 @@ class UserService:
             user_repo: AbstractUserRepository,
             pokemon_repo: AbstractPokemonRepository,
             item_repo: AbstractItemRepository,
+            user_item_repo: AbstractUserItemRepository,
             pokemon_service: PokemonService,
+            user_pokemon_repo: AbstractUserPokemonRepository,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.item_repo = item_repo
+        self.user_item_repo = user_item_repo
         self.pokemon_service = pokemon_service
+        self.user_pokemon_repo = user_pokemon_repo
         self.config = config
 
     def register(self, user_id: str, nickname: str) -> BaseResult:
@@ -40,7 +45,7 @@ class UserService:
         """
         origin_id = user_id
         user_id = userid_to_base32(user_id)
-        if self.user_repo.check_exists(user_id):
+        if self.user_repo.get_user_by_id(user_id):
             return BaseResult(
                 success=False,
                 message=AnswerEnum.USER_ALREADY_REGISTERED.value
@@ -53,7 +58,7 @@ class UserService:
             coins = initial_coins,
             origin_id = origin_id
         )
-        self.user_repo.create_user(new_user)
+        self.user_repo.add_pokemon_user(new_user)
 
         return BaseResult(
             success=True,
@@ -104,7 +109,7 @@ class UserService:
         self.user_repo.update_user_coins(user_id, new_coins)
 
         # 为用户添加道具
-        self.user_repo.add_user_item(user_id, item_reward_id, item_quantity)
+        self.user_item_repo.add_user_item(user_id, item_reward_id, item_quantity)
 
         # 记录签到信息
         self.user_repo.add_user_checkin(user_id, today, gold_reward, item_reward_id, item_quantity)
@@ -204,7 +209,7 @@ class UserService:
                 success=False,
                 message=AnswerEnum.USER_NOT_REGISTERED.value
             )
-        self.user_repo.add_user_item(user_id, item_id, quantity)
+        self.user_item_repo.add_user_item(user_id, item_id, quantity)
         return BaseResult(
             success=True,
             message=AnswerEnum.USER_ITEM_ADDED.value
@@ -213,12 +218,12 @@ class UserService:
     def _update_encounter_log(self, user_id: str, wild_id: int, captured: bool = False, deleted: bool = False):
         """更新遭遇日志 (封装Repo操作)"""
         try:
-            logs = self.pokemon_repo.get_user_encounters(user_id, limit=5)
+            logs = self.user_pokemon_repo.get_user_encounters(user_id, limit=5)
             # 找到最近一条匹配且未处理的记录
             target_log = next((l for l in logs if l.wild_pokemon_id == wild_id and l.is_captured == 0), None)
 
             if target_log:
-                self.pokemon_repo.update_encounter_log(
+                self.user_pokemon_repo.update_encounter_log(
                     log_id=target_log.id,
                     is_captured=1 if captured else 0,
                     isdel=1 if deleted else 0
@@ -226,29 +231,6 @@ class UserService:
         except Exception as e:
             # 日志更新失败不应阻断主流程，打印错误即可
             logger.error(f"Error updating encounter log: {e}")
-
-    def get_user_encounters(self, user_id: str, limit: int = 5) -> BaseResult[List[WildPokemonEncounterLog]]:
-        """
-        获取用户最近的遭遇记录。
-        Args:
-            user_id: 用户ID
-            limit: 返回记录数量，默认5条
-        Returns:
-            如果用户存在则返回{"success": True, "message": AnswerEnum.USER_ENCOUNTERS.value, "data": encounters}，
-            否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
-        """
-        user = self.user_repo.get_user_by_id(user_id)
-        if not user:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.USER_NOT_REGISTERED.value
-            )
-        encounters = self.pokemon_repo.get_user_encounters(user_id, limit=limit)
-        return BaseResult(
-            success=True,
-            message=AnswerEnum.USER_ENCOUNTERS.value,
-            data=encounters
-        )
 
     def update_encounter_log(self, log_id: int, is_captured: int, isdel: int) -> BaseResult:
         """
@@ -261,7 +243,7 @@ class UserService:
             如果更新成功则返回{"success": True, "message": AnswerEnum.USER_ENCOUNTERS_UPDATED.value}，
             否则返回{"success": False, "message": AnswerEnum.USER_NOT_REGISTERED.value}。
         """
-        self.pokemon_repo.update_encounter_log(log_id, is_captured, isdel)
+        self.user_pokemon_repo.update_encounter_log(log_id, is_captured, isdel)
         return BaseResult(
             success=True,
             message=AnswerEnum.USER_ENCOUNTERS_UPDATED.value

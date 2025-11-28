@@ -68,7 +68,7 @@ class AdventureHandlers:
             return
 
         # 1. 检查状态 (是否已遭遇、冷却时间、队伍设置)
-        if self.pokemon_service.get_user_encountered_wild_pokemon(user_id):
+        if self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id):
             yield event.plain_result(AnswerEnum.USER_ADVENTURE_ALREADY_ENCOUNTERED.value)
             return
 
@@ -129,7 +129,7 @@ class AdventureHandlers:
             yield event.plain_result(check_res.message)
             return
 
-        wild_pokemon_info = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
+        wild_pokemon_info = self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id)
         if not wild_pokemon_info:
             yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
             return
@@ -193,7 +193,7 @@ class AdventureHandlers:
             yield event.plain_result(check_res.message)
             return
 
-        wild_pokemon = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
+        wild_pokemon = self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id)
         if not wild_pokemon:
             yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
             return
@@ -250,7 +250,7 @@ class AdventureHandlers:
         if not check_res.success:
             yield event.plain_result(check_res.message)
             return
-        wild_pokemon = self.pokemon_service.get_user_encountered_wild_pokemon(user_id)
+        wild_pokemon = self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id)
         if not wild_pokemon:
             yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
             return

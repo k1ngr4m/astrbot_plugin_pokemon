@@ -7,7 +7,7 @@ from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.r
     AbstractPokemonRepository,
     AbstractAdventureRepository,
     AbstractShopRepository,
-    AbstractMoveRepository,
+    AbstractMoveRepository, AbstractItemRepository,
 )
 from astrbot.api import logger
 
@@ -20,12 +20,15 @@ class DataSetupService:
                  adventure_repo: AbstractAdventureRepository,
                  shop_repo: AbstractShopRepository,
                  move_repo: AbstractMoveRepository,
+                 item_repo: AbstractItemRepository,
                  data_path: str = None
                  ):
         self.pokemon_repo = pokemon_repo
         self.adventure_repo = adventure_repo
         self.shop_repo = shop_repo
         self.move_repo = move_repo
+        self.item_repo = item_repo
+
         # 如果未指定路径，则使用相对于插件根目录的路径
         if data_path is None:
             plugin_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -188,7 +191,7 @@ class DataSetupService:
                         "description": str(item_row['description']) if pd.notna(item_row['description']) else ""
                     }
 
-                    self.shop_repo.add_item_template(item_data)
+                    self.item_repo.add_item_template(item_data)
                 except (ValueError, TypeError) as e:
                     logger.error(f"处理物品数据时出错 (ID: {item_row.get('id', 'Unknown')}): {e}")
                     continue

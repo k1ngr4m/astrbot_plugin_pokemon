@@ -1,13 +1,20 @@
 from typing import Dict, List, Any
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import AbstractUserRepository, AbstractShopRepository
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import \
+    AbstractUserRepository, AbstractShopRepository, AbstractUserItemRepository
 
 
 class ShopService:
     """处理商店业务逻辑"""
 
-    def __init__(self, user_repo: AbstractUserRepository, shop_repo: AbstractShopRepository):
+    def __init__(
+             self,
+            user_repo: AbstractUserRepository,
+            shop_repo: AbstractShopRepository,
+            user_item_repo: AbstractUserItemRepository
+    ):
         self.user_repo = user_repo
         self.shop_repo = shop_repo
+        self.user_item_repo = user_item_repo
 
     def get_active_shops(self) -> List[Dict[str, Any]]:
         """
@@ -155,7 +162,7 @@ class ShopService:
                 self.shop_repo.update_shop_item_stock(shop_item_id, new_stock)
 
             # 3. 添加用户道具
-            self.user_repo.add_user_item(user_id, item_id, quantity)
+            self.user_item_repo.add_user_item(user_id, item_id, quantity)
 
             return {
                 "success": True,
