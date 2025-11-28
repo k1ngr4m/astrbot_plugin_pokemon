@@ -72,7 +72,9 @@ class PokemonHandlers:
     async def pokedex(self, event: AstrMessageEvent):
         """
         查询图鉴
-        指令: /图鉴 [页码 | 宝可梦名]
+        指令1: /图鉴 ：查看第一页图鉴
+        指令2: /图鉴 P+[页码] ：查看第P页图鉴
+        指令3: /图鉴 M+[宝可梦ID/宝可梦名] ：查看宝可梦图鉴详情
         """
         user_id = userid_to_base32(event.get_sender_id())
         result = self.user_service.check_user_registered(user_id)
@@ -82,7 +84,6 @@ class PokemonHandlers:
 
         # 获取查询参数
         args = event.message_str.split()
-        # 移除指令前缀（如"/图鉴"），只保留参数部分
         if len(args) > 1:
             query = ' '.join(args[1:]).strip()
         else:
@@ -92,7 +93,7 @@ class PokemonHandlers:
         if query.isdigit():
             page = int(query)
             # 调用 Service 获取列表视图
-            result_text = self.plugin.container.pokemon_service.get_pokedex_view(user_id, page)
+            result_text = self.pokemon_service.get_pokedex_view(user_id, page)
             yield event.plain_result(result_text)
             return
 
@@ -105,5 +106,5 @@ class PokemonHandlers:
             return
 
         # 情况 C: 默认显示第一页
-        result_text = self.plugin.container.pokemon_service.get_pokedex_view(user_id, 1)
+        result_text = self.pokemon_service.get_pokedex_view(user_id, 1)
         yield event.plain_result(result_text)

@@ -5,11 +5,10 @@ from astrbot.api.star import Context, Star
 from astrbot.api import logger, AstrBotConfig
 from .astrbot_plugin_pokemon.core.container import GameContainer
 
-# --- Imports 保持不变 ---
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
 from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
-from .astrbot_plugin_pokemon.interface.commands.comom_handlers import CommonHandlers
 
+from .astrbot_plugin_pokemon.interface.commands.comom_handlers import CommonHandlers
 from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers
 from .astrbot_plugin_pokemon.interface.commands.team_handlers import TeamHandlers
 from .astrbot_plugin_pokemon.interface.commands.adventure_handlers import AdventureHandlers
@@ -45,11 +44,10 @@ class PokemonPlugin(Star):
         self.secret_key = webui_config.get("secret_key")
         self.port = webui_config.get("port", 7777)
 
-        # 3. 初始化容器 (结构优化的核心)
-        # 所有的脏活累活都交给 Container，main.py 瞬间清爽
+        # 3. 初始化容器
         self.container = GameContainer(str(self.db_path), self.game_config)
 
-        # 4. 兼容性桥接 (解决 IDE 杂乱与兼容旧代码)
+        # 4. 兼容性桥接
         self._bridge_compatibility()
 
         # 5. 初始化 Handlers
@@ -128,6 +126,7 @@ class PokemonPlugin(Star):
 
     # ====================== 指令注册区 ======================
 
+    # ==========注册与初始化==========
     @filter.command("宝可梦注册")
     async def register(self, event: AstrMessageEvent):
         """注册成为宝可梦游戏玩家，开始你的宝可梦之旅"""
@@ -146,12 +145,33 @@ class PokemonPlugin(Star):
         async for r in self.user_pokemon_handlers.init_select(event):
             yield r
 
+    # ==========用户资产==========
+    @filter.command("宝可梦背包")
+    async def view_items(self, event: AstrMessageEvent):
+        """查看用户背包中的所有道具"""
+        async for r in self.item_handlers.view_items(event):
+            yield r
+
+    # ==========宝可梦和队伍管理==========
     @filter.command("我的宝可梦")
     async def my_pokemon(self, event: AstrMessageEvent):
         """查看我的宝可梦列表，或使用 /我的宝可梦 <宝可梦ID> 查看特定宝可梦详细信息"""
         async for r in self.user_pokemon_handlers.view_user_pokemon(event):
             yield r
 
+    @filter.command("学习技能")
+    async def learn_move(self, event: AstrMessageEvent):
+        """学习新技能。用法：/学习技能 [宝可梦ID] [技能ID] [槽位编号]"""
+        async for r in self.adventure_handlers.learn_move(event):
+            yield r
+
+    @filter.command("图鉴", alias={"宝可梦图鉴", "pokedex"})
+    async def pokedex(self, event: AstrMessageEvent):
+        """查看宝可梦图鉴。用法：/图鉴 [页码] 或 /图鉴 [宝可梦名/ID]"""
+        async for r in self.pokemon_handlers.pokedex(event):
+            yield r
+
+    # ==========冒险系统==========
     @filter.command("设置队伍")
     async def set_team(self, event: AstrMessageEvent):
         """设置队伍中的宝可梦"""
@@ -200,18 +220,7 @@ class PokemonPlugin(Star):
         async for r in self.adventure_handlers.view_battle_log(event):
             yield r
 
-    @filter.command("学习技能")
-    async def learn_move(self, event: AstrMessageEvent):
-        """学习新技能。用法：/学习技能 [宝可梦ID] [技能ID] [槽位编号]"""
-        async for r in self.adventure_handlers.learn_move(event):
-            yield r
-
-    @filter.command("宝可梦背包")
-    async def view_items(self, event: AstrMessageEvent):
-        """查看用户背包中的所有道具"""
-        async for r in self.item_handlers.view_items(event):
-            yield r
-
+    # ==========商店系统==========
     @filter.command("宝可梦商店")
     async def view_shop(self, event: AstrMessageEvent):
         """查看商店中的所有商品"""
@@ -224,12 +233,7 @@ class PokemonPlugin(Star):
         async for r in self.shop_handlers.purchase_item(event):
             yield r
 
-    @filter.command("图鉴", alias={"宝可梦图鉴", "pokedex"})
-    async def pokedex(self, event: AstrMessageEvent):
-        """查看宝可梦图鉴。用法：/图鉴 [页码] 或 /图鉴 [宝可梦名/ID]"""
-        async for r in self.pokemon_handlers.pokedex(event):
-            yield r
-
+    # ==========通用帮助==========
     @filter.command("宝可梦帮助", alias={"宝可梦菜单", "菜单"})
     async def pokemon_help(self, event: AstrMessageEvent):
         """查看宝可梦游戏的帮助信息和所有可用命令"""
