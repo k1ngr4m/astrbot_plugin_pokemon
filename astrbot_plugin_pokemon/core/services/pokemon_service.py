@@ -1,7 +1,7 @@
 import random
 from typing import Dict, Any, Optional
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
-    AbstractPokemonRepository, AbstractMoveRepository)
+    AbstractPokemonRepository, AbstractMoveRepository, AbstractUserPokemonRepository)
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonCreateResult, \
     PokemonDetail, PokemonStats, PokemonIVs, \
@@ -17,10 +17,12 @@ class PokemonService:
     def __init__(
             self,
             pokemon_repo: AbstractPokemonRepository,
+            user_pokemon_repo: AbstractUserPokemonRepository,
             move_repo: AbstractMoveRepository,
             config: Dict[str, Any]
     ):
         self.pokemon_repo = pokemon_repo
+        self.user_pokemon_repo = user_pokemon_repo
         self.move_repo = move_repo
         self.config = config
 
@@ -213,7 +215,7 @@ class PokemonService:
         all_species = self.pokemon_repo.get_all_pokemon_simple()
 
         # 2. 获取用户进度
-        user_progress = self.pokemon_repo.get_user_pokedex_ids(user_id)
+        user_progress = self.user_pokemon_repo.get_user_pokedex_ids(user_id)
         caught_set = user_progress['caught']
         seen_set = user_progress['seen']
 

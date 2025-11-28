@@ -167,7 +167,7 @@ class PokemonPlugin(Star):
 
     @filter.command("图鉴", alias={"宝可梦图鉴", "pokedex"})
     async def pokedex(self, event: AstrMessageEvent):
-        """查看宝可梦图鉴。用法：/图鉴 [页码] 或 /图鉴 [宝可梦名/ID]"""
+        """查看宝可梦图鉴。用法：/图鉴 (第一页) /图鉴 P+[页码] /图鉴 M+[宝可梦名/ID]"""
         async for r in self.pokemon_handlers.pokedex(event):
             yield r
 

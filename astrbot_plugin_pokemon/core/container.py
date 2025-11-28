@@ -42,14 +42,15 @@ class GameContainer:
 
         # 2. 初始化 Services (依赖注入逻辑)
         self.pokemon_service = PokemonService(
-            pokemon_repo=self.pokemon_repo, move_repo=self.move_repo, config=self.config
+            pokemon_repo=self.pokemon_repo, user_pokemon_repo=self.user_pokemon_repo, move_repo=self.move_repo, config=self.config
         )
         self.user_service = UserService(
             user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
             pokemon_service=self.pokemon_service, config=self.config
         )
         self.user_pokemon_service = UserPokemonService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
+            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo,
+            user_pokemon_repo=self.user_pokemon_repo, item_repo=self.item_repo,
             pokemon_service=self.pokemon_service, config=self.config
         )
         self.team_service = TeamService(

@@ -170,9 +170,6 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_all_pokemon_simple(self) -> List[PokemonSpecies]: pass
 
-    @abstractmethod
-    def get_user_pokedex_ids(self, user_id: str) -> dict[str, Any]: pass
-
 class AbstractUserPokemonRepository(ABC):
     """用户宝可梦数据仓储接口"""
 
@@ -297,3 +294,18 @@ class AbstractBattleRepository(ABC):
 
     @abstractmethod
     def get_battle_log_by_id(self, battle_log_id: int) -> Optional[Dict[str, Any]]: pass
+
+
+class AbstractTeamRepository(ABC):
+    """队伍数据仓储接口"""
+
+    # ==========改==========
+    # 更新用户的队伍配置
+    @abstractmethod
+    def update_user_team(self, user_id: str, team_data: UserTeam) -> None: pass
+
+
+    # ==========查==========
+    # 获取用户的队伍配置
+    @abstractmethod
+    def get_user_team(self, user_id: str) -> UserTeam | None: pass

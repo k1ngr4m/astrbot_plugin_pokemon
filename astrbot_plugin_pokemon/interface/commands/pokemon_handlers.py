@@ -15,15 +15,14 @@ class PokemonHandlers:
         self.user_pokemon_service = container.user_pokemon_service
         self.pokemon_repo = container.pokemon_repo
 
-    def _show_pokedex_detail(self, event, user_id, query):
+    def _show_pokedex_detail(self, user_id, query):
         """
         显示单只宝可梦的图鉴详情
-        :param event: 事件对象
         :param user_id: 用户ID
         :param query: 查询参数（宝可梦ID或名称）
+        :return: 图鉴详情文本或错误消息
         """
         # 先尝试按ID查找
-        species_info = None
         if query.isdigit():
             species_info = self.pokemon_service.get_pokemon_by_id(int(query))
         else:
@@ -31,43 +30,43 @@ class PokemonHandlers:
             species_info = self.pokemon_service.get_pokemon_by_name(query)
 
         if not species_info:
-            event.plain_result(f"❌ 未找到宝可梦: {query}")
-            return
+            message = f"❌ 未找到宝可梦: {query}"
+            return message
 
         # 检查用户是否已遇到或捕捉过该宝可梦
         user_progress = self.user_pokemon_service.get_user_pokedex_ids(user_id)
         if user_progress.success:
-            caught_set = user_progress['caught']
-            seen_set = user_progress['seen']
+            d = user_progress.data
+            caught_set = d['caught']
+            seen_set = d['seen']
         else:
-            event.plain_result(user_progress.message)
-            return
+            return user_progress.message
 
         # 构建图鉴详情
         if species_info.id not in seen_set:
             # 用户未遇到过该宝可梦，显示未知信息
-            detail_text = f"🔍 图鉴信息: #{species_info.id:04d} ???"
-            detail_text += f"\n该宝可梦的详细信息暂未解锁。"
-            detail_text += f"\n请先在野外遇到该宝可梦以解锁图鉴信息。"
+            detail_text = f"🔍 图鉴信息: #{species_info.id:04d} ???\n\n"
+            detail_text += f"该宝可梦的详细信息暂未解锁。\n\n"
+            detail_text += f"请先在野外遇到该宝可梦以解锁图鉴信息。"
         else:
             # 用户已遇到过，显示基础信息
-            detail_text = f"📖 图鉴信息: #{species_info.id:04d} {species_info.name_zh}"
-            detail_text += f"\n类型: {'/'.join(self.pokemon_repo.get_pokemon_types(species_info.id))}"
-            detail_text += f"\n身高: {species_info.height}m | 体重: {species_info.weight}kg"
-            detail_text += f"\n种族值: HP:{species_info.base_stats.base_hp} "
-            detail_text += f"攻击:{species_info.base_stats.base_attack} "
-            detail_text += f"防御:{species_info.base_stats.base_defense} "
-            detail_text += f"特攻:{species_info.base_stats.base_sp_attack} "
-            detail_text += f"特防:{species_info.base_stats.base_sp_defense} "
-            detail_text += f"速度:{species_info.base_stats.base_speed}"
-            detail_text += f"\n描述: {species_info.description}"
+            detail_text = f"📖 图鉴信息: #{species_info.id:04d} {species_info.name_zh}\n\n"
+            detail_text += f"类型: {'/'.join(self.pokemon_repo.get_pokemon_types(species_info.id))}\n\n"
+            detail_text += f"身高: {species_info.height}m | 体重: {species_info.weight}kg\n\n"
+            detail_text += f"种族值: \n\n"
+            detail_text += f"HP:{species_info.base_stats.base_hp}\n"
+            detail_text += f"攻击:{species_info.base_stats.base_attack}\n"
+            detail_text += f"防御:{species_info.base_stats.base_defense}\n\n"
+            detail_text += f"特攻:{species_info.base_stats.base_sp_attack}\n"
+            detail_text += f"特防:{species_info.base_stats.base_sp_defense}\n"
+            detail_text += f"速度:{species_info.base_stats.base_speed}\n\n"
+            detail_text += f"描述: {species_info.description}\n\n"
 
             if species_info.id in caught_set:
                 detail_text += f"\n✅ 状态: 已捕捉"
             else:
                 detail_text += f"\n👁️ 状态: 已遇见"
-
-        event.plain_result(detail_text)
+        return detail_text
 
     async def pokedex(self, event: AstrMessageEvent):
         """
@@ -89,22 +88,55 @@ class PokemonHandlers:
         else:
             query = ''
 
-        # 情况 A: 用户输入了数字，视为页码
-        if query.isdigit():
+        # 情况 A: 检查是否为P页码格式
+        if query.upper().startswith('P'):
+            try:
+                page_str = query[1:]  # 去掉"P"前缀
+                page = int(page_str)
+                if page <= 0:
+                    yield event.plain_result("页码必须是正整数！")
+                    return
+                # 调用 Service 获取列表视图
+                result_text = self.pokemon_service.get_pokedex_view(user_id, page)
+                yield event.plain_result(result_text)
+                return
+            except ValueError:
+                yield event.plain_result("页码格式错误！请使用 /图鉴 P+页码 格式。")
+                return
+
+        # 情况 B: 检查是否为M+查询格式
+        elif query.upper().startswith('M'):
+            query_param = query[1:]  # 去掉"M"前缀
+            if not query_param:
+                yield event.plain_result("查询参数不能为空！请使用 /图鉴 M+宝可梦ID或名称 格式。")
+                return
+            detail_text = self._show_pokedex_detail(user_id, query_param)
+            if isinstance(detail_text, str):
+                yield event.plain_result(detail_text)
+            else:
+                yield event.plain_result(detail_text.message)
+            return
+
+        # 情况 C: 如果是纯数字，视为页码
+        elif query.isdigit():
             page = int(query)
+            if page <= 0:
+                yield event.plain_result("页码必须是正整数！")
+                return
             # 调用 Service 获取列表视图
             result_text = self.pokemon_service.get_pokedex_view(user_id, page)
             yield event.plain_result(result_text)
             return
 
-        # 情况 B: 用户输入了名字，视为查询详情
-        if query:
-            # 这里调用现有的查询逻辑，但需要增加一个判断：
-            # 如果用户没【遇见】过该宝可梦，不允许查看详细数据
-            # 通常图鉴逻辑是：未遇到显示"数据未知"，已遇到显示基础信息，已捕捉显示全部信息。
-            self._show_pokedex_detail(event, user_id, query)
+        # 情况 D: 其他非空参数视为宝可梦名称或ID查询
+        elif query:
+            detail_text = self._show_pokedex_detail(user_id, query)
+            if isinstance(detail_text, str):
+                yield event.plain_result(detail_text)
+            else:
+                yield event.plain_result(detail_text.message)
             return
 
-        # 情况 C: 默认显示第一页
+        # 情况 E: 默认显示第一页
         result_text = self.pokemon_service.get_pokedex_view(user_id, 1)
         yield event.plain_result(result_text)
