@@ -50,8 +50,7 @@ class GameContainer:
         )
         self.user_pokemon_service = UserPokemonService(
             user_repo=self.user_repo, pokemon_repo=self.pokemon_repo,
-            user_pokemon_repo=self.user_pokemon_repo, item_repo=self.item_repo,
-            pokemon_service=self.pokemon_service, config=self.config
+            user_pokemon_repo=self.user_pokemon_repo, item_repo=self.item_repo, config=self.config
         )
         self.team_service = TeamService(
             user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo, config=self.config

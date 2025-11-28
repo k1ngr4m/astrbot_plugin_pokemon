@@ -1,7 +1,6 @@
 import random
 from typing import Dict, Any
 
-from .pokemon_service import PokemonService
 from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserPokemonRepository,
@@ -20,76 +19,49 @@ class UserPokemonService:
             pokemon_repo: AbstractPokemonRepository,
             item_repo: AbstractItemRepository,
             user_pokemon_repo: AbstractUserPokemonRepository,
-            pokemon_service: PokemonService,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.item_repo = item_repo
         self.user_pokemon_repo = user_pokemon_repo
-        self.pokemon_service = pokemon_service
         self.config = config
 
-    def init_select_pokemon(self, user_id: str, pokemon_id: int) -> BaseResult:
+    def init_select_pokemon(self, user_id: str, new_pokemon: PokemonDetail) -> BaseResult:
         """
         初始化选择宝可梦。
         Args:
             user_id: 用户ID
             pokemon_id: 宝可梦ID
+            new_pokemon: 新创建的宝可梦详情
         Returns:
             一个包含成功状态和消息的BaseResult对象。
         """
-        user = self.user_repo.get_user_by_id(user_id)
-        if not user:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.USER_NOT_REGISTERED.value
-            )
-        if user.init_selected:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.USER_ALREADY_INITIALIZED_POKEMON.value
-            )
-
-        # 检查宝可梦是否存在
-        pokemon_template = self.pokemon_repo.get_pokemon_by_id(pokemon_id)
-        if not pokemon_template:
-            return BaseResult(
-                success=False,
-                message=AnswerEnum.POKEMON_NOT_FOUND.value
-            )
-
-        new_pokemon = self.pokemon_service.create_single_pokemon(pokemon_id, 1, 1)
-
-        if not new_pokemon["success"]:
-            return BaseResult(
-                success=False,
-                message=new_pokemon.message,
-            )
-        new_pokemon_data: PokemonDetail = new_pokemon.data
         user_pokemon_info = UserPokemonInfo(
             id = 0,
-            species_id = new_pokemon_data["base_pokemon"].id,
-            name = new_pokemon_data["base_pokemon"].name_zh,
-            gender = new_pokemon_data["gender"],
-            level = new_pokemon_data["level"],
-            exp = new_pokemon_data["exp"],
-            stats = new_pokemon_data["stats"],
-            ivs = new_pokemon_data["ivs"],
-            evs = new_pokemon_data["evs"],
-            moves = new_pokemon_data["moves"],
+            species_id = new_pokemon.base_pokemon.id,
+            name = new_pokemon.base_pokemon.name_zh,
+            gender = new_pokemon.gender,
+            level = new_pokemon.level,
+            exp = new_pokemon.exp,
+            stats = new_pokemon.stats,
+            ivs = new_pokemon.ivs,
+            evs = new_pokemon.evs,
+            moves = new_pokemon.moves,
         )
         # 创建用户宝可梦记录，使用模板数据完善实例
-        self.user_repo.create_user_pokemon(user_id, user_pokemon_info,)
+        pokemon_new_id = self.user_repo.create_user_pokemon(user_id, user_pokemon_info,)
 
         # 更新用户的初始选择状态
+        pokemon_id = new_pokemon.base_pokemon.id
         self.user_repo.update_init_select(user_id, pokemon_id)
 
         return BaseResult(
             success=True,
             message=AnswerEnum.POKEMON_INIT_SELECT_SUCCESS.value,
             data={
-                "pokemon_name": pokemon_template.name_zh
+                "pokemon_name": new_pokemon.base_pokemon.name_zh,
+                "pokemon_id": pokemon_new_id,
             }
         )
 

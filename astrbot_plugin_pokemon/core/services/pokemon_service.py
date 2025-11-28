@@ -1,11 +1,14 @@
 import random
 from typing import Dict, Any, Optional
+
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository, AbstractMoveRepository, AbstractUserPokemonRepository)
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonCreateResult, \
     PokemonDetail, PokemonStats, PokemonIVs, \
     PokemonEVs, WildPokemonInfo, PokemonMoves, PokemonSpecies
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.interface.response.answer_enum import AnswerEnum
 
 
 class PokemonService:
@@ -38,7 +41,7 @@ class PokemonService:
             return int(base_calculation) + level + self.HP_FORMULA_CONSTANT
         return int(base_calculation) + self.NON_HP_FORMULA_CONSTANT
 
-    def create_single_pokemon(self, species_id: int, max_level: int, min_level: int) -> PokemonCreateResult:
+    def create_single_pokemon(self, species_id: int, max_level: int, min_level: int) -> BaseResult[PokemonDetail]:
         """
         创建一个新的宝可梦实例，使用指定的宝可梦ID和等级范围
         Args:
@@ -51,10 +54,9 @@ class PokemonService:
         # 1. 获取宝可梦模板
         pokemon_template = self.pokemon_repo.get_pokemon_by_id(species_id)
         if not pokemon_template:
-            return PokemonCreateResult(
+            return BaseResult(
                 success=False,
                 message="无法获取宝可梦信息",
-                data=None
             )
 
         # 2. 生成基础信息
@@ -110,9 +112,9 @@ class PokemonService:
         stats["hp"] = max(1, stats["hp"], base_stats["hp"] // 2)
 
         # 7. 返回结果（统一键名格式，IV/EV使用一致的键）
-        result = PokemonCreateResult(
+        result = BaseResult(
             success=True,
-            message="宝可梦生成成功",
+            message=AnswerEnum.POKEMON_CREATE_SUCCESS.value,
             data= PokemonDetail(
                 base_pokemon=pokemon_template,
                 gender=gender,
@@ -257,6 +259,8 @@ class PokemonService:
 
         return "\n\n".join(lines)
 
+
+    # ==========直接返回repo层==========
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
         """
         根据宝可梦ID获取宝可梦物种信息

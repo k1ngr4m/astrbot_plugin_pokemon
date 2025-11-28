@@ -14,6 +14,7 @@ class UserPokemonHandlers:
     def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
         self.user_service = container.user_service
+        self.pokemon_service = container.pokemon_service
         self.user_pokemon_service = container.user_pokemon_service
 
     async def init_select(self, event: AstrMessageEvent):
@@ -24,11 +25,15 @@ class UserPokemonHandlers:
             yield event.plain_result(result.message)
             return
         user:User = result.data
+
+        # 检查用户是否已经初始化选择宝可梦
         if user.init_selected:
             yield event.plain_result(AnswerEnum.USER_ALREADY_INITIALIZED_POKEMON.value)
             return
 
+        # 解析宝可梦ID
         args = event.message_str.split()
+        # 检查参数数量是否正确
         if len(args) < 2:
             yield event.plain_result(AnswerEnum.POKEMON_INIT_SELECT_USAGE_ERROR.value)
             return
@@ -41,10 +46,24 @@ class UserPokemonHandlers:
             yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
             return
 
-        result = self.user_pokemon_service.init_select_pokemon(user_id, pokemon_id)
+        # 检查宝可梦是否存在
+        pokemon_info = self.pokemon_service.get_pokemon_by_id(pokemon_id)
+        if not pokemon_info:
+            yield event.plain_result(AnswerEnum.POKEMON_NOT_FOUND.value)
+            return
+
+        new_pokemon = self.pokemon_service.create_single_pokemon(pokemon_id, 1, 1)
+        if not new_pokemon.success:
+            yield event.plain_result(new_pokemon.message)
+            return
+
+        result = self.user_pokemon_service.init_select_pokemon(user_id, new_pokemon.data)
         if result.success:
             yield event.plain_result(
-                AnswerEnum.POKEMON_INIT_SELECT_SUCCESS.value.format(pokemon_name=result.data["pokemon_name"])
+                AnswerEnum.POKEMON_INIT_SELECT_SUCCESS.value.format(
+                    pokemon_name=result.data["pokemon_name"],
+                    pokemon_id=result.data["pokemon_id"]
+                )
             )
         else:
             yield event.plain_result(result.message)

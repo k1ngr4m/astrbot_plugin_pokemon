@@ -141,7 +141,7 @@ class PokemonPlugin(Star):
 
     @filter.command("初始选择")
     async def init_select(self, event: AstrMessageEvent):
-        """初始化选择宝可梦。用法：初始选择 <宝可梦ID>"""
+        """初始化选择宝可梦。用法：初始选择 [宝可梦ID]"""
         async for r in self.user_pokemon_handlers.init_select(event):
             yield r
 
@@ -154,7 +154,7 @@ class PokemonPlugin(Star):
 
     # ==========宝可梦和队伍管理==========
     @filter.command("我的宝可梦")
-    async def my_pokemon(self, event: AstrMessageEvent):
+    async def view_user_pokemon(self, event: AstrMessageEvent):
         """查看我的宝可梦列表，或使用 /我的宝可梦 <宝可梦ID> 查看特定宝可梦详细信息"""
         async for r in self.user_pokemon_handlers.view_user_pokemon(event):
             yield r
