@@ -44,35 +44,51 @@ class GameContainer:
 
         # 2. 初始化 Services (依赖注入逻辑)
         self.pokemon_service = PokemonService(
-            pokemon_repo=self.pokemon_repo, user_pokemon_repo=self.user_pokemon_repo, move_repo=self.move_repo, config=self.config
+            pokemon_repo=self.pokemon_repo,
+            move_repo=self.move_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            config=self.config
         )
         self.user_service = UserService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, item_repo=self.item_repo,
-            user_item_repo=self.user_item_repo, pokemon_service=self.pokemon_service,
-            user_pokemon_repo=self.user_pokemon_repo, config=self.config
+            user_repo=self.user_repo,
+            pokemon_repo=self.pokemon_repo,
+            item_repo=self.item_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            user_item_repo=self.user_item_repo,
+            config=self.config
         )
         self.user_pokemon_service = UserPokemonService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo,
-            user_pokemon_repo=self.user_pokemon_repo, item_repo=self.item_repo, config=self.config
+            user_repo=self.user_repo,
+            pokemon_repo=self.pokemon_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            item_repo=self.item_repo,
+            config=self.config
         )
         self.team_service = TeamService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
-            user_pokemon_repo=self.user_pokemon_repo, config=self.config
+            user_repo=self.user_repo,
+            pokemon_repo=self.pokemon_repo,
+            team_repo=self.team_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            config=self.config
         )
         self.exp_service = ExpService(
-            user_repo=self.user_repo, pokemon_repo=self.pokemon_repo, team_repo=self.team_repo,
-            move_repo=self.move_repo, user_pokemon_repo=self.user_pokemon_repo, config=self.config
+            user_repo=self.user_repo,
+            pokemon_repo=self.pokemon_repo,
+            team_repo=self.team_repo,
+            move_repo=self.move_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            config=self.config
         )
         self.adventure_service = AdventureService(
             adventure_repo=self.adventure_repo,
             pokemon_repo=self.pokemon_repo,
             team_repo=self.team_repo,
-            pokemon_service=self.pokemon_service,
             user_repo=self.user_repo,
             move_repo=self.move_repo,
             battle_repo=self.battle_repo,
             user_pokemon_repo=self.user_pokemon_repo,
             user_item_repo=self.user_item_repo,
+            pokemon_service=self.pokemon_service,
             exp_service=self.exp_service,
             config=self.config
         )

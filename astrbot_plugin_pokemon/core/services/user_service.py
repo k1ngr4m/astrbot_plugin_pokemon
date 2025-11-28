@@ -2,7 +2,6 @@ import random
 from typing import Dict, Any, List
 
 from astrbot.api import logger
-from .pokemon_service import PokemonService
 from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserItemRepository,
@@ -22,7 +21,6 @@ class UserService:
             pokemon_repo: AbstractPokemonRepository,
             item_repo: AbstractItemRepository,
             user_item_repo: AbstractUserItemRepository,
-            pokemon_service: PokemonService,
             user_pokemon_repo: AbstractUserPokemonRepository,
             config: Dict[str, Any]
     ):
@@ -30,7 +28,6 @@ class UserService:
         self.pokemon_repo = pokemon_repo
         self.item_repo = item_repo
         self.user_item_repo = user_item_repo
-        self.pokemon_service = pokemon_service
         self.user_pokemon_repo = user_pokemon_repo
         self.config = config
 

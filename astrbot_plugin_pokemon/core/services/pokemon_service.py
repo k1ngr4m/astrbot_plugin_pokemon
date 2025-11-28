@@ -20,13 +20,13 @@ class PokemonService:
     def __init__(
             self,
             pokemon_repo: AbstractPokemonRepository,
-            user_pokemon_repo: AbstractUserPokemonRepository,
             move_repo: AbstractMoveRepository,
+            user_pokemon_repo: AbstractUserPokemonRepository,
             config: Dict[str, Any]
     ):
         self.pokemon_repo = pokemon_repo
-        self.user_pokemon_repo = user_pokemon_repo
         self.move_repo = move_repo
+        self.user_pokemon_repo = user_pokemon_repo
         self.config = config
 
     @staticmethod
