@@ -69,7 +69,6 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def update_user_last_adventure_time(self, user_id, last_adventure_time): pass
 
-
 class AbstractPokemonRepository(ABC):
     """宝可梦数据仓储接口"""
 
@@ -127,6 +126,10 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]: pass
 
+    # 根据名称获取宝可梦物种信息
+    @abstractmethod
+    def get_pokemon_by_name(self, pokemon_name: str) -> Optional[PokemonSpecies]: pass
+
     # 获取所有Pokemon模板
     @abstractmethod
     def get_all_pokemon(self) -> List[PokemonSpecies]: pass
@@ -164,20 +167,22 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_pokemon_capture_rate(self, pokemon_id: int) -> int: pass
 
-class AbstractTeamRepository(ABC):
-    """队伍数据仓储接口"""
+    @abstractmethod
+    def get_all_pokemon_simple(self) -> List[PokemonSpecies]: pass
+
+    @abstractmethod
+    def get_user_pokedex_ids(self, user_id: str) -> dict[str, Any]: pass
+
+class AbstractUserPokemonRepository(ABC):
+    """用户宝可梦数据仓储接口"""
+
+    # ==========增==========
 
     # ==========改==========
-    # 更新用户的队伍配置
-    @abstractmethod
-    def update_user_team(self, user_id: str, team_data: UserTeam) -> None: pass
-
 
     # ==========查==========
-    # 获取用户的队伍配置
     @abstractmethod
-    def get_user_team(self, user_id: str) -> UserTeam | None: pass
-
+    def get_user_pokedex_ids(self, user_id: str) -> dict[str, Any]: pass
 
 class AbstractAdventureRepository(ABC):
     """冒险区域数据仓储接口"""

@@ -16,6 +16,7 @@ from ..infrastructure.repositories.sqlite_adventure_repo import SqliteAdventureR
 from ..infrastructure.repositories.sqlite_battle_repo import SqliteBattleRepository
 from ..infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
 from ..infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
+from ..infrastructure.repositories.sqlite_user_pokemon_repo import SqliteUserPokemonRepository
 
 
 class GameContainer:
@@ -35,6 +36,9 @@ class GameContainer:
         self.item_repo = SqliteItemRepository(self.db_path)
         self.move_repo = SqliteMoveRepository(self.db_path)
         self.battle_repo = SqliteBattleRepository(self.db_path)
+        self.user_pokemon_repo = SqliteUserPokemonRepository(self.db_path)
+
+
 
         # 2. 初始化 Services (依赖注入逻辑)
         self.pokemon_service = PokemonService(

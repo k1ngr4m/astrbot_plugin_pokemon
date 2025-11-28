@@ -3,8 +3,9 @@ from typing import Dict, Any, Optional
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository, AbstractMoveRepository)
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonCreateResult, PokemonDetail, PokemonStats, PokemonIVs, \
-    PokemonEVs, WildPokemonInfo, PokemonMoves
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonCreateResult, \
+    PokemonDetail, PokemonStats, PokemonIVs, \
+    PokemonEVs, WildPokemonInfo, PokemonMoves, PokemonSpecies
 
 
 class PokemonService:
@@ -199,3 +200,77 @@ class PokemonService:
                 return "M"
             else:
                 return "F"
+
+    def get_pokedex_view(self, user_id: str, page: int = 1, page_size: int = 20) -> str:
+        """
+        获取用户的图鉴视图
+        :param user_id: 用户ID
+        :param page: 页码
+        :param page_size: 每页数量
+        :return: 图鉴视图字符串
+        """
+        # 1. 获取所有宝可梦 (使用简化的获取方法以提高性能)
+        all_species = self.pokemon_repo.get_all_pokemon_simple()
+
+        # 2. 获取用户进度
+        user_progress = self.pokemon_repo.get_user_pokedex_ids(user_id)
+        caught_set = user_progress['caught']
+        seen_set = user_progress['seen']
+
+        # 3. 统计总数
+        total_count = len(all_species)
+        caught_count = len(caught_set)
+        seen_count = len(seen_set)
+
+        # 4. 分页切片
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        page_species = all_species[start_idx:end_idx]
+
+        if not page_species:
+            return "图鉴页码超出范围。"
+
+        # 5. 构建显示文本
+        lines = [f"📖 宝可梦图鉴 (第 {page} 页)"]
+        lines.append(f"收集进度: 🟢 捕捉 {caught_count} / 👁️ 遇见 {seen_count} / 🌐 总计 {total_count}")
+        lines.append("-" * 20)
+
+        for sp in page_species:
+            sp_id = sp.id
+            if sp_id in caught_set:
+                icon = "🟢" # 已捕捉
+                name = sp.name_zh
+            elif sp_id in seen_set:
+                icon = "👁️" # 仅遇见
+                name = sp.name_zh
+            else:
+                icon = "❓" # 未知
+                name = "???"
+
+            # 格式: #001 🟢 妙蛙种子
+            lines.append(f"#{sp_id:04d} {icon} {name}")
+
+        lines.append("-" * 20)
+        lines.append("提示: 输入 /图鉴 <名字/ID> 查看详细资料")
+
+        return "\n\n".join(lines)
+
+    def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
+        """
+        根据宝可梦ID获取宝可梦物种信息
+        Args:
+            pokemon_id (int): 宝可梦ID
+        Returns:
+            PokemonSpecies: 宝可梦物种信息
+        """
+        return self.pokemon_repo.get_pokemon_by_id(pokemon_id)
+
+    def get_pokemon_by_name(self, pokemon_name: str) -> Optional[PokemonSpecies]:
+        """
+        根据宝可梦名称获取宝可梦物种信息
+        Args:
+            pokemon_name (str): 宝可梦名称
+        Returns:
+            PokemonSpecies: 宝可梦物种信息
+        """
+        return self.pokemon_repo.get_pokemon_by_name(pokemon_name)

@@ -30,6 +30,7 @@ class AnswerEnum(Enum):
     USER_POKEMON_CREATED = "✅ 宝可梦已创建。"
     USER_ENCOUNTERS = "您最近的遭遇记录：\n{encounters}"
     USER_ENCOUNTERS_UPDATED = "✅ 遭遇记录已更新。"
+    USER_POKEMON_POKEDEX_IDS_SUCCESS = "✅ 您的宝可梦图鉴开启状态如下：\n\n已捕捉：{caught_count} 只宝可梦\n已遇见：{seen_count} 只宝可梦"
 
 
     # 宝可梦相关提示

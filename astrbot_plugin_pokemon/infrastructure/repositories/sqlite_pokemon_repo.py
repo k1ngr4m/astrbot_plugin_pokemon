@@ -116,8 +116,56 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
     def get_all_pokemon(self) -> List[PokemonSpecies]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM pokemon_species ORDER BY id DESC")
+            cursor.execute("SELECT * FROM pokemon_species WHERE isdel = 0 ORDER BY id ASC")
             return [self._row_to_pokemon(row) for row in cursor.fetchall()]
+
+    def get_all_pokemon_simple(self) -> List[PokemonSpecies]:
+        """只获取 ID 和名称，用于图鉴等需要减少数据量的场景"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name_zh, name_en FROM pokemon_species WHERE isdel = 0 ORDER BY id ASC")
+            rows = cursor.fetchall()
+            result = []
+            for row in rows:
+                # 创建一个简化的 PokemonSpecies 对象，只包含 ID 和名称
+                simple_species = PokemonSpecies(
+                    id=row['id'],
+                    name_zh=row['name_zh'],
+                    name_en=row['name_en'],
+                    generation_id=0,  # 简化对象，设置为0
+                    base_stats=PokemonBaseStats(
+                        base_hp=0,
+                        base_attack=0,
+                        base_defense=0,
+                        base_sp_attack=0,
+                        base_sp_defense=0,
+                        base_speed=0
+                    ),
+                    height=0.0,
+                    weight=0.0,
+                    description=""
+                )
+                result.append(simple_species)
+            return result
+
+    def get_pokemon_by_name(self, name: str) -> Optional[PokemonSpecies]:
+        """根据名称查找宝可梦，用于图鉴等功能"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM pokemon_species
+                WHERE (name_zh = ? OR name_en = ?) AND isdel = 0
+            """, (name, name))
+            row = cursor.fetchone()
+            return self._row_to_pokemon(row)
+
+    def get_pokemon_name_by_id(self, pokemon_id: int) -> Optional[str]:
+        """根据ID获取宝可梦中文名，用于图鉴等功能"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name_zh FROM pokemon_species WHERE id = ? AND isdel = 0", (pokemon_id,))
+            row = cursor.fetchone()
+            return row['name_zh'] if row else None
 
     def add_pokemon_template(self, data: Dict[str, Any]) -> None:
         with self._get_connection() as conn:

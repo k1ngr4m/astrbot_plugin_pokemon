@@ -395,6 +395,15 @@ class PokemonSpeciesMove:
 
 
 @dataclass
+class PokedexEntry:
+    """图鉴条目"""
+    species_id: int
+    name_zh: str
+    status: str  # "caught", "seen", "unknown"
+    display_text: str  # 渲染用的文本，例如 "001 妙蛙种子 [已捕捉]"
+
+
+@dataclass
 class Location:
     """冒险地点"""
     id: int

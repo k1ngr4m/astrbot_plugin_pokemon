@@ -224,6 +224,12 @@ class PokemonPlugin(Star):
         async for r in self.shop_handlers.purchase_item(event):
             yield r
 
+    @filter.command("图鉴", alias={"宝可梦图鉴", "pokedex"})
+    async def pokedex(self, event: AstrMessageEvent):
+        """查看宝可梦图鉴。用法：/图鉴 [页码] 或 /图鉴 [宝可梦名/ID]"""
+        async for r in self.pokemon_handlers.pokedex(event):
+            yield r
+
     @filter.command("宝可梦帮助", alias={"宝可梦菜单", "菜单"})
     async def pokemon_help(self, event: AstrMessageEvent):
         """查看宝可梦游戏的帮助信息和所有可用命令"""

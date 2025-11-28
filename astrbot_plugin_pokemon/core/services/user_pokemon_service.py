@@ -4,7 +4,7 @@ from typing import Dict, Any
 from .pokemon_service import PokemonService
 from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
-    AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository,
+    AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserPokemonRepository,
 )
 
 from ...utils.utils import get_today, userid_to_base32
@@ -19,12 +19,14 @@ class UserPokemonService:
             user_repo: AbstractUserRepository,
             pokemon_repo: AbstractPokemonRepository,
             item_repo: AbstractItemRepository,
+            user_pokemon_repo: AbstractUserPokemonRepository,
             pokemon_service: PokemonService,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.item_repo = item_repo
+        self.user_pokemon_repo = user_pokemon_repo
         self.pokemon_service = pokemon_service
         self.config = config
 
@@ -206,3 +208,23 @@ class UserPokemonService:
         )
         pid = self.user_repo.create_user_pokemon(user_id, info)
         return self.user_repo.get_user_pokemon_by_id(user_id, pid)
+
+    def get_user_pokedex_ids(self, user_id: str) -> BaseResult[dict]:
+        """
+        获取用户宝可梦图鉴IDs
+        Args:
+            user_id: 用户ID
+        Returns:
+            包含用户宝可梦图鉴IDs的字典
+        """
+        user_progress = self.user_pokemon_repo.get_user_pokedex_ids(user_id)
+        if not user_progress:
+            return BaseResult(
+                success=False,
+                message=AnswerEnum.USER_POKEMON_NOT_FOUND.value
+            )
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_POKEMON_POKEDEX_IDS_SUCCESS.value,
+            data=user_progress
+        )
