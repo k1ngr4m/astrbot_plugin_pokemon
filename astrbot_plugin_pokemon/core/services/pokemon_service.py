@@ -159,15 +159,6 @@ class PokemonService:
         wild_pokemon_info = self.pokemon_repo.get_wild_pokemon_by_id(wild_pokemon_id)
         return wild_pokemon_info
 
-    def add_user_encountered_wild_pokemon(self, user_id: str, wild_pokemon: WildPokemonInfo):
-        """
-        添加用户当前遇到的野生宝可梦
-        Args:
-            user_id (str): 用户ID
-            wild_pokemon (PokemonDetail): 野生宝可梦的详细信息
-        """
-        self.pokemon_repo.add_user_encountered_wild_pokemon(user_id, wild_pokemon)
-
     def determine_pokemon_gender(self, gender_rate: int) -> str:
         """
         根据gender_rate编码判定宝可梦性别

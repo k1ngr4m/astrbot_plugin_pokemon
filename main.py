@@ -8,6 +8,7 @@ from .astrbot_plugin_pokemon.core.container import GameContainer
 # --- Imports 保持不变 ---
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
 from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
+from .astrbot_plugin_pokemon.interface.commands.comom_handlers import CommonHandlers
 
 from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers
 from .astrbot_plugin_pokemon.interface.commands.team_handlers import TeamHandlers
@@ -58,6 +59,7 @@ class PokemonPlugin(Star):
         """负责实例化所有的 Repository, Service 和 Handler"""
 
         # --- Handlers (注入 Plugin self) ---
+        self.common_handlers = CommonHandlers(self, self.container)
         self.user_handlers = UserHandlers(self, self.container)
         self.user_pokemon_handlers = UserPokemonHandlers(self, self.container)
         self.team_handlers = TeamHandlers(self, self.container)
@@ -220,6 +222,12 @@ class PokemonPlugin(Star):
     async def purchase_item(self, event: AstrMessageEvent):
         """购买商店中的商品"""
         async for r in self.shop_handlers.purchase_item(event):
+            yield r
+
+    @filter.command("宝可梦帮助", alias={"宝可梦菜单", "菜单"})
+    async def pokemon_help(self, event: AstrMessageEvent):
+        """查看宝可梦游戏的帮助信息和所有可用命令"""
+        async for r in self.common_handlers.pokemon_help(event):
             yield r
 
     async def terminate(self):
