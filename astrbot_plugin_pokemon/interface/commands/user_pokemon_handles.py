@@ -52,7 +52,7 @@ class UserPokemonHandlers:
             yield event.plain_result(AnswerEnum.POKEMON_NOT_FOUND.value)
             return
 
-        new_pokemon = self.pokemon_service.create_single_pokemon(pokemon_id, 1, 1)
+        new_pokemon = self.pokemon_service.create_single_pokemon(pokemon_id, max_level=5, min_level=5)
         if not new_pokemon.success:
             yield event.plain_result(new_pokemon.message)
             return
