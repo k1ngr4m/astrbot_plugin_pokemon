@@ -352,13 +352,19 @@ class AdventureHandlers:
                 continue
 
             p_data = result.data
-            _, new_moves = self.exp_service.check_learnable_moves(
-                p_data.species_id, p_data.level, p_data.level, p_data.moves
-            )
 
-            if new_moves:
+            # 获取该宝可梦从1级到当前等级的所有可学习技能
+            all_learnable_moves = self.move_service.get_level_up_moves(p_data.species_id, p_data.level)
+
+            # 获取当前已拥有的技能
+            current_moves_ids = [getattr(p_data.moves, f"move{i}_id") or 0 for i in range(1, 5)]
+
+            # 过滤掉已拥有的技能
+            learnable_moves = [move_id for move_id in all_learnable_moves if move_id not in current_moves_ids and move_id != 0]
+
+            if learnable_moves:
                 has_new_move = True
-                move_names = [self.move_service.get_move_name_str(mid) for mid in new_moves]
+                move_names = [self.move_service.get_move_name_str(mid) for mid in learnable_moves]
                 message.append(f"  🌟 {p_data.name} (Lv.{p_data.level}) 可以学习: {', '.join(move_names)}")
 
         if not has_new_move:
@@ -381,14 +387,15 @@ class AdventureHandlers:
             return
 
         p_data = result.data
-        _, new_moves = self.exp_service.check_learnable_moves(
-            p_data.species_id, p_data.level, p_data.level, p_data.moves
-        )
+
+        # 获取该宝可梦从1级到当前等级的所有可学习技能
+        all_learnable_moves = self.move_service.get_level_up_moves(p_data.species_id, p_data.level)
 
         # 获取当前已拥有的技能
         current_moves_ids = [getattr(p_data.moves, f"move{i}_id") or 0 for i in range(1, 5)]
+
         # 过滤掉已拥有的技能
-        learnable_moves = [move_id for move_id in new_moves if move_id not in current_moves_ids and move_id != 0]
+        learnable_moves = [move_id for move_id in all_learnable_moves if move_id not in current_moves_ids and move_id != 0]
 
         if learnable_moves:
             move_names = [f"{self.move_service.get_move_name_str(mid)}[{mid}]" for mid in learnable_moves]
