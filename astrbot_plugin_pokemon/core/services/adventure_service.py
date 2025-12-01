@@ -433,6 +433,34 @@ class AdventureService:
                     effectiveness *= self.TYPE_CHART[type_name].get(def_type_name, 1.0)
         return effectiveness
 
+    def get_randon_move(self, attacker: Any) -> Optional[BattleMoveInfo]:
+        """
+        随机选择一个招式
+        """
+        attacker_moves = [attacker.moves.move1_id, attacker.moves.move2_id,
+                          attacker.moves.move3_id, attacker.moves.move4_id]
+        print(f"attacker_moves: {attacker_moves}")
+        valid_moves = [m for m in attacker_moves if m and m > 0]
+        print(f"valid_moves: {valid_moves}")
+        if not valid_moves:
+            return None
+        random_move_id = random.choice(valid_moves)
+        print(f"random_move_id: {random_move_id}")
+        move_data = self.move_repo.get_move_by_id(random_move_id)
+        if not move_data:
+            return None
+        return BattleMoveInfo(
+            power=move_data.get('power', 0) or 0,
+            accuracy=move_data.get('accuracy', 100) or 100,
+            type_name=move_data.get('type_name', 'normal'),
+            damage_class_id=move_data.get('damage_class_id', 2),
+            priority=move_data.get('priority', 0),
+            type_effectiveness=1.0,
+            stab_bonus=1.0,
+            move_id=random_move_id,
+            move_name=move_data.get('name_zh', 'Unknown Move')
+        )
+
     def get_best_move(self, attacker: Any, defender: Any) -> BattleMoveInfo:
         """
         根据预期伤害为攻击方选择最佳招式。
@@ -532,9 +560,6 @@ class AdventureService:
         执行单次实际战斗模拟并返回日志和结果。
         返回: (result_str, log_lines, remaining_wild_hp)
         """
-        user_best_move = self.get_best_move(user_pokemon, wild_pokemon)
-        wild_best_move = self.get_best_move(wild_pokemon, user_pokemon)
-
         cur_user_hp = user_pokemon.stats.hp
         cur_wild_hp = wild_pokemon.stats.hp
 
@@ -549,18 +574,19 @@ class AdventureService:
         while cur_user_hp > 0 and cur_wild_hp > 0 and turn < max_turns:
             turn += 1
             log_lines.append(f"--- 第 {turn} 回合 ---\n\n")
-
+            user_random_move = self.get_randon_move(user_pokemon)
+            wild_random_move = self.get_randon_move(wild_pokemon)
             user_first = self.user_goes_first(
                 user_pokemon.stats.speed,
                 wild_pokemon.stats.speed,
-                user_best_move,
-                wild_best_move
+                user_random_move,
+                wild_random_move
             )
 
             first_attacker = user_pokemon if user_first else wild_pokemon
             second_attacker = wild_pokemon if user_first else user_pokemon
-            first_move = user_best_move if user_first else wild_best_move
-            second_move = wild_best_move if user_first else user_best_move
+            first_move = user_random_move if user_first else wild_random_move
+            second_move = wild_random_move if user_first else user_random_move
 
             # 首次攻击
             dmg = self.resolve_damage(first_attacker, second_attacker, first_move)
@@ -621,10 +647,6 @@ class AdventureService:
         """
         计算宝可梦战斗胜率 (使用蒙特卡洛模拟)
         """
-        # 1. 预计算
-        user_best_move = self.get_best_move(user_pokemon, wild_pokemon)
-        wild_best_move = self.get_best_move(wild_pokemon, user_pokemon)
-
         user_wins = 0
         simulations = 1000  # 运行1000次模拟
 
@@ -638,34 +660,35 @@ class AdventureService:
 
             while cur_user_hp > 0 and cur_wild_hp > 0 and turn < max_turns:
                 turn += 1
-
+                user_random_move = self.get_randon_move(user_pokemon)
+                wild_random_move = self.get_randon_move(wild_pokemon)
                 user_first = self.user_goes_first(
                     user_pokemon.stats.speed,
                     wild_pokemon.stats.speed,
-                    user_best_move,
-                    wild_best_move
+                    user_random_move,
+                    wild_random_move
                 )
 
                 if user_first:
                     # 用户攻击
-                    dmg = self.resolve_damage(user_pokemon, wild_pokemon, user_best_move)
+                    dmg = self.resolve_damage(user_pokemon, wild_pokemon, user_random_move)
                     cur_wild_hp -= dmg
                     if cur_wild_hp <= 0:
                         user_wins += 1
                         break
 
                     # 野生宝可梦攻击
-                    dmg = self.resolve_damage(wild_pokemon, user_pokemon, wild_best_move)
+                    dmg = self.resolve_damage(wild_pokemon, user_pokemon, wild_random_move)
                     cur_user_hp -= dmg
                 else:
                     # 野生宝可梦攻击
-                    dmg = self.resolve_damage(wild_pokemon, user_pokemon, wild_best_move)
+                    dmg = self.resolve_damage(wild_pokemon, user_pokemon, wild_random_move)
                     cur_user_hp -= dmg
                     if cur_user_hp <= 0:
                         break  # 用户输了
 
                     # 用户攻击
-                    dmg = self.resolve_damage(user_pokemon, wild_pokemon, user_best_move)
+                    dmg = self.resolve_damage(user_pokemon, wild_pokemon, user_random_move)
                     cur_wild_hp -= dmg
                     if cur_wild_hp <= 0:
                         user_wins += 1
