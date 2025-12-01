@@ -16,6 +16,7 @@ from .astrbot_plugin_pokemon.interface.commands.item_handlers import ItemHandler
 from .astrbot_plugin_pokemon.interface.commands.shop_handlers import ShopHandlers
 from .astrbot_plugin_pokemon.interface.commands.user_handlers import UserHandlers
 from .astrbot_plugin_pokemon.interface.commands.user_pokemon_handles import UserPokemonHandlers
+from .astrbot_plugin_pokemon.interface.commands.evolution_handlers import EvolutionHandlers
 
 
 
@@ -65,6 +66,7 @@ class PokemonPlugin(Star):
         self.adventure_handlers = AdventureHandlers(self, self.container)
         self.item_handlers = ItemHandlers(self, self.container)
         self.shop_handlers = ShopHandlers(self, self.container)
+        self.evolution_handlers = EvolutionHandlers(self, self.container)
 
     def _bridge_compatibility(self):
         """
@@ -164,6 +166,18 @@ class PokemonPlugin(Star):
     async def learn_move(self, event: AstrMessageEvent):
         """学习新技能。用法：/学习技能 [宝可梦ID] [技能ID] [槽位编号]"""
         async for r in self.adventure_handlers.learn_move(event):
+            yield r
+
+    @filter.command("宝可梦进化")
+    async def evolve_pokemon(self, event: AstrMessageEvent):
+        """进化宝可梦。用法：/宝可梦进化 <宝可梦ID>"""
+        async for r in self.evolution_handlers.evolve_pokemon(event):
+            yield r
+
+    @filter.command("查看进化状态")
+    async def check_evolution_status(self, event: AstrMessageEvent):
+        """查看宝可梦进化状态。用法：/查看进化状态 <宝可梦ID>"""
+        async for r in self.evolution_handlers.check_evolution_status(event):
             yield r
 
     @filter.command("图鉴", alias={"宝可梦图鉴", "pokedex"})

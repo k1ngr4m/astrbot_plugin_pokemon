@@ -120,6 +120,10 @@ class ExpService:
             move_learning_result = self.learn_moves_after_level_up_with_levels(user_id, pokemon_data.id, current_level, level_up_info["new_level"])
             level_up_info["move_learning_result"] = move_learning_result
 
+            # 检查是否可以进化
+            evolution_info = self.check_evolution(user_id, pokemon_id, level_up_info["new_level"])
+            level_up_info["evolution_info"] = evolution_info
+
         return {
             "success": True,
             "exp_gained": exp_gained,
@@ -127,6 +131,37 @@ class ExpService:
             "pokemon_id": pokemon_id,
             "pokemon_name": pokemon_data.name or '未知宝可梦'
         }
+
+    def check_evolution(self, user_id: str, pokemon_id: int, new_level: int) -> Dict[str, Any]:
+        """
+        检查宝可梦是否满足进化条件
+        返回包含进化信息的字典
+        """
+        # 获取用户宝可梦信息
+        pokemon_data = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_data:
+            return {"can_evolve": False, "message": "宝可梦不存在"}
+
+        # 获取宝可梦的进化信息 - 查找满足等级要求的进化信息
+        evolution_data = self.pokemon_repo.get_pokemon_evolutions(pokemon_data.species_id, new_level)
+
+        if evolution_data:
+            # 检查是否满足进化条件（主要检查等级条件）
+            for evolution in evolution_data:
+                # 检查等级条件
+                if evolution.minimum_level > 0 and new_level >= evolution.minimum_level:
+                    # 获取进化后的宝可梦信息
+                    evolved_species = self.pokemon_repo.get_pokemon_by_id(evolution.evolved_species_id)
+                    if evolved_species:
+                        return {
+                            "can_evolve": True,
+                            "message": f"你的宝可梦 {pokemon_data.name} 已经达到{new_level}级，可以进化为 {evolved_species.name_zh} 了！",
+                            "evolved_species_id": evolution.evolved_species_id,
+                            "evolved_species_name": evolved_species.name_zh,
+                            "evolution_id": evolution.id
+                        }
+
+        return {"can_evolve": False, "message": "宝可梦暂无符合的进化条件"}
 
     def _calculate_and_update_pokemon_stats(self, pokemon_id: int, species_id: int, new_level: int, user_id: str) -> bool:
         """

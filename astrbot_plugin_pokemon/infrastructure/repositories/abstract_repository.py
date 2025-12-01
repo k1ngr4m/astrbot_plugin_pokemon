@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 from ...core.models.user_models import User, UserTeam, UserItems
 from ...core.models.pokemon_models import PokemonSpecies, UserPokemonInfo, \
-    WildPokemonInfo, WildPokemonEncounterLog, PokemonMoves
+    WildPokemonInfo, WildPokemonEncounterLog, PokemonMoves, PokemonEvolutionInfo
 from ...core.models.adventure_models import LocationTemplate, LocationPokemon
 from ...core.models.shop_models import Shop
 
@@ -108,6 +108,11 @@ class AbstractPokemonRepository(ABC):
     # 获取所有宝可梦模板（简单信息）
     @abstractmethod
     def get_all_pokemon_simple(self) -> List[PokemonSpecies]: pass
+
+    # 获取宝可梦进化数据
+    @abstractmethod
+    def get_pokemon_evolutions(self, species_id: int, new_level: int) -> list[PokemonEvolutionInfo]: pass
+
 
 class AbstractAdventureRepository(ABC):
     """冒险区域数据仓储接口"""
@@ -263,6 +268,9 @@ class AbstractUserPokemonRepository(ABC):
     @abstractmethod
     def update_pokemon_moves(self, moves: PokemonMoves, pokemon_id: int, user_id: str) -> None: pass
 
+    # 进化后更新用户宝可梦
+    @abstractmethod
+    def update_user_pokemon_after_evolution(self, user_id: str, pokemon_id: int, pokemon_info: UserPokemonInfo) -> None: pass
 
     # ==========查==========
     # 获取用户所有宝可梦

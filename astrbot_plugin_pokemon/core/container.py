@@ -7,6 +7,7 @@ from ..core.services.user_service import UserService
 from ..core.services.item_service import ItemService
 from ..core.services.shop_service import ShopService
 from ..core.services.move_service import MoveService
+from ..core.services.evolution_service import EvolutionService
 
 from ..infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
 from ..infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
@@ -103,4 +104,8 @@ class GameContainer:
         )
         self.move_service = MoveService(
             move_repo=self.move_repo
+        )
+        self.evolution_service = EvolutionService(
+            user_pokemon_repo=self.user_pokemon_repo,
+            pokemon_repo=self.pokemon_repo
         )

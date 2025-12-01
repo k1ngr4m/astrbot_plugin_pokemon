@@ -439,13 +439,10 @@ class AdventureService:
         """
         attacker_moves = [attacker.moves.move1_id, attacker.moves.move2_id,
                           attacker.moves.move3_id, attacker.moves.move4_id]
-        print(f"attacker_moves: {attacker_moves}")
         valid_moves = [m for m in attacker_moves if m and m > 0]
-        print(f"valid_moves: {valid_moves}")
         if not valid_moves:
             return None
         random_move_id = random.choice(valid_moves)
-        print(f"random_move_id: {random_move_id}")
         move_data = self.move_repo.get_move_by_id(random_move_id)
         if not move_data:
             return None

@@ -6,7 +6,7 @@ from typing import Optional, List, Dict, Any
 # 导入抽象基类和领域模型
 from .abstract_repository import AbstractPokemonRepository
 from ...core.models.pokemon_models import PokemonSpecies, PokemonBaseStats, PokemonDetail, WildPokemonInfo, \
-    WildPokemonEncounterLog, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves
+    WildPokemonEncounterLog, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves, PokemonEvolutionInfo
 
 
 class SqlitePokemonRepository(AbstractPokemonRepository):
@@ -401,3 +401,16 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                                        :needs_overworld_rain)
                                """, data_list)
             conn.commit()
+
+    def get_pokemon_evolutions(self, species_id: int, new_level: int) -> list[PokemonEvolutionInfo]:
+        """
+        获取指定物种的进化信息
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(                """
+                SELECT * FROM pokemon_evolutions
+                WHERE pre_species_id = ? AND minimum_level <= ? AND isdel = 0
+                """, (species_id, new_level))
+            rows = cursor.fetchall()
+            return [PokemonEvolutionInfo(**dict(row)) for row in rows]

@@ -520,3 +520,47 @@ class PokemonGrowthRate:
             "isdel": self.isdel,
         }
 
+
+@dataclass
+class PokemonEvolutionInfo:
+    """宝可梦进化信息"""
+    id: int
+    pre_species_id: int
+    evolved_species_id: int
+    evolution_trigger_id: Optional[int] = None
+    trigger_item_id: Optional[int] = None
+    minimum_level: Optional[int] = None
+    gender_id: Optional[int] = None
+    held_item_id: Optional[int] = None
+    time_of_day: Optional[str] = None
+    known_move_id: Optional[int] = None
+    minimum_happiness: Optional[int] = None
+    minimum_beauty: Optional[int] = None
+    minimum_affection: Optional[int] = None
+    relative_physical_stats: Optional[int] = None
+    party_species_id: Optional[int] = None
+    trade_species_id: Optional[int] = None
+    needs_overworld_rain: Optional[int] = None
+    isdel: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "pre_species_id": self.pre_species_id,
+            "evolved_species_id": self.evolved_species_id,
+            "evolution_trigger_id": self.evolution_trigger_id,
+            "trigger_item_id": self.trigger_item_id,
+            "minimum_level": self.minimum_level,
+            "gender_id": self.gender_id,
+            "held_item_id": self.held_item_id,
+            "time_of_day": self.time_of_day,
+            "known_move_id": self.known_move_id,
+            "minimum_happiness": self.minimum_happiness,
+            "minimum_beauty": self.minimum_beauty,
+            "minimum_affection": self.minimum_affection,
+            "relative_physical_stats": self.relative_physical_stats,
+            "party_species_id": self.party_species_id,
+            "trade_species_id": self.trade_species_id,
+            "needs_overworld_rain": self.needs_overworld_rain,
+            "isdel": self.isdel,
+        }

@@ -254,6 +254,23 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             ))
             conn.commit()
 
+    def update_user_pokemon_after_evolution(self, user_id: str, pokemon_id: int, pokemon_info: UserPokemonInfo) -> None:
+        """更新用户宝可梦"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE user_pokemon
+                SET species_id = ?, nickname = ?,
+                    hp = ?, attack = ?, defense = ?, sp_attack = ?, sp_defense = ?, speed = ?
+                WHERE id = ? AND user_id = ?
+            """, (
+                pokemon_info.species_id, pokemon_info.name,
+                pokemon_info.stats.hp, pokemon_info.stats.attack, pokemon_info.stats.defense,
+                pokemon_info.stats.sp_attack, pokemon_info.stats.sp_defense, pokemon_info.stats.speed,
+                pokemon_id, user_id
+            ))
+            conn.commit()
+
     # =========查=========
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
         """

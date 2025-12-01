@@ -325,9 +325,14 @@ class AdventureHandlers:
                         moves = ", ".join(m.get('name', '未知') for m in move_res['new_moves'])
                         moves_id = [m.get('id') for m in move_res['new_moves']]
                         if move_res.get("requires_choice"):
-                            lines.append(f"  ⚡ 领悟新技能: {moves}[{', '.join(map(str, moves_id))}] (技能槽已满，请使用 /学习技能)")
+                            lines.append(f"\n\n  ⚡ 领悟新技能: {moves}[{', '.join(map(str, moves_id))}] (技能槽已满，请使用 /学习技能)")
                         else:
-                            lines.append(f"  ⚡ 学会新技能: {moves}[{', '.join(map(str, moves_id))}]")
+                            lines.append(f"\n\n  ⚡ 学会新技能: {moves}[{', '.join(map(str, moves_id))}]")
+
+                    evolution_info = lvl_info.get("evolution_info")
+                    if evolution_info:
+                        print(evolution_info)
+                        lines.append(f"\n\n  🔄 可以进化为: {evolution_info['evolved_species_name']} (ID: {evolution_info['evolved_species_id']})")
                 lines.append("")
 
         return "\n".join(lines)
