@@ -433,6 +433,39 @@ class AdventureService:
                     effectiveness *= self.TYPE_CHART[type_name].get(def_type_name, 1.0)
         return effectiveness
 
+    def get_move_details(self, move_id: int) -> Optional[BattleMoveInfo]:
+        """
+        获取招式详情
+        """
+        move_data = self.move_repo.get_move_by_id(move_id)
+        if not move_data:
+            return None
+        return BattleMoveInfo(
+            power=move_data.get('power', 0) or 0,
+            accuracy=move_data.get('accuracy', 100) or 100,
+            type_name=move_data.get('type_name', 'normal'),
+            damage_class_id=move_data.get('damage_class_id', 2),
+            priority=move_data.get('priority', 0),
+            type_effectiveness=1.0,
+            stab_bonus=1.0,
+            move_id=move_id,
+            move_name=move_data.get('name_zh', 'Unknown Move')
+        )
+
+    def get_moves_list(self, attacker: Any) -> List[BattleMoveInfo]:
+        """
+        获取攻击方的所有招式详情
+        """
+        attacker_moves = [attacker.moves.move1_id, attacker.moves.move2_id,
+                          attacker.moves.move3_id, attacker.moves.move4_id]
+        valid_moves = [m for m in attacker_moves if m and m > 0]
+        moves_list = []
+        for move_id in valid_moves:
+            move_details = self.get_move_details(move_id)
+            if move_details:
+                moves_list.append(move_details)
+        return moves_list
+
     def get_randon_move(self, attacker: Any) -> Optional[BattleMoveInfo]:
         """
         随机选择一个招式
@@ -568,11 +601,14 @@ class AdventureService:
         max_turns = 50
         result = "fail"
 
+        user_moves_list = self.get_moves_list(user_pokemon)
+        wild_moves_list = self.get_moves_list(wild_pokemon)
+
         while cur_user_hp > 0 and cur_wild_hp > 0 and turn < max_turns:
             turn += 1
             log_lines.append(f"--- 第 {turn} 回合 ---\n\n")
-            user_random_move = self.get_randon_move(user_pokemon)
-            wild_random_move = self.get_randon_move(wild_pokemon)
+            user_random_move = random.choice(user_moves_list)
+            wild_random_move = random.choice(wild_moves_list)
             user_first = self.user_goes_first(
                 user_pokemon.stats.speed,
                 wild_pokemon.stats.speed,
@@ -646,6 +682,8 @@ class AdventureService:
         """
         user_wins = 0
         simulations = 1000  # 运行1000次模拟
+        user_moves_list = self.get_moves_list(user_pokemon)
+        wild_moves_list = self.get_moves_list(wild_pokemon)
 
         for _ in range(simulations):
             # 重置模拟的HP
@@ -657,8 +695,8 @@ class AdventureService:
 
             while cur_user_hp > 0 and cur_wild_hp > 0 and turn < max_turns:
                 turn += 1
-                user_random_move = self.get_randon_move(user_pokemon)
-                wild_random_move = self.get_randon_move(wild_pokemon)
+                user_random_move = random.choice(user_moves_list)
+                wild_random_move = random.choice(wild_moves_list)
                 user_first = self.user_goes_first(
                     user_pokemon.stats.speed,
                     wild_pokemon.stats.speed,
