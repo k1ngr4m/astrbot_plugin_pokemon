@@ -274,6 +274,8 @@ class AdventureHandlers:
         args = event.message_str.split()
         if len(args) == 1:
             async for r in self._handle_show_learnable_moves(event, user_id): yield r
+        elif len(args) == 2:
+            async for r in self._handle_show_learnable_moves_for_single_pokemon(event, user_id, args): yield r
         elif len(args) >= 3:
             async for r in self._handle_learn_move_action(event, user_id, args): yield r
         else:
@@ -323,7 +325,7 @@ class AdventureHandlers:
                         moves = ", ".join(m.get('name', '未知') for m in move_res['new_moves'])
                         moves_id = [m.get('id') for m in move_res['new_moves']]
                         if move_res.get("requires_choice"):
-                            lines.append(f"  ⚡ 领悟新技能: {moves} (技能槽已满，请使用 /学习技能)")
+                            lines.append(f"  ⚡ 领悟新技能: {moves}[{', '.join(map(str, moves_id))}] (技能槽已满，请使用 /学习技能)")
                         else:
                             lines.append(f"  ⚡ 学会新技能: {moves}[{', '.join(map(str, moves_id))}]")
                 lines.append("")
@@ -361,6 +363,44 @@ class AdventureHandlers:
 
         if not has_new_move:
             message.append("  ✅ 没有宝可梦有待学习的新技能！")
+
+        yield event.plain_result("\n".join(message))
+
+    async def _handle_show_learnable_moves_for_single_pokemon(self, event, user_id, args):
+        """子逻辑：显示指定宝可梦可以学习的技能"""
+        try:
+            pokemon_id = int(args[1])
+        except ValueError:
+            yield event.plain_result("❌ 宝可梦ID必须是数字")
+            return
+
+        # 获取指定的宝可梦信息
+        result = self.user_pokemon_service.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not result.success or not result.data:
+            yield event.plain_result("❌ 找不到指定的宝可梦！")
+            return
+
+        p_data = result.data
+        _, new_moves = self.exp_service.check_learnable_moves(
+            p_data.species_id, p_data.level, p_data.level, p_data.moves
+        )
+
+        # 获取当前已拥有的技能
+        current_moves_ids = [getattr(p_data.moves, f"move{i}_id") or 0 for i in range(1, 5)]
+        # 过滤掉已拥有的技能
+        learnable_moves = [move_id for move_id in new_moves if move_id not in current_moves_ids and move_id != 0]
+
+        if learnable_moves:
+            move_names = [f"{self.move_service.get_move_name_str(mid)}[{mid}]" for mid in learnable_moves]
+            message = [
+                f"📖 {p_data.name} (ID: {p_data.id}, Lv.{p_data.level}) 可以学习的技能：\n",
+                f"  💫 {', '.join(move_names)}"
+            ]
+        else:
+            message = [
+                f"📖 {p_data.name} (ID: {p_data.id}, Lv.{p_data.level}) 当前没有可学习的新技能！\n",
+                "  ✅ 所有该等级可学习的技能都已掌握。"
+            ]
 
         yield event.plain_result("\n".join(message))
 
