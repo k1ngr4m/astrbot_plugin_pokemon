@@ -16,6 +16,7 @@ class UserPokemonHandlers:
         self.user_service = container.user_service
         self.pokemon_service = container.pokemon_service
         self.user_pokemon_service = container.user_pokemon_service
+        self.nature_service = container.nature_service
 
     async def init_select(self, event: AstrMessageEvent):
         """初始化选择宝可梦"""
@@ -92,10 +93,17 @@ class UserPokemonHandlers:
                 "N": "⚲"
             }.get(pokemon_data["gender"], "")
 
+            # 获取宝可梦的类型信息
+            pokemon_types = self.pokemon_service.get_pokemon_types(pokemon_data.species_id)
+            pokemon_nature_name = self.nature_service.get_nature_name_by_id(pokemon_data.nature_id)
+            types_str = '/'.join(pokemon_types) if pokemon_types else "未知"
+
             message = f"🔍 宝可梦详细信息：\n\n"
-            message += f"{pokemon_data['name']} {gender_str}\n\n"
-            message += f"等级: {pokemon_data['level']}\n"
-            message += f"经验: {pokemon_data['exp']}\n\n"
+            message += f"{pokemon_data.name} {gender_str}\n\n"
+            message += f"类型: {types_str}\n"
+            message += f"性格: {pokemon_nature_name}\n"  # 显示性格名称
+            message += f"等级: {pokemon_data.level}\n"
+            message += f"经验: {pokemon_data.exp}\n\n"
 
             # 实际属性值
             message += "💪 属性值:\n\n"
@@ -180,8 +188,13 @@ class UserPokemonHandlers:
                     "N": "⚲"
                 }.get(pokemon.gender, "")
 
+                # 获取宝可梦的类型信息
+                pokemon_types = self.pokemon_service.get_pokemon_types(pokemon.species_id)
+                pokemon_nature_name = self.nature_service.get_nature_name_by_id(pokemon.nature_id)
+                types_str = '/'.join(pokemon_types) if pokemon_types else "未知"
+
                 message += f"{i}. {pokemon.name} {gender_str}\n"
-                message += f"   ID：{pokemon.id} | 等级: {pokemon.level} | HP: {pokemon.stats['hp']}\n"
+                message += f"   类型: {types_str} | 性格: {pokemon_nature_name} | ID: {pokemon.id} | 等级: {pokemon.level} | HP: {pokemon.stats['hp']}\n"
 
             message += f"\n您可以使用 /我的宝可梦 <宝可梦ID> 来查看特定宝可梦的详细信息。"
             yield event.plain_result(message)

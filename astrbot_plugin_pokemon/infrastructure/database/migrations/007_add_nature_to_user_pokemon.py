@@ -4,11 +4,10 @@ from astrbot.api import logger
 
 def up(cursor: sqlite3.Cursor):
     """
-    应用此迁移：创建 natures 表和 nature_stats 表
+    应用此迁移：为user_pokemon和wild_pokemon表添加性格字段
     """
-    logger.debug("正在执行 006_add_natures_and_nature_stats_tables: 创建性格相关表...")
+    logger.debug("正在执行 007_add_nature_to_user_pokemon: 添加性格相关字段...")
 
-    """执行数据库迁移"""
     # 添加性格相关字段到user_pokemon表
     cursor.execute("""
     ALTER TABLE user_pokemon ADD COLUMN nature_id INTEGER DEFAULT 1;

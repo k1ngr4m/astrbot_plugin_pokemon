@@ -336,14 +336,17 @@ class ExpService:
             if is_hp:
                 return int(base_calculation) + level + 10
             return int(base_calculation) + 5
+
         # 获取宝可梦的种族值
         species_data = self.pokemon_repo.get_pokemon_by_id(species_id)
         if not species_data:
             return False
+
         # 获取宝可梦的IV和EV值
         pokemon_data = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
         if not pokemon_data:
             return False
+
         # 获取各种族值
         base_data: PokemonBaseStats = species_data.base_stats
         base_hp = base_data.base_hp
@@ -360,6 +363,7 @@ class ExpService:
         sp_attack_iv = pokemon_data.ivs.sp_attack_iv
         sp_defense_iv = pokemon_data.ivs.sp_defense_iv
         speed_iv = pokemon_data.ivs.speed_iv
+
         # 获取EV值
         hp_ev = pokemon_data.evs.hp_ev
         attack_ev = pokemon_data.evs.attack_ev
@@ -370,22 +374,44 @@ class ExpService:
 
         # 根据公式计算新属性值
         # HP: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 等级 + 10
-        new_hp = calculate_stat(base_hp, hp_iv, hp_ev, new_level, is_hp=True)
+        base_hp_val = calculate_stat(base_hp, hp_iv, hp_ev, new_level, is_hp=True)
         # 非HP属性: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5
-        new_attack = calculate_stat(base_attack, attack_iv, attack_ev, new_level)
-        new_defense = calculate_stat(base_defense, defense_iv, defense_ev, new_level)
-        new_sp_attack = calculate_stat(base_sp_attack, sp_attack_iv, sp_attack_ev, new_level)
-        new_sp_defense = calculate_stat(base_sp_defense, sp_defense_iv, sp_defense_ev, new_level)
-        new_speed = calculate_stat(base_speed, speed_iv, speed_ev, new_level)
-        new_pokemon_attributes = {
-            'hp': new_hp,
-            'attack': new_attack,
-            'defense': new_defense,
-            'sp_attack': new_sp_attack,
-            'sp_defense': new_sp_defense,
-            'speed': new_speed,
-        }
+        base_attack_val = calculate_stat(base_attack, attack_iv, attack_ev, new_level)
+        base_defense_val = calculate_stat(base_defense, defense_iv, defense_ev, new_level)
+        base_sp_attack_val = calculate_stat(base_sp_attack, sp_attack_iv, sp_attack_ev, new_level)
+        base_sp_defense_val = calculate_stat(base_sp_defense, sp_defense_iv, sp_defense_ev, new_level)
+        base_speed_val = calculate_stat(base_speed, speed_iv, speed_ev, new_level)
+
+        # 创建基础属性对象
+        base_stats_obj = PokemonStats(
+            hp=base_hp_val,
+            attack=base_attack_val,
+            defense=base_defense_val,
+            sp_attack=base_sp_attack_val,
+            sp_defense=base_sp_defense_val,
+            speed=base_speed_val
+        )
+
+        # 应用性格修正
+        # 导入NatureService并应用性格修正
+        from ..core.services.nature_service import NatureService
+        from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository
+
+        temp_nature_repo = SqliteNatureRepository(self.user_pokemon_repo.db_path)
+        temp_nature_service = NatureService(temp_nature_repo)
+
+        # 应用性格修正
+        final_stats = temp_nature_service.apply_nature_modifiers(base_stats_obj, pokemon_data.nature_id)
+
         # 更新宝可梦的属性
+        new_pokemon_attributes = {
+            'hp': final_stats.hp,
+            'attack': final_stats.attack,
+            'defense': final_stats.defense,
+            'sp_attack': final_stats.sp_attack,
+            'sp_defense': final_stats.sp_defense,
+            'speed': final_stats.speed,
+        }
         self.user_pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
         return True
 

@@ -29,6 +29,15 @@ class NatureService:
         if self._all_natures is None:
             self._all_natures = self.nature_repo.get_all_natures()
 
+    def get_nature_name_by_id(self, nature_id: int) -> Optional[str]:
+        """根据性格ID获取性格名称"""
+        self._load_all_natures()
+        if not self._all_natures:
+            return None
+
+        nature = next((n for n in self._all_natures if n['id'] == nature_id), None)
+        return nature['name_zh'] if nature else None
+
     def get_random_nature(self) -> Dict[str, Any]:
         """随机获取一个性格"""
         self._load_all_natures()

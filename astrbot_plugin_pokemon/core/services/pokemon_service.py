@@ -1,5 +1,5 @@
 import random
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
@@ -170,7 +170,7 @@ class PokemonService:
                     speed_ev=evs["speed"],
                 ),
                 moves= moves,
-                nature_id=nature_id
+                nature_id=nature_id,
             )
         )
         return result
@@ -291,3 +291,13 @@ class PokemonService:
             PokemonSpecies: 宝可梦物种信息
         """
         return self.pokemon_repo.get_pokemon_by_name(pokemon_name)
+
+    def get_pokemon_types(self, pokemon_id: int) -> List[str]:
+        """
+        根据宝可梦ID获取宝可梦的类型
+        Args:
+            pokemon_id (int): 宝可梦ID
+        Returns:
+            List[str]: 宝可梦的类型列表
+        """
+        return self.pokemon_repo.get_pokemon_types(pokemon_id)

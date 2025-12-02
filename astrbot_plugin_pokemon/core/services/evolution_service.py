@@ -46,12 +46,13 @@ class EvolutionService:
                 return {"success": False, "message": "进化数据缺失，无法完成进化"}
 
             # 4. 核心逻辑：计算进化后的数值
-            # 进化后：种族值改变，等级/个体值/努力值/性格(暂未实现)保持不变
+            # 进化后：种族值改变，等级/个体值/努力值/性格保持不变
             new_stats = self._calculate_new_stats(
                 evolved_species.base_stats,
                 current_pokemon.ivs,
                 current_pokemon.evs,
-                current_pokemon.level
+                current_pokemon.level,
+                current_pokemon.nature_id  # 使用原来的性格
             )
 
             # 5. 构建更新数据对象
@@ -67,7 +68,8 @@ class EvolutionService:
                 ivs=current_pokemon.ivs,
                 evs=current_pokemon.evs,
                 moves=current_pokemon.moves,  # 进化是否自动学招式？通常需要额外逻辑，此处保持原样
-                caught_time=current_pokemon.caught_time
+                caught_time=current_pokemon.caught_time,
+                nature_id=current_pokemon.nature_id  # 保持原有性格不变
             )
 
             # 6. 写入数据库
@@ -141,7 +143,7 @@ class EvolutionService:
 
         return None, "尚未满足进化条件（等级不足）"
 
-    def _calculate_new_stats(self, base_stats, ivs: PokemonIVs, evs: PokemonEVs, level: int) -> PokemonStats:
+    def _calculate_new_stats(self, base_stats, ivs: PokemonIVs, evs: PokemonEVs, level: int, nature_id: int = 1) -> PokemonStats:
         """
         根据种族值、个体值、努力值和等级计算属性值
         HP公式: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 等级 + 10
@@ -156,9 +158,8 @@ class EvolutionService:
             else:
                 return core_val + 5
 
-        # TODO: 如果未来引入性格(Nature)系统，需要在非HP属性计算最后乘以性格修正系数 (0.9, 1.0, 1.1)
-
-        return PokemonStats(
+        # 创建基础属性对象
+        base_stats_obj = PokemonStats(
             hp=_calc(base_stats.base_hp, ivs.hp_iv, evs.hp_ev, level, is_hp=True),
             attack=_calc(base_stats.base_attack, ivs.attack_iv, evs.attack_ev, level),
             defense=_calc(base_stats.base_defense, ivs.defense_iv, evs.defense_ev, level),
@@ -166,3 +167,20 @@ class EvolutionService:
             sp_defense=_calc(base_stats.base_sp_defense, ivs.sp_defense_iv, evs.sp_defense_ev, level),
             speed=_calc(base_stats.base_speed, ivs.speed_iv, evs.speed_ev, level)
         )
+
+        # 如果需要应用性格修正，创建并使用NatureService
+        # 这里我们直接导入NatureService来应用性格修正
+        from .nature_service import NatureService
+        from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository
+        import os
+
+        # 创建临时nature_service来应用修正
+        # 注意：在实际应用中，应该通过依赖注入传入nature_service
+        # 这里是为了解决循环依赖而做的简化
+        temp_nature_repo = SqliteNatureRepository(self.user_pokemon_repo.db_path)  # 假设user_pokemon_repo有db_path
+        temp_nature_service = NatureService(temp_nature_repo)
+
+        # 应用性格修正
+        final_stats = temp_nature_service.apply_nature_modifiers(base_stats_obj, nature_id)
+
+        return final_stats
