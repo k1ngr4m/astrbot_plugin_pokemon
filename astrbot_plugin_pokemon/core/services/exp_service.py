@@ -1,6 +1,8 @@
 from typing import Dict, Any
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats, PokemonMoves
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats, \
+    PokemonMoves, PokemonStats
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.services.nature_service import NatureService
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository, AbstractMoveRepository,
     AbstractUserPokemonRepository,
@@ -16,7 +18,8 @@ class ExpService:
         team_repo: AbstractTeamRepository,
         move_repo: AbstractMoveRepository,
         user_pokemon_repo: AbstractUserPokemonRepository,
-        config: Dict[str, Any]
+        config: Dict[str, Any],
+        nature_service: NatureService,
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
@@ -24,6 +27,7 @@ class ExpService:
         self.move_repo = move_repo
         self.user_pokemon_repo = user_pokemon_repo
         self.config = config
+        self.nature_service = nature_service
 
     # 计算达到指定等级所需的总经验值（基于n³公式）
     def get_required_exp_for_level(self, level: int) -> int:
@@ -393,15 +397,7 @@ class ExpService:
         )
 
         # 应用性格修正
-        # 导入NatureService并应用性格修正
-        from ..core.services.nature_service import NatureService
-        from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository
-
-        temp_nature_repo = SqliteNatureRepository(self.user_pokemon_repo.db_path)
-        temp_nature_service = NatureService(temp_nature_repo)
-
-        # 应用性格修正
-        final_stats = temp_nature_service.apply_nature_modifiers(base_stats_obj, pokemon_data.nature_id)
+        final_stats = self.nature_service.apply_nature_modifiers(base_stats_obj, pokemon_data.nature_id)
 
         # 更新宝可梦的属性
         new_pokemon_attributes = {

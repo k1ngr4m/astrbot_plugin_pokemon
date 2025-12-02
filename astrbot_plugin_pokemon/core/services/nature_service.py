@@ -41,16 +41,8 @@ class NatureService:
     def get_random_nature(self) -> Dict[str, Any]:
         """随机获取一个性格"""
         self._load_all_natures()
-        if not self._all_natures:
-            # 如果没有从数据库加载到性格数据，返回默认值
-            return {
-                "id": 1,
-                "name_en": "hardy",
-                "name_zh": "勤奋",
-                "decreased_stat_id": 2,
-                "increased_stat_id": 2
-            }
-        return random.choice(self._all_natures)
+        nature = random.choice(self._all_natures)
+        return nature
 
     def apply_nature_modifiers(self, stats: PokemonStats, nature_id: int) -> PokemonStats:
         """根据性格修正属性值"""

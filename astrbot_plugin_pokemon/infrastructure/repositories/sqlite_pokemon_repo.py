@@ -104,7 +104,8 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             stats=stats,
             ivs=ivs,
             evs=evs,
-            moves=moves
+            moves=moves,
+            nature_id=row_dict['nature_id']
         )
 
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
@@ -300,13 +301,13 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id
+                move1_id, move2_id, move3_id, move4_id, nature_id
             )
             VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
-                ?, ?, ?
+                ?, ?, ?, ?
             )
             """
 
@@ -346,12 +347,13 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             move3_id = moves.move3_id
             move4_id = moves.move4_id
 
+            nature_id = pokemon.nature_id
             cursor.execute(sql, (
                 species_id, nickname, level, exp, gender,
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id
+                move1_id, move2_id, move3_id, move4_id, nature_id
             ))
             new_id = cursor.lastrowid
             conn.commit()

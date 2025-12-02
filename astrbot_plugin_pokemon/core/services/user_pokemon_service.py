@@ -1,6 +1,8 @@
 import random
 from typing import Dict, Any, Optional
 
+from astrbot.api import logger
+
 from ..models.common_models import BaseResult
 from ...infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserPokemonRepository,
@@ -48,6 +50,7 @@ class UserPokemonService:
             ivs = new_pokemon.ivs,
             evs = new_pokemon.evs,
             moves = new_pokemon.moves,
+            nature_id = new_pokemon.nature_id,
         )
         # 创建用户宝可梦记录，使用模板数据完善实例
         pokemon_new_id = self.user_pokemon_repo.create_user_pokemon(user_id, user_pokemon_info)
@@ -177,6 +180,7 @@ class UserPokemonService:
             id=0, species_id=wild.species_id, name=wild.name,
             level=wild.level, exp=wild.exp, gender=wild.gender,
             stats=wild.stats, ivs=wild.ivs, evs=wild.evs, moves=wild.moves
+            , nature_id=wild.nature_id
         )
         pid = self.user_pokemon_repo.create_user_pokemon(user_id, info)
         return self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)

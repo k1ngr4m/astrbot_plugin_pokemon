@@ -4,6 +4,8 @@ import dataclasses
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 
+from pokebase import nature
+
 from ...core.models.pokemon_models import PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves, WildPokemonEncounterLog
 from ...core.models.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserPokemonRepository
@@ -82,6 +84,7 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             evs=evs,
             moves=moves,
             caught_time=row_dict['caught_time'],
+            nature_id=row_dict['nature_id'],
         )
 
 
@@ -104,58 +107,59 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id, shortcode
+                move1_id, move2_id, move3_id, move4_id, shortcode, nature_id
             )
             VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?
             )
             """
 
-            species_id = pokemon["species_id"]
-            nickname = pokemon["name"]
-            level = pokemon["level"]
-            exp = pokemon["exp"]
-            gender = pokemon["gender"]
+            species_id = pokemon.species_id
+            nickname = pokemon.name
+            level = pokemon.level
+            exp = pokemon.exp
+            gender = pokemon.gender
 
-            ivs: PokemonIVs = pokemon["ivs"]
-            hp_iv = ivs["hp_iv"]
-            attack_iv = ivs["attack_iv"]
-            defense_iv = ivs["defense_iv"]
-            sp_attack_iv = ivs["sp_attack_iv"]
-            sp_defense_iv = ivs["sp_defense_iv"]
-            speed_iv = ivs["speed_iv"]
+            ivs: PokemonIVs = pokemon.ivs
+            hp_iv = ivs.hp_iv
+            attack_iv = ivs.attack_iv
+            defense_iv = ivs.defense_iv
+            sp_attack_iv = ivs.sp_attack_iv
+            sp_defense_iv = ivs.sp_defense_iv
+            speed_iv = ivs.speed_iv
 
-            evs: PokemonEVs = pokemon["evs"]
-            hp_ev = evs["hp_ev"]
-            attack_ev = evs["attack_ev"]
-            defense_ev = evs["defense_ev"]
-            sp_attack_ev = evs["sp_attack_ev"]
-            sp_defense_ev = evs["sp_defense_ev"]
-            speed_ev = evs["speed_ev"]
+            evs: PokemonEVs = pokemon.evs
+            hp_ev = evs.hp_ev
+            attack_ev = evs.attack_ev
+            defense_ev = evs.defense_ev
+            sp_attack_ev = evs.sp_attack_ev
+            sp_defense_ev = evs.sp_defense_ev
+            speed_ev = evs.speed_ev
 
-            stats: PokemonStats = pokemon["stats"]
-            hp = stats["hp"]
-            attack = stats["attack"]
-            defense = stats["defense"]
-            sp_attack = stats["sp_attack"]
-            sp_defense = stats["sp_defense"]
-            speed = stats["speed"]
+            stats: PokemonStats = pokemon.stats
+            hp = stats.hp
+            attack = stats.attack
+            defense = stats.defense
+            sp_attack = stats.sp_attack
+            sp_defense = stats.sp_defense
+            speed = stats.speed
 
-            moves: PokemonMoves = pokemon["moves"]
-            move1_id = moves["move1_id"]
-            move2_id = moves["move2_id"]
-            move3_id = moves["move3_id"]
-            move4_id = moves["move4_id"]
+            moves: PokemonMoves = pokemon.moves
+            move1_id = moves.move1_id
+            move2_id = moves.move2_id
+            move3_id = moves.move3_id
+            move4_id = moves.move4_id
+            nature_id = pokemon.nature_id
             # 获取新记录的ID（先插入然后获取ID用于生成短码）
             cursor.execute(sql, (
                 user_id, species_id, nickname, level, exp, gender,
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id, f"P{0:04d}"
+                move1_id, move2_id, move3_id, move4_id, f"P{0:04d}", nature_id
             ))
             new_id = cursor.lastrowid
             conn.commit()

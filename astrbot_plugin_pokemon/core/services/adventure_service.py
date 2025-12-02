@@ -163,7 +163,8 @@ class AdventureService:
                 move2_id=wild_pokemon.moves.move2_id,
                 move3_id=wild_pokemon.moves.move3_id,
                 move4_id=wild_pokemon.moves.move4_id,
-            )
+            ),
+            nature_id=wild_pokemon.nature_id,
         )
 
         wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)

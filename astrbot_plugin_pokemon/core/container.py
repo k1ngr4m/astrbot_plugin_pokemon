@@ -85,7 +85,8 @@ class GameContainer:
             team_repo=self.team_repo,
             move_repo=self.move_repo,
             user_pokemon_repo=self.user_pokemon_repo,
-            config=self.config
+            config=self.config,
+            nature_service=self.nature_service
         )
         self.adventure_service = AdventureService(
             adventure_repo=self.adventure_repo,

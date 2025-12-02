@@ -1,6 +1,7 @@
 import random
 from typing import Dict, Any, Optional, List
 
+from astrbot.api import logger
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository, AbstractMoveRepository, AbstractUserPokemonRepository)
@@ -112,33 +113,21 @@ class PokemonService:
         }
 
         # 6. 获取并应用性格
-        nature_id = 1  # 默认值
-        if self.nature_service:
-            nature = self.nature_service.get_random_nature()
-            nature_id = nature['id']
+        nature = self.nature_service.get_random_nature()
+        nature_id = nature['id']
 
-            # 创建基础属性对象用于修正
-            base_stats_obj = PokemonStats(
-                hp=base_stats_calculated["hp"],
-                attack=base_stats_calculated["attack"],
-                defense=base_stats_calculated["defense"],
-                sp_attack=base_stats_calculated["sp_attack"],
-                sp_defense=base_stats_calculated["sp_defense"],
-                speed=base_stats_calculated["speed"]
-            )
+        # 创建基础属性对象用于修正
+        base_stats_obj = PokemonStats(
+            hp=base_stats_calculated["hp"],
+            attack=base_stats_calculated["attack"],
+            defense=base_stats_calculated["defense"],
+            sp_attack=base_stats_calculated["sp_attack"],
+            sp_defense=base_stats_calculated["sp_defense"],
+            speed=base_stats_calculated["speed"]
+        )
+        # 应用性格修正
+        final_stats = self.nature_service.apply_nature_modifiers(base_stats_obj, nature_id)
 
-            # 应用性格修正
-            final_stats = self.nature_service.apply_nature_modifiers(base_stats_obj, nature_id)
-        else:
-            # 如果没有nature_service，则直接使用计算后的基础属性
-            final_stats = PokemonStats(
-                hp=base_stats_calculated["hp"],
-                attack=base_stats_calculated["attack"],
-                defense=base_stats_calculated["defense"],
-                sp_attack=base_stats_calculated["sp_attack"],
-                sp_defense=base_stats_calculated["sp_defense"],
-                speed=base_stats_calculated["speed"]
-            )
 
         # 7. 确保HP最小值（原逻辑保留，优化写法）
         final_stats.hp = max(1, final_stats.hp, base_stats["hp"] // 2)
