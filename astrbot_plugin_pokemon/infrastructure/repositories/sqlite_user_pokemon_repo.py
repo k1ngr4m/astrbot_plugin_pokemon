@@ -271,6 +271,20 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             ))
             conn.commit()
 
+    def update_user_pokemon_ev(self, ev: Dict[str, int], pokemon_id: int, user_id: str) -> None:
+        """更新用户宝可梦ev值"""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE user_pokemon
+                SET hp_ev = ?, attack_ev = ?, defense_ev = ?, sp_attack_ev = ?, sp_defense_ev = ?, speed_ev = ?
+                WHERE id = ? AND user_id = ?
+            """, (
+                ev['hp_ev'], ev['attack_ev'], ev['defense_ev'], ev['sp_attack_ev'], ev['sp_defense_ev'], ev['speed_ev'],
+                pokemon_id, user_id
+            ))
+            conn.commit()
+
     # =========查=========
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
         """

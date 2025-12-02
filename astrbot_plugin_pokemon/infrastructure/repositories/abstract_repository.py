@@ -272,6 +272,9 @@ class AbstractUserPokemonRepository(ABC):
     @abstractmethod
     def update_user_pokemon_after_evolution(self, user_id: str, pokemon_id: int, pokemon_info: UserPokemonInfo) -> None: pass
 
+    # 更新用户宝可梦ev值
+    @abstractmethod
+    def update_user_pokemon_ev(self, ev: Dict[str, int], pokemon_id: int, user_id: str) -> None: pass
     # ==========查==========
     # 获取用户所有宝可梦
     @abstractmethod

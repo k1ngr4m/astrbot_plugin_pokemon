@@ -65,6 +65,76 @@ class ExpService:
         # 根据新规则，玩家不获得经验
         return 0
 
+    def calculate_pokemon_ev_gain(self, wild_pokemon_species_id: int, battle_result: str) -> Dict[str, int]:
+        """
+        根据野生宝可梦的effort数据计算EV奖励
+        Args:
+            wild_pokemon_species_id: 野生宝可梦的物种ID
+            battle_result: 战斗结果 ("success" 或其他)
+        Returns:
+            Dict[str, int]: 包含hp_ev, attack_ev, defense_ev等EV奖励的字典
+        """
+        # 只有战斗胜利时才获得EV
+        if battle_result != "success":
+            return {
+                "hp_ev": 0,
+                "attack_ev": 0,
+                "defense_ev": 0,
+                "sp_attack_ev": 0,
+                "sp_defense_ev": 0,
+                "speed_ev": 0
+            }
+
+        # 获取野生宝可梦的物种数据，包括effort字段
+        wild_pokemon_species = self.pokemon_repo.get_pokemon_by_id(wild_pokemon_species_id)
+        if not wild_pokemon_species:
+            return {
+                "hp_ev": 0,
+                "attack_ev": 0,
+                "defense_ev": 0,
+                "sp_attack_ev": 0,
+                "sp_defense_ev": 0,
+                "speed_ev": 0
+            }
+
+        # 解析effort JSON字段
+        import json
+        try:
+            effort_data = json.loads(wild_pokemon_species.effort) if wild_pokemon_species.effort else []
+        except json.JSONDecodeError:
+            effort_data = []
+
+        # 初始化EV奖励
+        ev_rewards = {
+            "hp_ev": 0,
+            "attack_ev": 0,
+            "defense_ev": 0,
+            "sp_attack_ev": 0,
+            "sp_defense_ev": 0,
+            "speed_ev": 0
+        }
+
+        # stat_id 到字段的映射
+        stat_id_to_field = {
+            1: "hp_ev",
+            2: "attack_ev",
+            3: "defense_ev",
+            4: "sp_attack_ev",
+            5: "sp_defense_ev",
+            6: "speed_ev"
+        }
+
+        # 根据effort数据添加EV奖励
+        for effort in effort_data:
+            stat_id = effort.get("stat_id", 0)
+            value = effort.get("value", 0)
+
+            if stat_id in stat_id_to_field:
+                field_name = stat_id_to_field[stat_id]
+                ev_rewards[field_name] += value
+
+        return ev_rewards
+
     def check_pokemon_level_up(self, current_level: int, current_exp: int) -> Dict[str, Any]:
         """
         检查宝可梦是否升级
@@ -90,7 +160,7 @@ class ExpService:
             "required_exp_for_next": self.get_required_exp_for_level(new_level + 1) if new_level < 100 else 0
         }
 
-    def update_pokemon_after_battle(self, user_id: str, pokemon_id: int, exp_gained: int) -> Dict[str, Any]:
+    def update_pokemon_after_battle(self, user_id: str, pokemon_id: int, exp_gained: int, ev_gained: Dict[str, int] = None) -> Dict[str, Any]:
         """
         战斗后更新宝可梦的经验值和等级
         """
@@ -102,6 +172,18 @@ class ExpService:
         current_level = pokemon_data.level
         current_exp = pokemon_data.exp
         new_total_exp = current_exp + exp_gained
+
+        # 如果有EV奖励，更新EV值
+        if ev_gained:
+            # 验证EV值在合理范围内
+            for key in ev_gained:
+                if ev_gained[key] < 0:
+                    ev_gained[key] = 0
+
+            # 更新宝可梦的EV值
+            self._update_pokemon_ev(user_id, pokemon_id, ev_gained)
+            # 根据新的EV值重新计算属性
+            self._calculate_and_update_pokemon_stats(pokemon_id, pokemon_data.species_id, current_level, user_id)
 
         # 检查是否升级
         level_up_info = self.check_pokemon_level_up(current_level, new_total_exp)
@@ -127,10 +209,81 @@ class ExpService:
         return {
             "success": True,
             "exp_gained": exp_gained,
+            "ev_gained": ev_gained or {"hp_ev": 0, "attack_ev": 0, "defense_ev": 0, "sp_attack_ev": 0, "sp_defense_ev": 0, "speed_ev": 0},
             "level_up_info": level_up_info,
             "pokemon_id": pokemon_id,
             "pokemon_name": pokemon_data.name or '未知宝可梦'
         }
+
+    def _update_pokemon_ev(self, user_id: str, pokemon_id: int, ev_gained: Dict[str, int]) -> bool:
+        """
+        更新宝可梦的EV值（考虑单个属性的上限252和总和的上限510）
+        """
+        # 获取当前宝可梦的EV数据
+        pokemon_data = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_data:
+            return False
+
+        # 计算新的EV值（考虑上限）
+        new_hp_ev = min(252, pokemon_data.evs.hp_ev + ev_gained.get("hp_ev", 0))
+        new_attack_ev = min(252, pokemon_data.evs.attack_ev + ev_gained.get("attack_ev", 0))
+        new_defense_ev = min(252, pokemon_data.evs.defense_ev + ev_gained.get("defense_ev", 0))
+        new_sp_attack_ev = min(252, pokemon_data.evs.sp_attack_ev + ev_gained.get("sp_attack_ev", 0))
+        new_sp_defense_ev = min(252, pokemon_data.evs.sp_defense_ev + ev_gained.get("sp_defense_ev", 0))
+        new_speed_ev = min(252, pokemon_data.evs.speed_ev + ev_gained.get("speed_ev", 0))
+
+        # 计算EV总和
+        total_new_ev = new_hp_ev + new_attack_ev + new_defense_ev + new_sp_attack_ev + new_sp_defense_ev + new_speed_ev
+
+        # 如果总和超过510，需要按照一定规则减少EV
+        if total_new_ev > 510:
+            # 计算需要减少的EV总量
+            excess_ev = total_new_ev - 510
+
+            # 按比例减少各项EV
+            ev_values = [new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev]
+            total_old = sum(ev_values)
+            if total_old > 0:
+                new_hp_ev = int(new_hp_ev * 510 / total_old)
+                new_attack_ev = int(new_attack_ev * 510 / total_old)
+                new_defense_ev = int(new_defense_ev * 510 / total_old)
+                new_sp_attack_ev = int(new_sp_attack_ev * 510 / total_old)
+                new_sp_defense_ev = int(new_sp_defense_ev * 510 / total_old)
+                new_speed_ev = int(new_speed_ev * 510 / total_old)
+
+                # 为了确保总和不超过510，再做一次检查和调整
+                total_after_reduction = new_hp_ev + new_attack_ev + new_defense_ev + new_sp_attack_ev + new_sp_defense_ev + new_speed_ev
+                if total_after_reduction > 510:
+                    # 从最大的EV值开始减少，直到总和为510
+                    ev_list = [new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev]
+                    ev_names = ['hp', 'attack', 'defense', 'sp_attack', 'sp_defense', 'speed']
+
+                    # 按EV值降序排序索引
+                    sorted_indices = sorted(range(6), key=lambda i: ev_list[i], reverse=True)
+
+                    excess = total_after_reduction - 510
+                    for i in sorted_indices:
+                        if excess <= 0:
+                            break
+                        reduction = min(excess, ev_list[i])
+                        ev_list[i] -= reduction
+                        excess -= reduction
+
+                    # 更新值
+                    new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev = ev_list
+
+        # 更新数据库中的EV值
+        ev_data = {
+            'hp_ev': new_hp_ev,
+            'attack_ev': new_attack_ev,
+            'defense_ev': new_defense_ev,
+            'sp_attack_ev': new_sp_attack_ev,
+            'sp_defense_ev': new_sp_defense_ev,
+            'speed_ev': new_speed_ev
+        }
+
+        self.user_pokemon_repo.update_user_pokemon_ev(ev_data, pokemon_id, user_id)
+        return True
 
     def check_evolution(self, user_id: str, pokemon_id: int, new_level: int) -> Dict[str, Any]:
         """
@@ -464,13 +617,13 @@ class ExpService:
                     "requires_choice": True
                 }
 
-    def update_team_pokemon_after_battle(self, user_id: str, team_pokemon_ids: list, exp_gained: int) -> list:
+    def update_team_pokemon_after_battle(self, user_id: str, team_pokemon_ids: list, exp_gained: int, ev_gained: Dict[str, int] = None) -> list:
         """
         战斗后更新队伍中所有宝可梦的经验值和等级
         """
         results = []
         for pokemon_id in team_pokemon_ids:
-            result = self.update_pokemon_after_battle(user_id, int(pokemon_id), exp_gained)
+            result = self.update_pokemon_after_battle(user_id, int(pokemon_id), exp_gained, ev_gained)
             results.append(result)
         return results
 

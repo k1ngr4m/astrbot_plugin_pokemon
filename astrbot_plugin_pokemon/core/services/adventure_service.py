@@ -596,21 +596,37 @@ class AdventureService:
         if not self.exp_service or result_str != "success":
             return {
                 "pokemon_exp": {"success": True, "exp_gained": 0, "message": AnswerEnum.BATTLE_FAILURE_NO_EXP.value},
+                "ev_gained": {"hp_ev": 0, "attack_ev": 0, "defense_ev": 0, "sp_attack_ev": 0, "sp_defense_ev": 0, "speed_ev": 0},
                 "team_pokemon_results": []
             }
 
         exp_gained = self.exp_service.calculate_pokemon_exp_gain(
-            wild_pokemon_id=wild_pokemon.id,
+            wild_pokemon_id=wild_pokemon.species_id,  # 使用species_id而不是id
             wild_pokemon_level=wild_pokemon.level,
             battle_result=result_str
         )
+
+        # 计算EV奖励
+        ev_gained = self.exp_service.calculate_pokemon_ev_gain(
+            wild_pokemon_species_id=wild_pokemon.species_id,
+            battle_result=result_str
+        )
+
         user_team = self.team_repo.get_user_team(user_id)
         team_results = []
         if user_team and user_team.team_pokemon_ids:
-            team_results = self.exp_service.update_team_pokemon_after_battle(user_id, user_team.team_pokemon_ids,
-                                                                             exp_gained)
+            team_results = self.exp_service.update_team_pokemon_after_battle(
+                user_id,
+                user_team.team_pokemon_ids,
+                exp_gained,
+                ev_gained
+            )
 
-        return {"pokemon_exp": team_results[0] if team_results else {}, "team_pokemon_results": team_results}
+        return {
+            "pokemon_exp": team_results[0] if team_results else {},
+            "ev_gained": ev_gained,
+            "team_pokemon_results": team_results
+        }
 
     def _update_encounter_log(self, user_id: str, wild_pokemon_id: int, result_str: str):
         recent_encounters = self.user_pokemon_repo.get_user_encounters(user_id, limit=5)
