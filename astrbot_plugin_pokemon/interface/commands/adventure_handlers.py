@@ -322,12 +322,13 @@ class AdventureHandlers:
 
                     move_res = lvl_info.get("move_learning_result")
                     if move_res and move_res.get("new_moves"):
-                        moves = ", ".join(m.get('name', '未知') for m in move_res['new_moves'])
-                        moves_id = [m.get('id') for m in move_res['new_moves']]
+                        # 格式化为 技能名[ID], 技能名[ID], ...
+                        moves_with_ids = ", ".join(f"{m.get('name', '未知')}[{m.get('id')}]"
+                                                   for m in move_res['new_moves'])
                         if move_res.get("requires_choice"):
-                            lines.append(f"\n\n  ⚡ 领悟新技能: {moves}[{', '.join(map(str, moves_id))}] (技能槽已满，请使用 /学习技能)")
+                            lines.append(f"\n\n  ⚡ 领悟新技能: {moves_with_ids} (技能槽已满，请使用 /学习技能)")
                         else:
-                            lines.append(f"\n\n  ⚡ 学会新技能: {moves}[{', '.join(map(str, moves_id))}]")
+                            lines.append(f"\n\n  ⚡ 学会新技能: {moves_with_ids}")
 
                     evolution_info = lvl_info.get("evolution_info")
                     if evolution_info['can_evolve']:
