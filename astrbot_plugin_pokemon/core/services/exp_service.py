@@ -227,53 +227,169 @@ class ExpService:
         if not pokemon_data:
             return False
 
-        # 计算新的EV值（考虑上限）
-        new_hp_ev = min(252, pokemon_data.evs.hp_ev + ev_gained.get("hp_ev", 0))
-        new_attack_ev = min(252, pokemon_data.evs.attack_ev + ev_gained.get("attack_ev", 0))
-        new_defense_ev = min(252, pokemon_data.evs.defense_ev + ev_gained.get("defense_ev", 0))
-        new_sp_attack_ev = min(252, pokemon_data.evs.sp_attack_ev + ev_gained.get("sp_attack_ev", 0))
-        new_sp_defense_ev = min(252, pokemon_data.evs.sp_defense_ev + ev_gained.get("sp_defense_ev", 0))
-        new_speed_ev = min(252, pokemon_data.evs.speed_ev + ev_gained.get("speed_ev", 0))
+        # 计算当前总EV值
+        current_total_ev = (pokemon_data.evs.hp_ev + pokemon_data.evs.attack_ev +
+                           pokemon_data.evs.defense_ev + pokemon_data.evs.sp_attack_ev +
+                           pokemon_data.evs.sp_defense_ev + pokemon_data.evs.speed_ev)
 
-        # 计算EV总和
-        total_new_ev = new_hp_ev + new_attack_ev + new_defense_ev + new_sp_attack_ev + new_sp_defense_ev + new_speed_ev
+        # 计算待增加的EV总和
+        additional_ev = (ev_gained.get("hp_ev", 0) + ev_gained.get("attack_ev", 0) +
+                        ev_gained.get("defense_ev", 0) + ev_gained.get("sp_attack_ev", 0) +
+                        ev_gained.get("sp_defense_ev", 0) + ev_gained.get("speed_ev", 0))
 
-        # 如果总和超过510，需要按照一定规则减少EV
-        if total_new_ev > 510:
-            # 计算需要减少的EV总量
-            excess_ev = total_new_ev - 510
+        # 计算增加后总EV值
+        total_after_add = current_total_ev + additional_ev
+        max_allowed_ev = min(510, total_after_add)  # 最多到510
+        allowed_ev_to_add = max_allowed_ev - current_total_ev  # 实际可以增加的EV总量
 
-            # 按比例减少各项EV
-            ev_values = [new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev]
-            total_old = sum(ev_values)
-            if total_old > 0:
-                new_hp_ev = int(new_hp_ev * 510 / total_old)
-                new_attack_ev = int(new_attack_ev * 510 / total_old)
-                new_defense_ev = int(new_defense_ev * 510 / total_old)
-                new_sp_attack_ev = int(new_sp_attack_ev * 510 / total_old)
-                new_sp_defense_ev = int(new_sp_defense_ev * 510 / total_old)
-                new_speed_ev = int(new_speed_ev * 510 / total_old)
+        # 如果没有剩余空间，则不增加任何EV
+        if allowed_ev_to_add <= 0:
+            new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev = (
+                pokemon_data.evs.hp_ev, pokemon_data.evs.attack_ev, pokemon_data.evs.defense_ev,
+                pokemon_data.evs.sp_attack_ev, pokemon_data.evs.sp_defense_ev, pokemon_data.evs.speed_ev
+            )
+        else:
+            # 按比例分配可增加的EV
+            total_requested = additional_ev
+            if total_requested == 0:
+                # 如果没有请求增加EV，直接返回原值
+                new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev = (
+                    pokemon_data.evs.hp_ev, pokemon_data.evs.attack_ev, pokemon_data.evs.defense_ev,
+                    pokemon_data.evs.sp_attack_ev, pokemon_data.evs.sp_defense_ev, pokemon_data.evs.speed_ev
+                )
+            else:
+                # 按比例分配可增加的EV
+                hp_to_add = min(
+                    252 - pokemon_data.evs.hp_ev,  # 不超过单属性上限
+                    int(ev_gained.get("hp_ev", 0) * allowed_ev_to_add / total_requested)  # 按比例分配
+                )
 
-                # 为了确保总和不超过510，再做一次检查和调整
-                total_after_reduction = new_hp_ev + new_attack_ev + new_defense_ev + new_sp_attack_ev + new_sp_defense_ev + new_speed_ev
-                if total_after_reduction > 510:
-                    # 从最大的EV值开始减少，直到总和为510
-                    ev_list = [new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev]
-                    ev_names = ['hp', 'attack', 'defense', 'sp_attack', 'sp_defense', 'speed']
+                attack_to_add = min(
+                    252 - pokemon_data.evs.attack_ev,  # 不超过单属性上限
+                    int(ev_gained.get("attack_ev", 0) * allowed_ev_to_add / total_requested)  # 按比例分配
+                )
 
-                    # 按EV值降序排序索引
-                    sorted_indices = sorted(range(6), key=lambda i: ev_list[i], reverse=True)
+                defense_to_add = min(
+                    252 - pokemon_data.evs.defense_ev,  # 不超过单属性上限
+                    int(ev_gained.get("defense_ev", 0) * allowed_ev_to_add / total_requested)  # 按比例分配
+                )
 
-                    excess = total_after_reduction - 510
-                    for i in sorted_indices:
-                        if excess <= 0:
-                            break
-                        reduction = min(excess, ev_list[i])
-                        ev_list[i] -= reduction
-                        excess -= reduction
+                sp_attack_to_add = min(
+                    252 - pokemon_data.evs.sp_attack_ev,  # 不超过单属性上限
+                    int(ev_gained.get("sp_attack_ev", 0) * allowed_ev_to_add / total_requested)  # 按比例分配
+                )
 
-                    # 更新值
-                    new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev = ev_list
+                sp_defense_to_add = min(
+                    252 - pokemon_data.evs.sp_defense_ev,  # 不超过单属性上限
+                    int(ev_gained.get("sp_defense_ev", 0) * allowed_ev_to_add / total_requested)  # 按比例分配
+                )
+
+                speed_to_add = min(
+                    252 - pokemon_data.evs.speed_ev,  # 不超过单属性上限
+                    int(ev_gained.get("speed_ev", 0) * allowed_ev_to_add / total_requested)  # 按比例分配
+                )
+
+                # 计算按比例分配后实际增加的EV总和
+                actual_added = hp_to_add + attack_to_add + defense_to_add + sp_attack_to_add + sp_defense_to_add + speed_to_add
+
+                # 如果分配后还有剩余EV（由于整数除法的舍入），将剩余EV分配给各个属性
+                remaining_ev = allowed_ev_to_add - actual_added
+
+                # 将剩余EV按原始比例分配给还未达到上限的属性
+                ev_gains = [
+                    ev_gained.get("hp_ev", 0),
+                    ev_gained.get("attack_ev", 0),
+                    ev_gained.get("defense_ev", 0),
+                    ev_gained.get("sp_attack_ev", 0),
+                    ev_gained.get("sp_defense_ev", 0),
+                    ev_gained.get("speed_ev", 0)
+                ]
+
+                for i in range(remaining_ev):
+                    # 找到还有空间的属性进行分配
+                    max_ratio = -1
+                    selected_idx = -1
+                    for idx, (gain, current_ev) in enumerate(zip(ev_gains, [
+                        pokemon_data.evs.hp_ev + hp_to_add,
+                        pokemon_data.evs.attack_ev + attack_to_add,
+                        pokemon_data.evs.defense_ev + defense_to_add,
+                        pokemon_data.evs.sp_attack_ev + sp_attack_to_add,
+                        pokemon_data.evs.sp_defense_ev + sp_defense_to_add,
+                        pokemon_data.evs.speed_ev + speed_to_add
+                    ])):
+                        if current_ev < 252 and gain > 0:  # 还有空间且原本有增加
+                            ratio = gain / total_requested if total_requested > 0 else 0
+                            if ratio > max_ratio:
+                                max_ratio = ratio
+                                selected_idx = idx
+
+                    if selected_idx != -1:
+                        if selected_idx == 0 and pokemon_data.evs.hp_ev + hp_to_add < 252:
+                            hp_to_add += 1
+                        elif selected_idx == 1 and pokemon_data.evs.attack_ev + attack_to_add < 252:
+                            attack_to_add += 1
+                        elif selected_idx == 2 and pokemon_data.evs.defense_ev + defense_to_add < 252:
+                            defense_to_add += 1
+                        elif selected_idx == 3 and pokemon_data.evs.sp_attack_ev + sp_attack_to_add < 252:
+                            sp_attack_to_add += 1
+                        elif selected_idx == 4 and pokemon_data.evs.sp_defense_ev + sp_defense_to_add < 252:
+                            sp_defense_to_add += 1
+                        elif selected_idx == 5 and pokemon_data.evs.speed_ev + speed_to_add < 252:
+                            speed_to_add += 1
+                    else:
+                        # 如果按比例分配没有找到合适的位置，随机分配
+                        for idx in range(6):
+                            if idx == 0 and pokemon_data.evs.hp_ev + hp_to_add < 252:
+                                hp_to_add += 1
+                                break
+                            elif idx == 1 and pokemon_data.evs.attack_ev + attack_to_add < 252:
+                                attack_to_add += 1
+                                break
+                            elif idx == 2 and pokemon_data.evs.defense_ev + defense_to_add < 252:
+                                defense_to_add += 1
+                                break
+                            elif idx == 3 and pokemon_data.evs.sp_attack_ev + sp_attack_to_add < 252:
+                                sp_attack_to_add += 1
+                                break
+                            elif idx == 4 and pokemon_data.evs.sp_defense_ev + sp_defense_to_add < 252:
+                                sp_defense_to_add += 1
+                                break
+                            elif idx == 5 and pokemon_data.evs.speed_ev + speed_to_add < 252:
+                                speed_to_add += 1
+                                break
+
+                # 计算最终EV值
+                new_hp_ev = pokemon_data.evs.hp_ev + hp_to_add
+                new_attack_ev = pokemon_data.evs.attack_ev + attack_to_add
+                new_defense_ev = pokemon_data.evs.defense_ev + defense_to_add
+                new_sp_attack_ev = pokemon_data.evs.sp_attack_ev + sp_attack_to_add
+                new_sp_defense_ev = pokemon_data.evs.sp_defense_ev + sp_defense_to_add
+                new_speed_ev = pokemon_data.evs.speed_ev + speed_to_add
+
+        # 确保不超过510的总和上限
+        total_final_ev = new_hp_ev + new_attack_ev + new_defense_ev + new_sp_attack_ev + new_sp_defense_ev + new_speed_ev
+        if total_final_ev > 510:
+            # 如果仍然超过510，从最大的EV值开始减少
+            ev_list = [new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev]
+            excess = total_final_ev - 510
+            sorted_indices = sorted(range(6), key=lambda i: ev_list[i], reverse=True)
+
+            for i in sorted_indices:
+                if excess <= 0:
+                    break
+                reduction = min(excess, ev_list[i])
+                ev_list[i] -= reduction
+                excess -= reduction
+
+            new_hp_ev, new_attack_ev, new_defense_ev, new_sp_attack_ev, new_sp_defense_ev, new_speed_ev = ev_list
+
+        # 确保最终值不超过单个属性上限252
+        new_hp_ev = min(252, new_hp_ev)
+        new_attack_ev = min(252, new_attack_ev)
+        new_defense_ev = min(252, new_defense_ev)
+        new_sp_attack_ev = min(252, new_sp_attack_ev)
+        new_sp_defense_ev = min(252, new_sp_defense_ev)
+        new_speed_ev = min(252, new_speed_ev)
 
         # 更新数据库中的EV值
         ev_data = {
