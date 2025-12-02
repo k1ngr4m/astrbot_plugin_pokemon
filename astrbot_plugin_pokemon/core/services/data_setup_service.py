@@ -107,10 +107,13 @@ class DataSetupService:
                 df = self._read_csv_data("pokemon_species_types.csv")
                 if not df.empty:
                     for row in df.to_dict('records'):
-                        self.pokemon_repo.add_pokemon_species_type_template({
-                            "species_id": int(row['pokemon_id']),
-                            "type_id": int(row['type_id']),
-                        })
+                        try:
+                            self.pokemon_repo.add_pokemon_species_type_template({
+                                "species_id": int(row['pokemon_id']) if pd.notna(row['pokemon_id']) else 0,
+                                "type_id": int(row['type_id']) if pd.notna(row['type_id']) else 0,
+                            })
+                        except Exception as e:
+                            logger.error(f"宝可梦类型数据错误 (Species: {row.get('pokemon_id')}, Type: {row.get('type_id')}): {e}")
 
             # 4. 填充 Pokemon 进化数据
             if not self.pokemon_repo.get_pokemon_evolutions(1, 100):
@@ -218,20 +221,20 @@ class DataSetupService:
                     for row in df.to_dict('records'):
                         try:
                             move_data = {
-                                "id": int(row['id']),
-                                "name_en": str(row['name_en']),
-                                "name_zh": str(row['name_zh']) if row['name_zh'] else None,
-                                "generation_id": int(row['generation_id']),
-                                "type_id": int(row['type_id']),
-                                "power": int(row['power']) if row['power'] else None,
-                                "pp": int(row['pp']) if row['pp'] else None,
-                                "accuracy": int(row['accuracy']) if row['accuracy'] else None,
-                                "priority": int(row['priority']) if row['priority'] is not None else 0,
-                                "target_id": int(row['target_id']),
-                                "damage_class_id": int(row['damage_class_id']),
-                                "effect_id": int(row['effect_id']) if row['effect_id'] else None,
-                                "effect_chance": int(row['effect_chance']) if row['effect_chance'] else None,
-                                "description": str(row['description']) if row['description'] else ""
+                                "id": int(row['id']) if pd.notna(row['id']) else 0,
+                                "name_en": str(row['name_en']) if pd.notna(row['name_en']) else "",
+                                "name_zh": str(row['name_zh']) if pd.notna(row['name_zh']) else None,
+                                "generation_id": int(row['generation_id']) if pd.notna(row['generation_id']) else 0,
+                                "type_id": int(row['type_id']) if pd.notna(row['type_id']) else 0,
+                                "power": int(row['power']) if pd.notna(row['power']) else None,
+                                "pp": int(row['pp']) if pd.notna(row['pp']) else None,
+                                "accuracy": int(row['accuracy']) if pd.notna(row['accuracy']) else None,
+                                "priority": int(row['priority']) if pd.notna(row['priority']) else 0,
+                                "target_id": int(row['target_id']) if pd.notna(row['target_id']) else 0,
+                                "damage_class_id": int(row['damage_class_id']) if pd.notna(row['damage_class_id']) else 0,
+                                "effect_id": int(row['effect_id']) if pd.notna(row['effect_id']) else None,
+                                "effect_chance": int(row['effect_chance']) if pd.notna(row['effect_chance']) else None,
+                                "description": str(row['description']) if pd.notna(row['description']) else ""
                             }
                             self.move_repo.add_move_template(move_data)
                         except Exception as e:
@@ -255,10 +258,10 @@ class DataSetupService:
                         for row in batch:
                             try:
                                 batch_data.append({
-                                    "pokemon_species_id": int(row['pokemon_id']),
-                                    "move_id": int(row['move_id']),
-                                    "move_method_id": int(row['pokemon_move_method_id']),
-                                    "level": int(row['level']) if row['level'] is not None else 0
+                                    "pokemon_species_id": int(row['pokemon_id']) if pd.notna(row['pokemon_id']) else 0,
+                                    "move_id": int(row['move_id']) if pd.notna(row['move_id']) else 0,
+                                    "move_method_id": int(row['pokemon_move_method_id']) if pd.notna(row['pokemon_move_method_id']) else 0,
+                                    "level": int(row['level']) if pd.notna(row['level']) else 0
                                 })
                             except Exception:
                                 continue
@@ -320,14 +323,14 @@ class DataSetupService:
 
                     natures_list = [
                         {
-                            "id": row['id'],
-                            "name_en": row['name_en'],
-                            "name_zh": row['name_zh'],
-                            "decreased_stat_id": row['decreased_stat_id'],
-                            "increased_stat_id": row['increased_stat_id'],
-                            "hates_flavor_id": row['hates_flavor_id'],
-                            "likes_flavor_id": row['likes_flavor_id'],
-                            "game_index": row['game_index']
+                            "id": int(row['id']) if pd.notna(row['id']) else 0,
+                            "name_en": str(row['name_en']) if pd.notna(row['name_en']) else "",
+                            "name_zh": str(row['name_zh']) if pd.notna(row['name_zh']) else "",
+                            "decreased_stat_id": int(row['decreased_stat_id']) if pd.notna(row['decreased_stat_id']) else 0,
+                            "increased_stat_id": int(row['increased_stat_id']) if pd.notna(row['increased_stat_id']) else 0,
+                            "hates_flavor_id": int(row['hates_flavor_id']) if pd.notna(row['hates_flavor_id']) else 0,
+                            "likes_flavor_id": int(row['likes_flavor_id']) if pd.notna(row['likes_flavor_id']) else 0,
+                            "game_index": int(row['game_index']) if pd.notna(row['game_index']) else 0
                         }
                         for row in df.to_dict('records')
                     ]
@@ -340,16 +343,15 @@ class DataSetupService:
 
 
             if not self.nature_repo.get_nature_stats_by_nature_id(1):
-                print(1)
                 # 填充性格统计 (Pokeathlon)
                 df_stats = self._read_csv_data("nature_stats.csv")
                 if not df_stats.empty:
                     df_stats = df_stats.where(pd.notnull(df_stats), None)
                     stats_list = [
                         {
-                            "nature_id": row['nature_id'],
-                            "pokeathlon_stat_id": row['pokeathlon_stat_id'],
-                            "max_change": row['max_change']
+                            "nature_id": int(row['nature_id']) if pd.notna(row['nature_id']) else 0,
+                            "pokeathlon_stat_id": int(row['pokeathlon_stat_id']) if pd.notna(row['pokeathlon_stat_id']) else 0,
+                            "max_change": int(row['max_change']) if pd.notna(row['max_change']) else 0
                         }
                         for row in df_stats.to_dict('records')
                     ]
