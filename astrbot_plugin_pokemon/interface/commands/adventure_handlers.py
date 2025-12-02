@@ -330,7 +330,7 @@ class AdventureHandlers:
                             lines.append(f"\n\n  ⚡ 学会新技能: {moves}[{', '.join(map(str, moves_id))}]")
 
                     evolution_info = lvl_info.get("evolution_info")
-                    if evolution_info:
+                    if evolution_info['can_evolve']:
                         print(evolution_info)
                         lines.append(f"\n\n  🔄 可以进化为: {evolution_info['evolved_species_name']} (ID: {evolution_info['evolved_species_id']})")
                 lines.append("")
