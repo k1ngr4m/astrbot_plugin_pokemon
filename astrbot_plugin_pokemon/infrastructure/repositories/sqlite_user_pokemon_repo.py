@@ -4,8 +4,6 @@ import dataclasses
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 
-from pokebase import nature
-
 from ...core.models.pokemon_models import PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves, WildPokemonEncounterLog
 from ...core.models.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserPokemonRepository
