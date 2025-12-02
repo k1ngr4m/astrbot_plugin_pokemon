@@ -17,4 +17,9 @@ def up(cursor: sqlite3.Cursor):
         WHERE generation_id != 1
     """)
 
+    cursor.execute("""
+    UPDATE user_pokemon
+    SET isdel = 1
+    WHERE species_id NOT IN (SELECT id FROM pokemon_species WHERE isdel = 0)
+    """)
     logger.debug("已执行 100_excute_gen_1: 启用第一世代...")
