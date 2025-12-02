@@ -1,6 +1,7 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
+from astrbot.api import logger
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import (
-    UserPokemonInfo, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves
+    UserPokemonInfo, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves, PokemonEvolution
 )
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractUserPokemonRepository, AbstractPokemonRepository
@@ -11,9 +12,9 @@ class EvolutionService:
     """宝可梦进化服务类"""
 
     def __init__(
-        self,
-        user_pokemon_repo: AbstractUserPokemonRepository,
-        pokemon_repo: AbstractPokemonRepository
+            self,
+            user_pokemon_repo: AbstractUserPokemonRepository,
+            pokemon_repo: AbstractPokemonRepository
     ):
         self.user_pokemon_repo = user_pokemon_repo
         self.pokemon_repo = pokemon_repo
@@ -25,148 +26,143 @@ class EvolutionService:
             user_id: 用户ID
             pokemon_id: 宝可梦ID
         Returns:
-            进化结果信息
+            Dict: 进化结果信息
         """
-        # 获取当前宝可梦信息
-        current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
-        if not current_pokemon:
-            return {
-                "success": False,
-                "message": "宝可梦不存在"
-            }
-
-        # 检查是否有进化路线
-        evolutions = self.pokemon_repo.get_pokemon_evolutions(current_pokemon.species_id, current_pokemon.level)
-
-        if not evolutions:
-            return {
-                "success": False,
-                "message": f"宝可梦 {current_pokemon.name} 还未满足进化条件"
-            }
-
-        # 找到第一个符合要求的进化
-        evolution = None
-        for evo in evolutions:
-            if evo.minimum_level > 0 and current_pokemon.level >= evo.minimum_level:
-                evolution = evo
-                break
-
-        # 获取进化后的物种信息
-        evolved_species = self.pokemon_repo.get_pokemon_by_id(evolution.evolved_species_id)
-        if not evolved_species:
-            return {
-                "success": False,
-                "message": "进化后的宝可梦信息不存在"
-            }
-
-
-
-        # 计算新的属性值（因为种族值可能发生变化）
-        new_stats = self._calculate_new_stats(
-            evolved_species.base_stats,
-            current_pokemon.ivs,
-            current_pokemon.evs,
-            current_pokemon.level
-        )
-
-        # 创建进化后的宝可梦数据
-        evolved_pokemon_data = UserPokemonInfo(
-            id=current_pokemon.id,
-            species_id=evolved_species.id,
-            name=evolved_species.name_zh,
-            gender=current_pokemon.gender,
-            level=current_pokemon.level,
-            exp=current_pokemon.exp,
-            stats=new_stats,
-            ivs=current_pokemon.ivs,
-            evs=current_pokemon.evs,
-            moves=current_pokemon.moves,
-            caught_time=current_pokemon.caught_time
-        )
-
-        # 更新宝可梦数据
         try:
-            # 更新宝可梦的种族ID
+            # 1. 获取当前宝可梦信息
+            current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+            if not current_pokemon:
+                return {"success": False, "message": "找不到该宝可梦"}
+
+            # 2. 查找有效的进化路线
+            valid_evolution, error_msg = self._get_valid_evolution(current_pokemon)
+            if not valid_evolution:
+                return {"success": False, "message": error_msg or "该宝可梦当前无法进化"}
+
+            # 3. 获取进化后的物种信息
+            evolved_species = self.pokemon_repo.get_pokemon_by_id(valid_evolution.evolved_species_id)
+            if not evolved_species:
+                logger.error(f"[Evolution] Target species {valid_evolution.evolved_species_id} not found.")
+                return {"success": False, "message": "进化数据缺失，无法完成进化"}
+
+            # 4. 核心逻辑：计算进化后的数值
+            # 进化后：种族值改变，等级/个体值/努力值/性格(暂未实现)保持不变
+            new_stats = self._calculate_new_stats(
+                evolved_species.base_stats,
+                current_pokemon.ivs,
+                current_pokemon.evs,
+                current_pokemon.level
+            )
+
+            # 5. 构建更新数据对象
+            # 注意：保持原有ID、性别、捕获时间、性格等不变
+            evolved_pokemon_data = UserPokemonInfo(
+                id=current_pokemon.id,
+                species_id=evolved_species.id,
+                name=evolved_species.name_zh,
+                gender=current_pokemon.gender,
+                level=current_pokemon.level,
+                exp=current_pokemon.exp,
+                stats=new_stats,
+                ivs=current_pokemon.ivs,
+                evs=current_pokemon.evs,
+                moves=current_pokemon.moves,  # 进化是否自动学招式？通常需要额外逻辑，此处保持原样
+                caught_time=current_pokemon.caught_time
+            )
+
+            # 6. 写入数据库
             self.user_pokemon_repo.update_user_pokemon_after_evolution(
                 user_id=user_id,
                 pokemon_id=pokemon_id,
                 pokemon_info=evolved_pokemon_data
             )
 
+            logger.info(f"User {user_id}'s Pokemon {current_pokemon.name} evolved into {evolved_species.name_zh}")
+
             return {
                 "success": True,
-                "message": f"宝可梦 {current_pokemon.name} 成功进化为 {evolved_species.name_zh}！",
+                "message": f"✨ 恭喜！你的 {current_pokemon.name} 成功进化成了 {evolved_species.name_zh}！",
                 "original_name": current_pokemon.name,
                 "evolved_name": evolved_species.name_zh,
-                "evolved_species_id": evolved_species.id
+                "evolved_species_id": evolved_species.id,
+                "new_stats": new_stats.__dict__
             }
+
         except Exception as e:
-            return {
-                "success": False,
-                "message": f"进化失败: {str(e)}"
-            }
+            logger.exception(f"Evolution failed for user {user_id}, pokemon {pokemon_id}")
+            return {"success": False, "message": f"系统错误: {str(e)}"}
+
+    def check_evolution_status(self, user_id: str, pokemon_id: int) -> Dict[str, Any]:
+        """
+        检查宝可梦的进化状态（用于查询是否可进化）
+        """
+        current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not current_pokemon:
+            return {"can_evolve": False, "message": "宝可梦不存在"}
+
+        valid_evolution, _ = self._get_valid_evolution(current_pokemon)
+
+        if valid_evolution:
+            evolved_species = self.pokemon_repo.get_pokemon_by_id(valid_evolution.evolved_species_id)
+            if evolved_species:
+                return {
+                    "can_evolve": True,
+                    "message": f"⚡ {current_pokemon.name} 现在的力量已经足以进化为 {evolved_species.name_zh}！",
+                    "evolved_species_id": evolved_species.id,
+                    "evolved_species_name": evolved_species.name_zh
+                }
+
+        return {
+            "can_evolve": False,
+            "message": f"{current_pokemon.name} 暂时还不能进化。"
+        }
+
+    def _get_valid_evolution(self, pokemon: UserPokemonInfo) -> Tuple[Optional[PokemonEvolution], Optional[str]]:
+        """
+        辅助方法：检查宝可梦是否满足进化条件
+        Returns:
+            (Evolution对象, 错误信息)
+        """
+        # 获取所有可能的进化路线（包括等级进化、道具进化等）
+        evolutions = self.pokemon_repo.get_pokemon_evolutions(pokemon.species_id, pokemon.level)
+
+        if not evolutions:
+            return None, "该宝可梦没有进化形态"
+
+        # 遍历所有进化路线，找到第一条满足条件的
+        # TODO: 未来在此处扩展逻辑，支持 亲密度进化(happiness)、道具进化(item_id) 等
+        for evo in evolutions:
+            # 逻辑：等级进化 (Level Up)
+            if evo.minimum_level and evo.minimum_level > 0:
+                if pokemon.level >= evo.minimum_level:
+                    return evo, None
+
+            # 可以在此添加 elif 处理其他进化方式
+
+        return None, "尚未满足进化条件（等级不足）"
 
     def _calculate_new_stats(self, base_stats, ivs: PokemonIVs, evs: PokemonEVs, level: int) -> PokemonStats:
         """
         根据种族值、个体值、努力值和等级计算属性值
-        公式: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + constant
+        HP公式: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 等级 + 10
+        其他公式: ((种族值 × 2 + IV + EV ÷ 4) × 等级) ÷ 100 + 5
         """
-        def calculate_stat(base: int, iv: int, ev: int, level: int, is_hp: bool = False) -> int:
-            base_calculation = (base * 2 + iv + ev // 4) * level / 100
-            if is_hp:
-                return int(base_calculation) + level + 10
-            return int(base_calculation) + 5
 
-        new_hp = calculate_stat(base_stats.base_hp, ivs.hp_iv, evs.hp_ev, level, is_hp=True)
-        new_attack = calculate_stat(base_stats.base_attack, ivs.attack_iv, evs.attack_ev, level)
-        new_defense = calculate_stat(base_stats.base_defense, ivs.defense_iv, evs.defense_ev, level)
-        new_sp_attack = calculate_stat(base_stats.base_sp_attack, ivs.sp_attack_iv, evs.sp_attack_ev, level)
-        new_sp_defense = calculate_stat(base_stats.base_sp_defense, ivs.sp_defense_iv, evs.sp_defense_ev, level)
-        new_speed = calculate_stat(base_stats.base_speed, ivs.speed_iv, evs.speed_ev, level)
+        def _calc(base: int, iv: int, ev: int, lvl: int, is_hp: bool = False) -> int:
+            # 核心计算部分 (使用整除 //)
+            core_val = ((base * 2 + iv + (ev // 4)) * lvl) // 100
+            if is_hp:
+                return core_val + lvl + 10
+            else:
+                return core_val + 5
+
+        # TODO: 如果未来引入性格(Nature)系统，需要在非HP属性计算最后乘以性格修正系数 (0.9, 1.0, 1.1)
 
         return PokemonStats(
-            hp=new_hp,
-            attack=new_attack,
-            defense=new_defense,
-            sp_attack=new_sp_attack,
-            sp_defense=new_sp_defense,
-            speed=new_speed
+            hp=_calc(base_stats.base_hp, ivs.hp_iv, evs.hp_ev, level, is_hp=True),
+            attack=_calc(base_stats.base_attack, ivs.attack_iv, evs.attack_ev, level),
+            defense=_calc(base_stats.base_defense, ivs.defense_iv, evs.defense_ev, level),
+            sp_attack=_calc(base_stats.base_sp_attack, ivs.sp_attack_iv, evs.sp_attack_ev, level),
+            sp_defense=_calc(base_stats.base_sp_defense, ivs.sp_defense_iv, evs.sp_defense_ev, level),
+            speed=_calc(base_stats.base_speed, ivs.speed_iv, evs.speed_ev, level)
         )
-
-    def check_evolution_status(self, user_id: str, pokemon_id: int) -> Dict[str, Any]:
-        """
-        检查宝可梦的进化状态
-        """
-        current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
-        if not current_pokemon:
-            return {
-                "can_evolve": False,
-                "message": "宝可梦不存在"
-            }
-
-        # 检查是否有进化路线
-        with self.pokemon_repo._get_connection() as conn:
-            evolutions = conn.execute(
-                """
-                SELECT * FROM pokemon_evolutions
-                WHERE pre_species_id = ? AND minimum_level <= ? AND isdel = 0
-                """, (current_pokemon.species_id, current_pokemon.level)
-            ).fetchall()
-
-        if evolutions:
-            for evo in evolutions:
-                evo_dict = dict(evo)
-                if evo_dict['minimum_level'] > 0 and current_pokemon.level >= evo_dict['minimum_level']:
-                    evolved_species = self.pokemon_repo.get_pokemon_by_id(evo_dict['evolved_species_id'])
-                    if evolved_species:
-                        return {
-                            "can_evolve": True,
-                            "message": f"宝可梦 {current_pokemon.name} 可以进化为 {evolved_species.name_zh}",
-                            "evolved_species_id": evolved_species.id,
-                            "evolved_species_name": evolved_species.name_zh
-                        }
-
-        return {
-            "can_evolve": False,
-            "message": f"宝可梦 {current_pokemon.name} 暂时无法进化"
-        }
