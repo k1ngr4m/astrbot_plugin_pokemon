@@ -10,6 +10,7 @@ from ..core.services.move_service import MoveService
 from ..core.services.evolution_service import EvolutionService
 
 from ..infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
+from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository
 from ..infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
 from ..infrastructure.repositories.sqlite_team_repo import SqliteTeamRepository
 from ..infrastructure.repositories.sqlite_user_item_repo import SqliteUserItemRepository
@@ -40,6 +41,7 @@ class GameContainer:
         self.battle_repo = SqliteBattleRepository(self.db_path)
         self.user_pokemon_repo = SqliteUserPokemonRepository(self.db_path)
         self.user_item_repo = SqliteUserItemRepository(self.db_path)
+        self.nature_repo = SqliteNatureRepository(self.db_path)
 
 
 

@@ -152,3 +152,28 @@ class SqliteMoveRepository(AbstractMoveRepository):
         except Exception as e:
             logger.error(f"获取招式详细信息失败: {e}")
             return None
+
+    def get_pokemon_moves_by_species_id(self, pokemon_species_id: int) -> List[Dict[str, Any]]:
+        """
+        获取宝可梦物种的所有招式
+        """
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT pm.move_id, pm.move_method_id, pm.level
+                    FROM pokemon_moves pm
+                    WHERE pm.pokemon_species_id = ?
+                """, (pokemon_species_id,))
+                rows = cursor.fetchall()
+                return [
+                    {
+                        "move_id": row[0],
+                        "move_method_id": row[1],
+                        "level": row[2]
+                    }
+                    for row in rows
+                ]
+        except Exception as e:
+            logger.error(f"获取宝可梦物种招式失败: {e}")
+            return []

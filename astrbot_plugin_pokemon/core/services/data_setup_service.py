@@ -1,13 +1,11 @@
 import os
 import pandas as pd
-import glob
-import re
-
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository,
     AbstractAdventureRepository,
     AbstractShopRepository,
     AbstractMoveRepository, AbstractItemRepository,
+    AbstractNatureRepository,
 )
 from astrbot.api import logger
 
@@ -21,6 +19,7 @@ class DataSetupService:
                  shop_repo: AbstractShopRepository,
                  move_repo: AbstractMoveRepository,
                  item_repo: AbstractItemRepository,
+                 nature_repo: AbstractNatureRepository,
                  data_path: str = None
                  ):
         self.pokemon_repo = pokemon_repo
@@ -28,6 +27,7 @@ class DataSetupService:
         self.shop_repo = shop_repo
         self.move_repo = move_repo
         self.item_repo = item_repo
+        self.nature_repo = nature_repo
 
         # 如果未指定路径，则使用相对于插件根目录的路径
         if data_path is None:
@@ -48,285 +48,318 @@ class DataSetupService:
         """
         检查核心数据表是否为空，如果为空则进行数据填充。
         从v3目录中的CSV文件读取数据并填充到数据库。
-        这是一个幂等操作（idempotent），可以安全地多次调用而不会重复插入数据。
+        这是一个幂等操作（idempotent）。
         """
+        logger.info("开始检查并初始化游戏数据...")
+
         try:
-            existing_pokemon = self.pokemon_repo.get_all_pokemon()
-            if existing_pokemon:
-                logger.info("数据库核心数据已存在，跳过初始化。")
-                return
-        except Exception as e:
-            # 如果表不存在等数据库错误，也需要继续执行创建和插入
-            logger.error(f"检查数据时发生错误 (可能是表不存在，将继续初始化): {e}")
+            # 1. 填充 Pokemon 数据
+            if not self.pokemon_repo.get_all_pokemon():
+                df = self._read_csv_data("pokemon_species.csv")
+                if not df.empty:
+                    logger.info("正在初始化宝可梦种族数据...")
+                    df = df.where(pd.notnull(df), None)
 
-        logger.info("检测到数据库为空或核心数据不完整，正在从v3目录初始化游戏数据...")
-
-        # 读取v3目录中的CSV数据
-        pokemon_species_df = self._read_csv_data("pokemon_species.csv")
-        pokemon_types_df = self._read_csv_data("pokemon_types.csv")
-        pokemon_species_types_df = self._read_csv_data("pokemon_species_types.csv")
-        pokemon_evolution_df = self._read_csv_data("pokemon_evolution.csv")
-        items_df = self._read_csv_data("items.csv")
-        locations_df = self._read_csv_data("locations.csv")
-        location_pokemon_df = self._read_csv_data("location_pokemon.csv")
-        moves_df = self._read_csv_data("moves.csv")
-        pokemon_moves_df = self._read_csv_data("pokemon_moves.csv")
-        shops_df = self._read_csv_data("shops.csv")
-        shop_items_df = self._read_csv_data("shop_items.csv")
-
-        # 注意：初始数据中的其他数据（如技能、冒险区域等）可能仍需要从其他来源获取
-        # 我们假设这些数据仍然在initial_data.py中，或者需要创建对应的CSV文件
-
-        # 1. 填充 Pokemon 数据 (批量)
-        if not pokemon_species_df.empty:
-            # 将 DataFrame 中的 NaN 替换为 None，以适配 SQL
-            pokemon_species_df = pokemon_species_df.where(pd.notnull(pokemon_species_df), None)
-
-            # 构造数据列表
-            pokemon_data_list = []
-            for _, row in pokemon_species_df.iterrows():  # 或者直接用 to_dict('records') 后处理键名映射
-                # 这里的映射逻辑比较简单，可以直接构造
-                pokemon_data_list.append({
-                    "id": row['id'],
-                    "name_en": row['name_en'],
-                    "name_zh": row['name_zh'],
-                    "generation_id": row['generation_id'],
-                    "base_hp": row['base_hp'],
-                    "base_attack": row['base_attack'],
-                    "base_defense": row['base_defense'],
-                    "base_sp_attack": row['base_sp_attack'],
-                    "base_sp_defense": row['base_sp_defense'],
-                    "base_speed": row['base_speed'],
-                    "height": row['height'],
-                    "weight": row['weight'],
-                    "base_experience": row['base_experience'],
-                    "gender_rate": row['gender_rate'],
-                    "capture_rate": row['capture_rate'],
-                    "growth_rate_id": row['growth_rate_id'],
-                    "description": row['description'],
-                    "orders": row.get('order', row['id']),
-                    "effort": row.get('effort', '[]')  # 从CSV中读取effort字段，如果不存在则默认为'[]'
-                })
-
-            # 调用批量插入接口 (需要确保 Repo 中实现了该方法，如上一步所示)
-            if hasattr(self.pokemon_repo, 'add_pokemon_templates_batch'):
-                self.pokemon_repo.add_pokemon_templates_batch(pokemon_data_list)
-            else:
-                # 兼容旧代码，但建议升级 Repo
-                for data in pokemon_data_list:
-                    self.pokemon_repo.add_pokemon_template(data)
-
-        # 填充Pokemon类型数据
-        if not pokemon_types_df.empty:
-            for _, type_row in pokemon_types_df.iterrows():
-                self.pokemon_repo.add_pokemon_type_template(
-                    {
-                        "id": type_row['id'],
-                        "name_en": type_row['name_en'],  # 英文名称
-                        "name_zh": type_row['name_zh'],  # 中文名称
-                    }
-                )
-
-        # 填充Pokemon类型关联数据
-        if not pokemon_species_types_df.empty:
-            for _, species_type_row in pokemon_species_types_df.iterrows():
-                self.pokemon_repo.add_pokemon_species_type_template(
-                    {
-                        "species_id": int(species_type_row['pokemon_id']),
-                        "type_id": int(species_type_row['type_id']),
-                    }
-                )
-
-        # 填充Pokemon进化数据
-        if not pokemon_evolution_df.empty:
-            pokemon_evolution_df = pokemon_evolution_df.where(pd.notnull(pokemon_evolution_df), None)
-
-            pokemon_evolution_data_list = []
-            for _, evolution_row in pokemon_evolution_df.iterrows():
-                # 直接使用CSV中的字段映射到数据库字段
-                pokemon_evolution_data_list.append({
-                    "id": evolution_row['id'],
-                    "pre_species_id": evolution_row['pre_species_id'],
-                    "evolved_species_id": evolution_row['evolved_species_id'],
-                    "evolution_trigger_id": evolution_row.get('evolution_trigger_id', 0),
-                    "trigger_item_id": evolution_row.get('trigger_item_id', 0),
-                    "minimum_level": evolution_row.get('minimum_level', 0),
-                    "gender_id": evolution_row.get('gender_id', 0),
-                    "location_id": evolution_row.get('location_id', 0),
-                    "held_item_id": evolution_row.get('held_item_id', 0),
-                    "time_of_day": evolution_row.get('time_of_day', ''),
-                    "known_move_id": evolution_row.get('known_move_id', 0),
-                    "known_move_type_id": evolution_row.get('known_move_type_id', 0),
-                    "minimum_happiness": evolution_row.get('minimum_happiness', 0),
-                    "minimum_beauty": evolution_row.get('minimum_beauty', 0),
-                    "minimum_affection": evolution_row.get('minimum_affection', 0),
-                    "relative_physical_stats": evolution_row.get('relative_physical_stats', 0),
-                    "party_species_id": evolution_row.get('party_species_id', 0),
-                    "party_type_id": evolution_row.get('party_type_id', 0),
-                    "trade_species_id": evolution_row.get('trade_species_id', 0),
-                    "needs_overworld_rain": evolution_row.get('needs_overworld_rain', 0),
-                    "turn_upside_down": evolution_row.get('turn_upside_down', 0),
-                    "region_id": evolution_row.get('region_id', 0),
-                    "base_form_id": evolution_row.get('base_form_id', 0)
-                })
-
-            if hasattr(self.pokemon_repo, 'add_pokemon_evolutions_batch'):
-                self.pokemon_repo.add_pokemon_evolutions_batch(pokemon_evolution_data_list)
-
-            else:
-                for data in pokemon_evolution_data_list:
-                    self.pokemon_repo.add_pokemon_evolution_template(data)
-
-        # 填充物品数据
-        if not items_df.empty:
-            for _, item_row in items_df.iterrows():
-                try:
-                    # 注意：数据库items表字段为: id, name, rarity, price, type, description
-                    # 需要调整字段映射以适配数据库结构
-                    item_data = {
-                        "id": int(item_row['id']),
-                        "name_en": str(item_row['name_en']),  # 使用英文名称作为name_en字段
-                        "name_zh": str(item_row['name_zh']),  # 使用中文名称作为name_zh字段
-                        "category_id": int(item_row['category_id']),
-                        "cost": int(item_row['cost']),
-                        "description": str(item_row['description']) if pd.notna(item_row['description']) else ""
-                    }
-
-                    self.item_repo.add_item_template(item_data)
-                except (ValueError, TypeError) as e:
-                    logger.error(f"处理物品数据时出错 (ID: {item_row.get('id', 'Unknown')}): {e}")
-                    continue
-
-        # 填充地点数据
-        if not locations_df.empty:
-            for _, location_row in locations_df.iterrows():
-                try:
-                    location_data = {
-                        "id": int(location_row['id']),
-                        "name": str(location_row['name']),
-                        "description": str(location_row['description']) if pd.notna(location_row['description']) else "",
-                        "min_level": int(location_row['min_level']) if pd.notna(location_row['min_level']) else 1,
-                        "max_level": int(location_row['max_level']) if pd.notna(location_row['max_level']) else 100
-                    }
-                    self.adventure_repo.add_location_template(location_data)
-                except (ValueError, TypeError) as e:
-                    logger.error(f"处理地点数据时出错 (ID: {location_row.get('id', 'Unknown')}): {e}")
-                    continue
-
-        # 填充地点宝可梦关联数据
-        if not location_pokemon_df.empty:
-            for _, loc_pokemon_row in location_pokemon_df.iterrows():
-                try:
-                    location_pokemon_data = {
-                        "id": int(loc_pokemon_row['id']),
-                        "location_id": int(loc_pokemon_row['location_id']),  # 需要将CSV中的location_id映射为location_id
-                        "pokemon_species_id": int(loc_pokemon_row['pokemon_species_id']),
-                        "encounter_rate": float(loc_pokemon_row['encounter_rate']) if pd.notna(loc_pokemon_row['encounter_rate']) else 10.0,
-                        "min_level": int(loc_pokemon_row['min_level']) if pd.notna(loc_pokemon_row['min_level']) else 1,
-                        "max_level": int(loc_pokemon_row['max_level']) if pd.notna(loc_pokemon_row['max_level']) else 10
-                    }
-                    self.adventure_repo.add_location_pokemon_template(location_pokemon_data)
-                except (ValueError, TypeError) as e:
-                    logger.error(f"处理地点宝可梦关联数据时出错 (Location: {loc_pokemon_row.get('location_id', 'Unknown')}, Pokemon: {loc_pokemon_row.get('pokemon_species_id', 'Unknown')}): {e}")
-                    continue
-
-        # 填充技能数据
-        if not moves_df.empty:
-            for _, move_row in moves_df.iterrows():
-                try:
-                    move_data = {
-                        "id": int(move_row['id']),
-                        "name_en": str(move_row['name_en']),
-                        "name_zh": str(move_row['name_zh']) if pd.notna(move_row['name_zh']) else None,
-                        "generation_id": int(move_row['generation_id']),
-                        "type_id": int(move_row['type_id']),
-                        "power": int(move_row['power']) if pd.notna(move_row['power']) else None,
-                        "pp": int(move_row['pp']) if pd.notna(move_row['pp']) else None,
-                        "accuracy": int(move_row['accuracy']) if pd.notna(move_row['accuracy']) else None,
-                        "priority": int(move_row['priority']) if pd.notna(move_row['priority']) else 0,
-                        "target_id": int(move_row['target_id']),
-                        "damage_class_id": int(move_row['damage_class_id']),
-                        "effect_id": int(move_row['effect_id']) if pd.notna(move_row['effect_id']) else None,
-                        "effect_chance": int(move_row['effect_chance']) if pd.notna(move_row['effect_chance']) else None,
-                        "description": str(move_row['description']) if pd.notna(move_row['description']) else ""
-                    }
-                    self.move_repo.add_move_template(move_data)
-
-
-                except (ValueError, TypeError) as e:
-                    logger.error(f"处理技能数据时出错 (ID: {move_row.get('id', 'Unknown')}): {e}")
-                    continue
-
-        if not pokemon_moves_df.empty:
-            # 对数据进行排序，按 pokemon_species_id (pokemon_id) 和 level 排序，确保数据有序
-            pokemon_moves_df_sorted = pokemon_moves_df.sort_values(['pokemon_id', 'pokemon_move_method_id']).reset_index(drop=True)
-
-            # 分批处理数据以提高性能，使用批量插入方法
-            batch_size = 1000  # 设置批量大小为1000条记录
-            total_rows = len(pokemon_moves_df_sorted)
-
-            for i in range(0, total_rows, batch_size):
-                batch_df = pokemon_moves_df_sorted.iloc[i:i + batch_size]
-
-                # 收集批量数据
-                batch_data = []
-                for _, pokemon_move_row in batch_df.iterrows():
-                    try:
-                        pokemon_move_data = {
-                            "pokemon_species_id": int(pokemon_move_row['pokemon_id']),
-                            "move_id": int(pokemon_move_row['move_id']),
-                            "move_method_id": int(pokemon_move_row['pokemon_move_method_id']),
-                            "level": int(pokemon_move_row['level']) if pd.notna(pokemon_move_row['level']) else 0
+                    pokemon_data_list = [
+                        {
+                            "id": row['id'],
+                            "name_en": row['name_en'],
+                            "name_zh": row['name_zh'],
+                            "generation_id": row['generation_id'],
+                            "base_hp": row['base_hp'],
+                            "base_attack": row['base_attack'],
+                            "base_defense": row['base_defense'],
+                            "base_sp_attack": row['base_sp_attack'],
+                            "base_sp_defense": row['base_sp_defense'],
+                            "base_speed": row['base_speed'],
+                            "height": row['height'],
+                            "weight": row['weight'],
+                            "base_experience": row['base_experience'],
+                            "gender_rate": row['gender_rate'],
+                            "capture_rate": row['capture_rate'],
+                            "growth_rate_id": row['growth_rate_id'],
+                            "description": row['description'],
+                            "orders": row.get('order', row['id']),
+                            "effort": row.get('effort', '[]')
                         }
-                        batch_data.append(pokemon_move_data)
-                    except (ValueError, TypeError) as e:
-                        logger.error(f"处理宝可梦技能学习数据时出错 (Pokemon ID: {pokemon_move_row.get('pokemon_id', 'Unknown')}, Move ID: {pokemon_move_row.get('move_id', 'Unknown')}): {e}")
-                        continue
+                        for row in df.to_dict('records')
+                    ]
 
-                # 批量插入数据
-                if batch_data:
-                    try:
-                        self.move_repo.add_pokemon_species_move_templates_batch(batch_data)
-                    except Exception as e:
-                        logger.error(f"批量插入宝可梦技能学习数据时出错: {e}")
-                        # 如果批量插入失败，尝试逐条插入
-                        for data in batch_data:
+                    if hasattr(self.pokemon_repo, 'add_pokemon_templates_batch'):
+                        self.pokemon_repo.add_pokemon_templates_batch(pokemon_data_list)
+                    else:
+                        for data in pokemon_data_list:
+                            self.pokemon_repo.add_pokemon_template(data)
+
+            # 2. 填充 Pokemon 类型数据
+            if not self.pokemon_repo.get_pokemon_types(1):
+                df = self._read_csv_data("pokemon_types.csv")
+                if not df.empty:
+                    for row in df.to_dict('records'):
+                        self.pokemon_repo.add_pokemon_type_template({
+                            "id": row['id'],
+                            "name_en": row['name_en'],
+                            "name_zh": row['name_zh'],
+                        })
+
+            # 3. 填充 Pokemon 类型关联
+            if not self.pokemon_repo.get_pokemon_species_types(1):
+                df = self._read_csv_data("pokemon_species_types.csv")
+                if not df.empty:
+                    for row in df.to_dict('records'):
+                        self.pokemon_repo.add_pokemon_species_type_template({
+                            "species_id": int(row['pokemon_id']),
+                            "type_id": int(row['type_id']),
+                        })
+
+            # 4. 填充 Pokemon 进化数据
+            if not self.pokemon_repo.get_pokemon_evolutions(1, 100):
+                df = self._read_csv_data("pokemon_evolution.csv")
+                if not df.empty:
+                    logger.info("正在初始化宝可梦进化数据...")
+                    df = df.where(pd.notnull(df), None)
+
+                    evolution_data_list = [
+                        {
+                            "id": row['id'],
+                            "pre_species_id": row['pre_species_id'],
+                            "evolved_species_id": row['evolved_species_id'],
+                            "evolution_trigger_id": row.get('evolution_trigger_id', 0),
+                            "trigger_item_id": row.get('trigger_item_id', 0),
+                            "minimum_level": row.get('minimum_level', 0),
+                            "gender_id": row.get('gender_id', 0),
+                            "location_id": row.get('location_id', 0),
+                            "held_item_id": row.get('held_item_id', 0),
+                            "time_of_day": row.get('time_of_day', ''),
+                            "known_move_id": row.get('known_move_id', 0),
+                            "known_move_type_id": row.get('known_move_type_id', 0),
+                            "minimum_happiness": row.get('minimum_happiness', 0),
+                            "minimum_beauty": row.get('minimum_beauty', 0),
+                            "minimum_affection": row.get('minimum_affection', 0),
+                            "relative_physical_stats": row.get('relative_physical_stats', 0),
+                            "party_species_id": row.get('party_species_id', 0),
+                            "party_type_id": row.get('party_type_id', 0),
+                            "trade_species_id": row.get('trade_species_id', 0),
+                            "needs_overworld_rain": row.get('needs_overworld_rain', 0),
+                            "turn_upside_down": row.get('turn_upside_down', 0),
+                            "region_id": row.get('region_id', 0),
+                            "base_form_id": row.get('base_form_id', 0)
+                        }
+                        for row in df.to_dict('records')
+                    ]
+
+                    if hasattr(self.pokemon_repo, 'add_pokemon_evolutions_batch'):
+                        self.pokemon_repo.add_pokemon_evolutions_batch(evolution_data_list)
+                    else:
+                        for data in evolution_data_list:
+                            self.pokemon_repo.add_pokemon_evolution_template(data)
+
+            # 5. 填充物品数据
+            if not self.item_repo.get_item_name(1):
+                df = self._read_csv_data("items.csv")
+                if not df.empty:
+                    logger.info("正在初始化物品数据...")
+                    df = df.where(pd.notnull(df), None)
+                    for row in df.to_dict('records'):
+                        try:
+                            item_data = {
+                                "id": int(row['id']),
+                                "name_en": str(row['name_en']),
+                                "name_zh": str(row['name_zh']),
+                                "category_id": int(row['category_id']),
+                                "cost": int(row['cost']),
+                                "description": str(row['description']) if row['description'] else ""
+                            }
+                            self.item_repo.add_item_template(item_data)
+                        except Exception as e:
+                            logger.error(f"物品数据错误 (ID: {row.get('id')}): {e}")
+
+            # 6. 填充地点数据
+            if not self.adventure_repo.get_location_by_id(1):
+                df = self._read_csv_data("locations.csv")
+                if not df.empty:
+                    df = df.where(pd.notnull(df), None)
+                    for row in df.to_dict('records'):
+                        try:
+                            self.adventure_repo.add_location_template({
+                                "id": int(row['id']),
+                                "name": str(row['name']),
+                                "description": str(row['description']) if row['description'] else "",
+                                "min_level": int(row['min_level']) if row['min_level'] else 1,
+                                "max_level": int(row['max_level']) if row['max_level'] else 100
+                            })
+                        except Exception as e:
+                            logger.error(f"地点数据错误 (ID: {row.get('id')}): {e}")
+
+            # 7. 填充地点宝可梦关联
+            if not self.adventure_repo.get_location_pokemon_by_location_id(1):
+                df = self._read_csv_data("location_pokemon.csv")
+                if not df.empty:
+                    df = df.where(pd.notnull(df), None)
+                    for row in df.to_dict('records'):
+                        try:
+                            self.adventure_repo.add_location_pokemon_template({
+                                "id": int(row['id']),
+                                "location_id": int(row['location_id']),
+                                "pokemon_species_id": int(row['pokemon_species_id']),
+                                "encounter_rate": float(row['encounter_rate']) if row['encounter_rate'] else 10.0,
+                                "min_level": int(row['min_level']) if row['min_level'] else 1,
+                                "max_level": int(row['max_level']) if row['max_level'] else 10
+                            })
+                        except Exception as e:
+                            logger.error(f"地点宝可梦错误 (Loc: {row.get('location_id')}): {e}")
+
+            # 8. 填充技能数据
+            if not self.move_repo.get_move_by_id(1):
+                df = self._read_csv_data("moves.csv")
+                if not df.empty:
+                    logger.info("正在初始化技能数据...")
+                    df = df.where(pd.notnull(df), None)
+                    for row in df.to_dict('records'):
+                        try:
+                            move_data = {
+                                "id": int(row['id']),
+                                "name_en": str(row['name_en']),
+                                "name_zh": str(row['name_zh']) if row['name_zh'] else None,
+                                "generation_id": int(row['generation_id']),
+                                "type_id": int(row['type_id']),
+                                "power": int(row['power']) if row['power'] else None,
+                                "pp": int(row['pp']) if row['pp'] else None,
+                                "accuracy": int(row['accuracy']) if row['accuracy'] else None,
+                                "priority": int(row['priority']) if row['priority'] is not None else 0,
+                                "target_id": int(row['target_id']),
+                                "damage_class_id": int(row['damage_class_id']),
+                                "effect_id": int(row['effect_id']) if row['effect_id'] else None,
+                                "effect_chance": int(row['effect_chance']) if row['effect_chance'] else None,
+                                "description": str(row['description']) if row['description'] else ""
+                            }
+                            self.move_repo.add_move_template(move_data)
+                        except Exception as e:
+                            logger.error(f"技能数据错误 (ID: {row.get('id')}): {e}")
+
+            # 9. 填充宝可梦技能关联 (大批量数据)
+            if not self.move_repo.get_pokemon_moves_by_species_id(1):
+                df = self._read_csv_data("pokemon_moves.csv")
+                if not df.empty:
+                    logger.info("正在初始化宝可梦技能学习表 (可能需要几秒钟)...")
+                    df = df.where(pd.notnull(df), None)
+                    # 排序
+                    df.sort_values(['pokemon_id', 'pokemon_move_method_id'], inplace=True)
+
+                    records = df.to_dict('records')
+                    batch_size = 1000
+
+                    for i in range(0, len(records), batch_size):
+                        batch = records[i:i + batch_size]
+                        batch_data = []
+                        for row in batch:
                             try:
-                                self.move_repo.add_pokemon_species_move_template(data)
-                            except Exception as single_e:
-                                logger.error(f"单条插入宝可梦技能学习数据失败: {data}, 错误: {single_e}")
+                                batch_data.append({
+                                    "pokemon_species_id": int(row['pokemon_id']),
+                                    "move_id": int(row['move_id']),
+                                    "move_method_id": int(row['pokemon_move_method_id']),
+                                    "level": int(row['level']) if row['level'] is not None else 0
+                                })
+                            except Exception:
+                                continue
 
-        # 填充商店数据
-        if not shops_df.empty:
-            for _, shop_row in shops_df.iterrows():
-                try:
-                    shop_data = {
-                        "id": int(shop_row['id']),
-                        "name": str(shop_row['name']),
-                        "description": str(shop_row['description']) if pd.notna(shop_row['description']) else "",
-                        "shop_type": str(shop_row['shop_type']),
-                        "is_active": int(shop_row['is_active']),
-                        "created_at": str(shop_row['created_at']) if pd.notna(shop_row['created_at']) else None,
-                        "updated_at": str(shop_row['updated_at']) if pd.notna(shop_row['updated_at']) else None
-                    }
-                    self.shop_repo.add_shop_template(shop_data)
-                except (ValueError, TypeError) as e:
-                    logger.error(f"处理商店数据时出错 (ID: {shop_row.get('id', 'Unknown')}): {e}")
-                    continue
+                        if batch_data:
+                            try:
+                                self.move_repo.add_pokemon_species_move_templates_batch(batch_data)
+                            except Exception as e:
+                                logger.error(f"批量插入技能失败，尝试单条插入: {e}")
+                                for data in batch_data:
+                                    try:
+                                        self.move_repo.add_pokemon_species_move_template(data)
+                                    except:
+                                        pass
 
-        # 填充商店物品数据
-        if not shop_items_df.empty:
-            for _, shop_item_row in shop_items_df.iterrows():
-                try:
-                    shop_item_data = {
-                        "id": int(shop_item_row['id']),
-                        "shop_id": int(shop_item_row['shop_id']),
-                        "item_id": int(shop_item_row['item_id']),
-                        "price": int(shop_item_row['price']),
-                        "stock": int(shop_item_row['stock']),
-                        "is_active": int(shop_item_row['is_active'])
-                    }
-                    self.shop_repo.add_shop_item_template(shop_item_data)
-                except (ValueError, TypeError) as e:
-                    logger.error(f"处理商店物品数据时出错 (ID: {shop_item_row.get('id', 'Unknown')}): {e}")
-                    continue
+            # 10. 填充商店数据
+            if not self.shop_repo.get_shop_by_id(1):
+                df = self._read_csv_data("shops.csv")
+                if not df.empty:
+                    df = df.where(pd.notnull(df), None)
+                    for row in df.to_dict('records'):
+                        try:
+                            self.shop_repo.add_shop_template({
+                                "id": int(row['id']),
+                                "name": str(row['name']),
+                                "description": str(row['description']) if row['description'] else "",
+                                "shop_type": str(row['shop_type']),
+                                "is_active": int(row['is_active']),
+                                "created_at": str(row['created_at']) if row['created_at'] else None,
+                                "updated_at": str(row['updated_at']) if row['updated_at'] else None
+                            })
+                        except Exception as e:
+                            logger.error(f"商店数据错误 (ID: {row.get('id')}): {e}")
+
+            # 11. 填充商店物品
+            if not self.shop_repo.get_shop_items_by_shop_id(1):
+                df = self._read_csv_data("shop_items.csv")
+                if not df.empty:
+                    df = df.where(pd.notnull(df), None)
+                    for row in df.to_dict('records'):
+                        try:
+                            self.shop_repo.add_shop_item_template({
+                                "id": int(row['id']),
+                                "shop_id": int(row['shop_id']),
+                                "item_id": int(row['item_id']),
+                                "price": int(row['price']),
+                                "stock": int(row['stock']),
+                                "is_active": int(row['is_active'])
+                            })
+                        except Exception as e:
+                            logger.error(f"商店物品错误 (ID: {row.get('id')}): {e}")
+
+            # 12. 填充性格数据
+            if not self.nature_repo.get_nature_by_id(1):
+                df = self._read_csv_data("natures.csv")
+                if not df.empty:
+                    logger.info("正在初始化性格数据...")
+                    df = df.where(pd.notnull(df), None)
+
+                    natures_list = [
+                        {
+                            "id": row['id'],
+                            "name_en": row['name_en'],
+                            "name_zh": row['name_zh'],
+                            "decreased_stat_id": row['decreased_stat_id'],
+                            "increased_stat_id": row['increased_stat_id'],
+                            "hates_flavor_id": row['hates_flavor_id'],
+                            "likes_flavor_id": row['likes_flavor_id'],
+                            "game_index": row['game_index']
+                        }
+                        for row in df.to_dict('records')
+                    ]
+
+                    if hasattr(self.nature_repo, 'add_nature_templates_batch'):
+                        self.nature_repo.add_nature_templates_batch(natures_list)
+                    else:
+                        for data in natures_list:
+                            self.nature_repo.add_nature_template(data)
+
+
+            if not self.nature_repo.get_nature_stats_by_nature_id(1):
+                print(1)
+                # 填充性格统计 (Pokeathlon)
+                df_stats = self._read_csv_data("nature_stats.csv")
+                if not df_stats.empty:
+                    df_stats = df_stats.where(pd.notnull(df_stats), None)
+                    stats_list = [
+                        {
+                            "nature_id": row['nature_id'],
+                            "pokeathlon_stat_id": row['pokeathlon_stat_id'],
+                            "max_change": row['max_change']
+                        }
+                        for row in df_stats.to_dict('records')
+                    ]
+
+                    if hasattr(self.nature_repo, 'add_nature_stat_templates_batch'):
+                        self.nature_repo.add_nature_stat_templates_batch(stats_list)
+                    else:
+                        for data in stats_list:
+                            self.nature_repo.add_nature_stat_template(data)
+
+        except Exception as e:
+            logger.error(f"初始化数据时发生全局错误: {e}")
+            # 允许继续运行，因为部分数据可能已经加载成功

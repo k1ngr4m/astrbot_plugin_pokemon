@@ -93,6 +93,9 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_pokemon_types(self, species_id: int) -> List[str]: pass
 
+    @abstractmethod
+    def get_pokemon_species_types(self, species_id: int) -> List[str]: pass
+
     # 获取宝可梦基础经验值
     @abstractmethod
     def get_base_exp(self, pokemon_id: int) -> int: pass
@@ -213,6 +216,8 @@ class AbstractMoveRepository(ABC):
     @abstractmethod
     def get_move_by_id(self, move_id: int) -> Dict[str, Any] | None: pass
 
+    @abstractmethod
+    def get_pokemon_moves_by_species_id(self, pokemon_species_id: int) -> List[Dict[str, Any]]: pass
 class AbstractBattleRepository(ABC):
     """战斗日志数据仓储接口"""
     # ==========增==========
@@ -311,3 +316,36 @@ class AbstractUserItemRepository(ABC):
     # 获取用户的所有物品
     @abstractmethod
     def get_user_items(self, user_id: str) -> UserItems: pass
+
+
+class AbstractNatureRepository(ABC):
+    """性格数据仓储接口"""
+    # ==========增==========
+    # 添加性格模板
+    @abstractmethod
+    def add_nature_template(self, nature_data: Dict[str, Any]) -> None: pass
+
+    # 批量添加性格模板
+    @abstractmethod
+    def add_nature_templates_batch(self, nature_data_list: List[Dict[str, Any]]) -> None: pass
+
+    # 添加性格属性模板
+    @abstractmethod
+    def add_nature_stat_template(self, nature_stat_data: Dict[str, Any]) -> None: pass
+
+    # 批量添加性格属性模板
+    @abstractmethod
+    def add_nature_stat_templates_batch(self, nature_stat_data_list: List[Dict[str, Any]]) -> None: pass
+
+    # ==========查==========
+    # 根据ID获取性格
+    @abstractmethod
+    def get_nature_by_id(self, nature_id: int) -> Optional[Dict[str, Any]]: pass
+
+    # 获取所有性格
+    @abstractmethod
+    def get_all_natures(self) -> List[Dict[str, Any]]: pass
+
+    # 根据性格ID获取性格属性
+    @abstractmethod
+    def get_nature_stats_by_nature_id(self, nature_id: int) -> List[Dict[str, Any]]: pass

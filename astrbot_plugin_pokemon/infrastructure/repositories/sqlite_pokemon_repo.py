@@ -258,6 +258,16 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             """, (species_id,))
             return [row[0] for row in cursor.fetchall()]
 
+    def get_pokemon_species_types(self, species_id: int) -> List[str]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT t.name_zh FROM pokemon_types t
+                JOIN pokemon_species_types st ON t.id = st.type_id
+                WHERE st.species_id = ?
+            """, (species_id,))
+            return [row[0] for row in cursor.fetchall()]
+
     def get_base_exp(self, pokemon_id: int) -> int:
         """获取宝可梦的基础经验值"""
         with self._get_connection() as conn:
