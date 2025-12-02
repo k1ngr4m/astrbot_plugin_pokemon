@@ -104,7 +104,8 @@ class DataSetupService:
                     "capture_rate": row['capture_rate'],
                     "growth_rate_id": row['growth_rate_id'],
                     "description": row['description'],
-                    "orders": row.get('order', row['id'])
+                    "orders": row.get('order', row['id']),
+                    "effort": row.get('effort', '[]')  # 从CSV中读取effort字段，如果不存在则默认为'[]'
                 })
 
             # 调用批量插入接口 (需要确保 Repo 中实现了该方法，如上一步所示)

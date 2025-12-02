@@ -88,6 +88,7 @@ class PokemonSpecies:
     capture_rate: Optional[int] = None
     growth_rate_id: Optional[int] = None
     orders: Optional[int] = None
+    effort: Optional[str] = "[]"  # effort 字段，存储JSON格式的effort数据
     isdel: Optional[int] = 0
 
     def to_dict(self) -> dict:
@@ -105,6 +106,7 @@ class PokemonSpecies:
             "capture_rate": self.capture_rate,
             "growth_rate_id": self.growth_rate_id,
             "orders": self.orders,
+            "effort": self.effort,
             "isdel": self.isdel,
         }
 

@@ -174,13 +174,13 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 INSERT OR IGNORE INTO pokemon_species
                 (id, name_en, name_zh, generation_id, base_hp, base_attack,
                  base_defense, base_sp_attack, base_sp_defense, base_speed,
-                height, weight, base_experience, gender_rate, capture_rate, 
-                 growth_rate_id, description, orders)
+                height, weight, base_experience, gender_rate, capture_rate,
+                 growth_rate_id, description, orders, effort)
                 VALUES (:id, :name_en, :name_zh, :generation_id, :base_hp,
                         :base_attack, :base_defense, :base_sp_attack,
                         :base_sp_defense, :base_speed, :height, :weight,
-                        :base_experience, :gender_rate, :capture_rate, 
-                        :growth_rate_id, :description, :orders)
+                        :base_experience, :gender_rate, :capture_rate,
+                        :growth_rate_id, :description, :orders, :effort)
             """, {**data})
             conn.commit()
 
@@ -371,12 +371,12 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                                (id, name_en, name_zh, generation_id, base_hp, base_attack,
                                 base_defense, base_sp_attack, base_sp_defense, base_speed,
                                 height, weight, base_experience, gender_rate, capture_rate,
-                                growth_rate_id, description, orders)
+                                growth_rate_id, description, orders, effort)
                                VALUES (:id, :name_en, :name_zh, :generation_id, :base_hp,
                                        :base_attack, :base_defense, :base_sp_attack,
                                        :base_sp_defense, :base_speed, :height, :weight,
                                        :base_experience, :gender_rate, :capture_rate,
-                                       :growth_rate_id, :description, :orders)
+                                       :growth_rate_id, :description, :orders, :effort)
                                """, data_list)
             conn.commit()
 
