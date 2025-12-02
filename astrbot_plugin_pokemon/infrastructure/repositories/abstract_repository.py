@@ -218,6 +218,7 @@ class AbstractMoveRepository(ABC):
 
     @abstractmethod
     def get_pokemon_moves_by_species_id(self, pokemon_species_id: int) -> List[Dict[str, Any]]: pass
+
 class AbstractBattleRepository(ABC):
     """战斗日志数据仓储接口"""
     # ==========增==========

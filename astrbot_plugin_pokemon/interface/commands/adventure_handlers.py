@@ -338,7 +338,7 @@ class AdventureHandlers:
         return "\n".join(lines)
 
     async def _handle_show_learnable_moves(self, event, user_id):
-        """子逻辑：显示队伍中可学习的技能"""
+        """子逻辑：显示宝可梦可学习的技能"""
         result = self.team_service.get_user_team(user_id)
         if not result.success or not result.data:
             yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
@@ -347,17 +347,13 @@ class AdventureHandlers:
         message = ["🔍 检查队伍中是否有宝可梦可以学习新技能：\n"]
         has_new_move = False
 
-        # 使用列表推导式获取非空的宝可梦ID
-        pokemon_ids = [getattr(user_team, f"pokemon{i}_id") for i in range(1, 7)]
-        valid_ids = [pid for pid in pokemon_ids if pid]
-
-        for pid in valid_ids:
+        for i in user_team:
+            pid = i.id
             result = self.user_pokemon_service.get_user_pokemon_by_id(user_id, pid)
             if not result.success or not result.data:
                 continue
 
-            p_data = result.data
-
+            p_data: UserPokemonInfo = result.data
             # 获取该宝可梦从1级到当前等级的所有可学习技能
             all_learnable_moves = self.move_service.get_level_up_moves(p_data.species_id, p_data.level)
 
@@ -366,7 +362,6 @@ class AdventureHandlers:
 
             # 过滤掉已拥有的技能
             learnable_moves = [move_id for move_id in all_learnable_moves if move_id not in current_moves_ids and move_id != 0]
-
             if learnable_moves:
                 has_new_move = True
                 move_names = [self.move_service.get_move_name_str(mid) for mid in learnable_moves]

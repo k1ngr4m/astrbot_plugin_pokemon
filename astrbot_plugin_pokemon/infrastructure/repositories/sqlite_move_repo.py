@@ -71,7 +71,7 @@ class SqliteMoveRepository(AbstractMoveRepository):
     def get_level_up_moves(self, pokemon_species_id: int, level: int) -> List[int]:
         """
         获取宝可梦在指定等级及以下可以学到的升级招式（method_id=1），
-        优先等级高的招式，最多返回4个。
+        优先等级高的招式。
         """
         try:
             with sqlite3.connect(self.db_path) as conn:
@@ -83,7 +83,6 @@ class SqliteMoveRepository(AbstractMoveRepository):
                       AND pm.move_method_id = 1
                       AND pm.level <= ?
                     ORDER BY pm.level DESC
-                    LIMIT 4
                 """, (pokemon_species_id, level))
                 rows = cursor.fetchall()
                 # rows 是 [(move_id,), (move_id,), ...]
