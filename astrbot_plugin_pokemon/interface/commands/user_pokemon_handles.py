@@ -96,11 +96,14 @@ class UserPokemonHandlers:
             # 获取宝可梦的类型信息
             pokemon_types = self.pokemon_service.get_pokemon_types(pokemon_data.species_id)
             pokemon_nature_name = self.nature_service.get_nature_name_by_id(pokemon_data.nature_id)
-            types_str = '/'.join(pokemon_types) if pokemon_types else "未知"
+
+            # 只显示不重复的类型
+            unique_types = list(dict.fromkeys(pokemon_types))  # 去重但保持顺序
+            types_str = '/'.join(unique_types) if unique_types else "未知"
 
             message = f"🔍 宝可梦详细信息：\n\n"
             message += f"{pokemon_data.name} {gender_str}\n\n"
-            message += f"类型: {types_str}\n"
+            message += f"属性: {types_str}\n"  # 将"类型"改为"属性"
             message += f"性格: {pokemon_nature_name}\n"  # 显示性格名称
             message += f"等级: {pokemon_data.level}\n"
             message += f"经验: {pokemon_data.exp}\n\n"
@@ -191,10 +194,13 @@ class UserPokemonHandlers:
                 # 获取宝可梦的类型信息
                 pokemon_types = self.pokemon_service.get_pokemon_types(pokemon.species_id)
                 pokemon_nature_name = self.nature_service.get_nature_name_by_id(pokemon.nature_id)
-                types_str = '/'.join(pokemon_types) if pokemon_types else "未知"
+
+                # 只显示不重复的类型
+                unique_types = list(dict.fromkeys(pokemon_types))  # 去重但保持顺序
+                types_str = '/'.join(unique_types) if unique_types else "未知"
 
                 message += f"{i}. {pokemon.name} {gender_str}\n"
-                message += f"   类型: {types_str} | 性格: {pokemon_nature_name} | ID: {pokemon.id} | 等级: {pokemon.level} | HP: {pokemon.stats['hp']}\n"
+                message += f"   属性: {types_str} | 性格: {pokemon_nature_name} | ID: {pokemon.id} | 等级: {pokemon.level} | HP: {pokemon.stats['hp']}\n"
 
             message += f"\n您可以使用 /我的宝可梦 <宝可梦ID> 来查看特定宝可梦的详细信息。"
             yield event.plain_result(message)
