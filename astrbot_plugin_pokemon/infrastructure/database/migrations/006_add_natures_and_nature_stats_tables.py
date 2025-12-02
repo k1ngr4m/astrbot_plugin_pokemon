@@ -46,4 +46,12 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nature_stats_nature_id ON nature_stats(nature_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_nature_stats_pokeathlon_stat_id ON nature_stats(pokeathlon_stat_id)")
 
+    # 添加性格相关字段到pokemon表
+    cursor.execute("""
+    ALTER TABLE user_pokemon ADD COLUMN nature_id INTEGER DEFAULT 1;
+    """)
+    cursor.execute("""
+    ALTER TABLE wild_pokemon ADD COLUMN nature_id INTEGER DEFAULT 1;
+    """)
+
     logger.info("✅ 006_add_natures_and_nature_stats_tables 完成")
