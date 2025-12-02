@@ -9,6 +9,7 @@ from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.poke
     PokemonDetail, PokemonStats, PokemonIVs, \
     PokemonEVs, WildPokemonInfo, PokemonMoves, PokemonSpecies
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.interface.response.answer_enum import AnswerEnum
+from .nature_service import NatureService
 
 
 class PokemonService:
@@ -22,12 +23,14 @@ class PokemonService:
             pokemon_repo: AbstractPokemonRepository,
             move_repo: AbstractMoveRepository,
             user_pokemon_repo: AbstractUserPokemonRepository,
-            config: Dict[str, Any]
+            config: Dict[str, Any],
+            nature_service: NatureService = None
     ):
         self.pokemon_repo = pokemon_repo
         self.move_repo = move_repo
         self.user_pokemon_repo = user_pokemon_repo
         self.config = config
+        self.nature_service = nature_service
 
     @staticmethod
     # 静态方法：生成0-31的随机IV
@@ -63,13 +66,13 @@ class PokemonService:
         gender = self.determine_pokemon_gender(pokemon_template.gender_rate)
         level = random.randint(min_level, max_level)
         exp = 0
-        
+
         # 获取招式
         move_list = self.move_repo.get_level_up_moves(species_id, level)
         # 填充到4个位置，不足的补None
         while len(move_list) < 4:
             move_list.append(None)
-            
+
         moves = PokemonMoves(
             move1_id=move_list[0],
             move2_id=move_list[1],
@@ -98,8 +101,8 @@ class PokemonService:
             "speed": pokemon_template.base_stats["base_speed"]
         }
 
-        # 5. 计算最终属性（使用局部函数，避免重复代码）
-        stats = {
+        # 5. 计算基础属性（使用局部函数，避免重复代码）
+        base_stats_calculated = {
             "hp": self._calculate_stat(base_stats["hp"], ivs["hp"], evs["hp"], level, is_hp=True),
             "attack": self._calculate_stat(base_stats["attack"], ivs["attack"], evs["attack"], level),
             "defense": self._calculate_stat(base_stats["defense"], ivs["defense"], evs["defense"], level),
@@ -108,10 +111,39 @@ class PokemonService:
             "speed": self._calculate_stat(base_stats["speed"], ivs["speed"], evs["speed"], level)
         }
 
-        # 6. 确保HP最小值（原逻辑保留，优化写法）
-        stats["hp"] = max(1, stats["hp"], base_stats["hp"] // 2)
+        # 6. 获取并应用性格
+        nature_id = 1  # 默认值
+        if self.nature_service:
+            nature = self.nature_service.get_random_nature()
+            nature_id = nature['id']
 
-        # 7. 返回结果（统一键名格式，IV/EV使用一致的键）
+            # 创建基础属性对象用于修正
+            base_stats_obj = PokemonStats(
+                hp=base_stats_calculated["hp"],
+                attack=base_stats_calculated["attack"],
+                defense=base_stats_calculated["defense"],
+                sp_attack=base_stats_calculated["sp_attack"],
+                sp_defense=base_stats_calculated["sp_defense"],
+                speed=base_stats_calculated["speed"]
+            )
+
+            # 应用性格修正
+            final_stats = self.nature_service.apply_nature_modifiers(base_stats_obj, nature_id)
+        else:
+            # 如果没有nature_service，则直接使用计算后的基础属性
+            final_stats = PokemonStats(
+                hp=base_stats_calculated["hp"],
+                attack=base_stats_calculated["attack"],
+                defense=base_stats_calculated["defense"],
+                sp_attack=base_stats_calculated["sp_attack"],
+                sp_defense=base_stats_calculated["sp_defense"],
+                speed=base_stats_calculated["speed"]
+            )
+
+        # 7. 确保HP最小值（原逻辑保留，优化写法）
+        final_stats.hp = max(1, final_stats.hp, base_stats["hp"] // 2)
+
+        # 8. 返回结果（统一键名格式，IV/EV使用一致的键）
         result = BaseResult(
             success=True,
             message=AnswerEnum.POKEMON_CREATE_SUCCESS.value,
@@ -120,14 +152,7 @@ class PokemonService:
                 gender=gender,
                 level=level,
                 exp=exp,
-                stats= PokemonStats(
-                    hp=stats["hp"],
-                    attack=stats["attack"],
-                    defense=stats["defense"],
-                    sp_attack=stats["sp_attack"],
-                    sp_defense=stats["sp_defense"],
-                    speed=stats["speed"],
-                ),
+                stats= final_stats,
                 ivs= PokemonIVs(
                     hp_iv=ivs["hp"],
                     attack_iv=ivs["attack"],
@@ -144,7 +169,8 @@ class PokemonService:
                     sp_defense_ev=evs["sp_defense"],
                     speed_ev=evs["speed"],
                 ),
-                moves= moves
+                moves= moves,
+                nature_id=nature_id
             )
         )
         return result

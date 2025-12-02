@@ -25,6 +25,7 @@ class ExpService:
         self.user_pokemon_repo = user_pokemon_repo
         self.config = config
 
+    # 计算达到指定等级所需的总经验值（基于n³公式）
     def get_required_exp_for_level(self, level: int) -> int:
         """
         计算达到指定等级所需的总经验值（基于n³公式）
@@ -33,6 +34,7 @@ class ExpService:
             return 1
         return level ** 3
 
+    # 计算从当前等级升到下一级所需的经验值
     def get_exp_needed_for_next_level(self, current_level: int) -> int:
         """
         计算从当前等级升到下一级所需的经验值
@@ -41,6 +43,7 @@ class ExpService:
             return 1
         return self.get_required_exp_for_level(current_level + 1) - self.get_required_exp_for_level(current_level)
 
+    # 计算野生宝可梦在战斗后获得的经验值
     def calculate_pokemon_exp_gain(self, wild_pokemon_id: int, wild_pokemon_level: int, battle_result: str) -> int:
         """
         根据野生宝可梦等级和战斗结果计算经验值获取
@@ -57,14 +60,7 @@ class ExpService:
         else:
             return 0  # 失败时不获得经验
 
-    def calculate_user_exp_gain(self, wild_pokemon_level: int, battle_result: str) -> int:
-        """
-        计算用户在战斗后获得的经验值
-        根据新规则，玩家不获得经验
-        """
-        # 根据新规则，玩家不获得经验
-        return 0
-
+    # 计算野生宝可梦在战斗后获得的EV奖励
     def calculate_pokemon_ev_gain(self, wild_pokemon_species_id: int, battle_result: str) -> Dict[str, int]:
         """
         根据野生宝可梦的effort数据计算EV奖励
@@ -135,6 +131,7 @@ class ExpService:
 
         return ev_rewards
 
+    # 检查宝可梦是否升级
     def check_pokemon_level_up(self, current_level: int, current_exp: int) -> Dict[str, Any]:
         """
         检查宝可梦是否升级
@@ -160,6 +157,7 @@ class ExpService:
             "required_exp_for_next": self.get_required_exp_for_level(new_level + 1) if new_level < 100 else 0
         }
 
+    # 战斗后更新宝可梦的经验值和等级（考虑EV值）
     def update_pokemon_after_battle(self, user_id: str, pokemon_id: int, exp_gained: int, ev_gained: Dict[str, int] = None) -> Dict[str, Any]:
         """
         战斗后更新宝可梦的经验值和等级
@@ -215,6 +213,7 @@ class ExpService:
             "pokemon_name": pokemon_data.name or '未知宝可梦'
         }
 
+    # 更新宝可梦的EV值（考虑单个属性的上限252和总和的上限510）
     def _update_pokemon_ev(self, user_id: str, pokemon_id: int, ev_gained: Dict[str, int]) -> bool:
         """
         更新宝可梦的EV值（考虑单个属性的上限252和总和的上限510）
@@ -285,6 +284,7 @@ class ExpService:
         self.user_pokemon_repo.update_user_pokemon_ev(ev_data, pokemon_id, user_id)
         return True
 
+    # 检查宝可梦是否满足进化条件
     def check_evolution(self, user_id: str, pokemon_id: int, new_level: int) -> Dict[str, Any]:
         """
         检查宝可梦是否满足进化条件
@@ -316,6 +316,7 @@ class ExpService:
 
         return {"can_evolve": False, "message": "宝可梦暂无符合的进化条件"}
 
+    # 根据新的等级计算并更新宝可梦的属性
     def _calculate_and_update_pokemon_stats(self, pokemon_id: int, species_id: int, new_level: int, user_id: str) -> bool:
         """
         根据新的等级计算并更新宝可梦的属性
@@ -388,6 +389,7 @@ class ExpService:
         self.user_pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
         return True
 
+    # 检查宝可梦在升级过程中可以学习的新技能
     def _check_and_learn_new_moves(self, species_id: int, current_level: int, new_level: int, current_moves: PokemonMoves) -> tuple[list, list]:
         """
         检查宝可梦在升级过程中可以学习的新技能
@@ -406,6 +408,7 @@ class ExpService:
 
         return all_learnable_moves, new_learned_moves
 
+    # 将新技能添加到宝可梦的技能列表中
     def _add_move_to_pokemon(self, moves: PokemonMoves, new_move_id: int) -> tuple[PokemonMoves, bool]:
         """
         将新技能添加到宝可梦的技能列表中
@@ -431,6 +434,7 @@ class ExpService:
         # 如果没有空槽位，返回False，表示无法直接添加
         return moves, False
 
+    # 宝可梦升级后检查并学习新技能（使用升级前和升级后的等级）
     def learn_moves_after_level_up_with_levels(self, user_id: str, pokemon_id: int, old_level: int, new_level: int) -> Dict[str, Any]:
         """
         宝可梦升级后检查并学习新技能（使用升级前和升级后的等级）
@@ -524,6 +528,7 @@ class ExpService:
                     "requires_choice": True
                 }
 
+    # 宝可梦升级后检查并学习新技能（使用升级后的等级）
     def learn_new_moves_after_level_up(self, user_id: str, pokemon_id: int, new_level: int) -> Dict[str, Any]:
         """
         宝可梦升级后检查并学习新技能
@@ -617,6 +622,7 @@ class ExpService:
                     "requires_choice": True
                 }
 
+    # 战斗后更新队伍中所有宝可梦的经验值和等级（考虑EV值）
     def update_team_pokemon_after_battle(self, user_id: str, team_pokemon_ids: list, exp_gained: int, ev_gained: Dict[str, int] = None) -> list:
         """
         战斗后更新队伍中所有宝可梦的经验值和等级
@@ -627,18 +633,21 @@ class ExpService:
             results.append(result)
         return results
 
+    # 检查宝可梦在升级过程中可以学习的新技能（使用升级前和升级后的等级）
     def check_learnable_moves(self, species_id: int, current_level: int, new_level: int, current_moves) -> tuple[list, list]:
         """
         检查宝可梦在升级过程中可以学习的新技能
         """
         return self._check_and_learn_new_moves(species_id, current_level, new_level, current_moves)
 
+    # 将新技能添加到宝可梦的技能列表中（考虑技能槽是否已满）
     def add_move_to_pokemon(self, moves, new_move_id: int) -> tuple:
         """
         将新技能添加到宝可梦的技能列表中
         """
         return self._add_move_to_pokemon(moves, new_move_id)
 
+    # 战斗后更新用户的经验值和等级（考虑EV值）
     def update_user_after_battle(self, user_id: str, exp_gained: int) -> Dict[str, Any]:
         """
         战斗后更新用户的经验值和等级

@@ -120,6 +120,7 @@ class PokemonDetail:
     ivs: PokemonIVs
     evs: PokemonEVs
     moves: PokemonMoves | None
+    nature_id: int = 1  # 默认性格ID为1，即勤奋
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -146,6 +147,7 @@ class UserPokemonInfo:
     evs: PokemonEVs
     moves: PokemonMoves
     caught_time: Optional[str] = None
+    nature_id: int = 1  # 默认性格ID为1，即勤奋
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -174,6 +176,7 @@ class UserPokemonInfo:
             "evs": get_dict(self.evs),
             "moves": get_dict(self.moves),
             "caught_time": self.caught_time,
+            "nature_id": self.nature_id,
         }
 
 @dataclass
@@ -188,6 +191,7 @@ class WildPokemonInfo:
     ivs: PokemonIVs
     evs: PokemonEVs
     moves: PokemonMoves
+    nature_id: int = 1  # 默认性格ID为1，即勤奋
 
     def to_dict(self):
         def get_dict(obj):
@@ -212,6 +216,7 @@ class WildPokemonInfo:
             "ivs": get_dict(self.ivs),
             "evs": get_dict(self.evs),
             "moves": get_dict(self.moves),
+            "nature_id": self.nature_id,
         }
 
     def model_dump_json(self):

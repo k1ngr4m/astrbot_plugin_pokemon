@@ -8,6 +8,7 @@ from ..core.services.item_service import ItemService
 from ..core.services.shop_service import ShopService
 from ..core.services.move_service import MoveService
 from ..core.services.evolution_service import EvolutionService
+from ..core.services.nature_service import NatureService
 
 from ..infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
 from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository
@@ -46,11 +47,15 @@ class GameContainer:
 
 
         # 2. 初始化 Services (依赖注入逻辑)
+        self.nature_service = NatureService(
+            nature_repo=self.nature_repo
+        )
         self.pokemon_service = PokemonService(
             pokemon_repo=self.pokemon_repo,
             move_repo=self.move_repo,
             user_pokemon_repo=self.user_pokemon_repo,
-            config=self.config
+            config=self.config,
+            nature_service=self.nature_service
         )
         self.user_service = UserService(
             user_repo=self.user_repo,
