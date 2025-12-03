@@ -122,6 +122,7 @@ class UserPokemonService:
                 ivs = pokemon["ivs"],
                 evs = pokemon["evs"],
                 moves = pokemon["moves"],
+                nature_id=pokemon["nature_id"],
             ))
 
         return BaseResult(
