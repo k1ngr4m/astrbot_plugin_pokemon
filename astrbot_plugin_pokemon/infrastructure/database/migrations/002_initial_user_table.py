@@ -63,7 +63,6 @@ def up(cursor: sqlite3.Cursor):
             move3_id INTEGER,                           -- 技能3ID
             move4_id INTEGER,                           -- 技能4ID
             caught_time TEXT DEFAULT (datetime('now', '+8 hours')),
-            shortcode TEXT,                       -- 短码ID（格式为P+4位数字）
             created_at TEXT DEFAULT (datetime('now', '+8 hours')),
             updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
@@ -77,7 +76,7 @@ def up(cursor: sqlite3.Cursor):
     """)
 
     # 为user_pokemon表创建索引
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_shortcode ON user_pokemon(shortcode)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_nickname ON user_pokemon(nickname)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_user_id ON user_pokemon(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_species_id ON user_pokemon(species_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_pokemon_attack ON user_pokemon(attack)")
@@ -92,7 +91,6 @@ def up(cursor: sqlite3.Cursor):
             user_id TEXT NOT NULL,                -- 玩家ID
             item_id INTEGER NOT NULL,             -- 道具ID
             quantity INTEGER DEFAULT 0,           -- 数量
-            shortcode TEXT,                       -- 短码ID（格式为I+4位数字）
             created_at TEXT DEFAULT (datetime('now', '+8 hours')),
             updated_at TEXT DEFAULT (datetime('now', '+8 hours')),
             isdel TINYINT(10) DEFAULT 0,         -- 是否已删除
@@ -104,7 +102,6 @@ def up(cursor: sqlite3.Cursor):
     # user_items表索引
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_items_user_id ON user_items(user_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_items_item_id ON user_items(item_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_items_shortcode ON user_items(shortcode)")
 
     # --- 4. 玩家队伍配置 ---
     cursor.execute("""

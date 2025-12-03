@@ -194,7 +194,7 @@ class ExpService:
         pokemon_id = pokemon_data.id
 
         # 更新宝可梦数据
-        self.user_pokemon_repo.update_user_pokemon_exp(level_up_info["new_level"], level_up_info["new_exp"], pokemon_id, user_id)
+        self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_id, level=level_up_info["new_level"], exp=level_up_info["new_exp"])
 
         # 如果有升级，更新属性
         if level_up_info.get("levels_gained", 0) > 0:
@@ -401,7 +401,7 @@ class ExpService:
             'speed_ev': new_speed_ev
         }
 
-        self.user_pokemon_repo.update_user_pokemon_ev(ev_data, pokemon_id, user_id)
+        self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_id, **ev_data)
         return True
 
     # 检查宝可梦是否满足进化条件
@@ -524,7 +524,7 @@ class ExpService:
             'sp_defense': final_stats.sp_defense,
             'speed': final_stats.speed,
         }
-        self.user_pokemon_repo.update_pokemon_attributes(new_pokemon_attributes, pokemon_id, user_id)
+        self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_id, **new_pokemon_attributes)
         return True
 
     # 检查宝可梦在升级过程中可以学习的新技能
@@ -636,7 +636,7 @@ class ExpService:
                         move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
 
             # 更新宝可梦的技能
-            self.user_pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
+            self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_data.id, moves=updated_moves)
 
             return {
                 "success": True,
@@ -730,7 +730,7 @@ class ExpService:
                         move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
 
             # 更新宝可梦的技能
-            self.user_pokemon_repo.update_pokemon_moves(updated_moves, pokemon_data.id, user_id)
+            self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_data.id, moves=updated_moves)
 
             return {
                 "success": True,

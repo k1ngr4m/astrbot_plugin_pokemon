@@ -257,30 +257,15 @@ class AbstractUserPokemonRepository(ABC):
 
 
     # ==========改==========
-    # 更新用户宝可梦经验
-    @abstractmethod
-    def update_user_pokemon_exp(self, level: int, exp: int, pokemon_id: int, user_id: str) -> None: pass
-
-    # 更新宝可梦属性
-    @abstractmethod
-    def update_pokemon_attributes(self, attributes: Dict[str, int], pokemon_id: int, user_id: str) -> None: pass
-
     # 更新野生宝可梦遇到记录（如捕捉或战斗结果）
     @abstractmethod
     def update_encounter_log(self, log_id: int, is_captured: int = None,
                             is_battled: int = None, battle_result: str = None, isdel: int = None) -> None: pass
 
-    # 更新用户宝可梦技能
     @abstractmethod
-    def update_pokemon_moves(self, moves: PokemonMoves, pokemon_id: int, user_id: str) -> None: pass
+    # 更新用户宝可梦字段
+    def _update_user_pokemon_fields(self, user_id: str, pokemon_id: int, **kwargs) -> None: pass
 
-    # 进化后更新用户宝可梦
-    @abstractmethod
-    def update_user_pokemon_after_evolution(self, user_id: str, pokemon_id: int, pokemon_info: UserPokemonInfo) -> None: pass
-
-    # 更新用户宝可梦ev值
-    @abstractmethod
-    def update_user_pokemon_ev(self, ev: Dict[str, int], pokemon_id: int, user_id: str) -> None: pass
     # ==========查==========
     # 获取用户所有宝可梦
     @abstractmethod
