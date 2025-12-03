@@ -82,3 +82,61 @@ FONT_SUBHEADER = load_font(24) # 收集进度字体
 FONT_FISH_NAME = load_font(24) # 鱼名字体
 FONT_REGULAR = load_font(14)   # 常规字体
 FONT_SMALL = load_font(12)     # 小字体
+
+# 宝可梦属性中心色 (参考)
+TYPE_COLORS = {
+    "一般": (168, 168, 120), "火": (240, 128, 48), "水": (104, 144, 240),
+    "草": (120, 200, 80), "电": (248, 208, 48), "冰": (152, 216, 216),
+    "格斗": (192, 48, 40), "毒": (160, 64, 160), "地面": (224, 192, 104),
+    "飞行": (168, 144, 240), "超能力": (248, 88, 136), "虫": (168, 184, 32),
+    "岩石": (184, 160, 56), "幽灵": (112, 88, 152), "龙": (112, 56, 248),
+    "钢": (184, 184, 208), "妖精": (238, 153, 172), "未知": (104, 160, 144)
+}
+
+def lighten_color(color, factor=0.2):
+    """使颜色变亮"""
+    r, g, b = color
+    return (
+        int(r + (255 - r) * factor),
+        int(g + (255 - g) * factor),
+        int(b + (255 - b) * factor)
+    )
+
+
+# 辅助函数：绘制抗锯齿圆角矩形
+from PIL import Image, ImageDraw
+
+
+def draw_rounded_rectangle(draw: ImageDraw.Draw, xy, corner_radius, fill=None, outline=None, width=1):
+    """绘制一个抗锯齿的圆角矩形"""
+    x1, y1, x2, y2 = xy
+
+    # 如果没有填充和边框，直接返回
+    if fill is None and outline is None:
+        return
+
+    # 绘制填充
+    if fill:
+        # 使用 4 倍大小绘制 mask 以实现抗锯齿
+        mask_scale = 4
+        mask_w = (x2 - x1) * mask_scale
+        mask_h = (y2 - y1) * mask_scale
+        radius = corner_radius * mask_scale
+
+        mask = Image.new('L', (mask_w, mask_h), 0)
+        mask_draw = ImageDraw.Draw(mask)
+        mask_draw.rounded_rectangle((0, 0, mask_w, mask_h), radius=radius, fill=255)
+
+        # 缩小 mask
+        mask = mask.resize((x2 - x1, y2 - y1), Image.Resampling.LANCZOS)
+
+        # 创建填充层
+        fill_layer = Image.new('RGBA', (x2 - x1, y2 - y1), fill)
+
+        # 应用 mask 到目标 draw 对象的图片上
+        # 注意：这里假设 draw 对象是依附于一个 RGBA 图片的
+        draw._image.paste(fill_layer, (x1, y1), mask)
+
+    # 绘制边框 (Pillow 原生支持，抗锯齿效果尚可)
+    if outline:
+        draw.rounded_rectangle(xy, radius=corner_radius, outline=outline, width=width)
