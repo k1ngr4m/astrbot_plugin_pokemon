@@ -278,7 +278,7 @@ class AdventureService:
             )
 
         # 处理经验值
-        exp_details = self._handle_battle_experience(user_id, battle_result_str, wild_pokemon_info)
+        exp_details = self._handle_battle_experience(user_id, battle_result_str, wild_pokemon_info, battle_log)
 
         # 更新图鉴/遭遇日志
         self._update_encounter_log(user_id, wild_pokemon_info.id, battle_result_str)
@@ -591,9 +591,10 @@ class AdventureService:
             }
         }
 
-    # --- Helpers for formatting and logs ---
-
-    def _handle_battle_experience(self, user_id: str, result_str: str, wild_pokemon: WildPokemonInfo):
+    def _handle_battle_experience(self, user_id: str, result_str: str, wild_pokemon: WildPokemonInfo, battle_log: List[Dict] = None):
+        """处理战斗后的经验分配
+        出场的宝可梦获得100%经验值，未出场的宝可梦获得50%经验值，已死亡的宝可梦不获得经验值
+        """
         if not self.exp_service or result_str != "success":
             return {
                 "pokemon_exp": {"success": True, "exp_gained": 0, "message": AnswerEnum.BATTLE_FAILURE_NO_EXP.value},
@@ -601,7 +602,8 @@ class AdventureService:
                 "team_pokemon_results": []
             }
 
-        exp_gained = self.exp_service.calculate_pokemon_exp_gain(
+        # 计算基础经验值
+        base_exp_gained = self.exp_service.calculate_pokemon_exp_gain(
             wild_pokemon_id=wild_pokemon.species_id,  # 使用species_id而不是id
             wild_pokemon_level=wild_pokemon.level,
             battle_result=result_str
@@ -616,15 +618,67 @@ class AdventureService:
         user_team = self.team_repo.get_user_team(user_id)
         team_results = []
         if user_team and user_team.team_pokemon_ids:
-            team_results = self.exp_service.update_team_pokemon_after_battle(
-                user_id,
-                user_team.team_pokemon_ids,
-                exp_gained,
-                ev_gained
-            )
+            # 根据战斗日志确定每只宝可梦的状态：出场、未出场或死亡
+            team_pokemon_ids = user_team.team_pokemon_ids
+            battle_participants = set()  # 出场的宝可梦ID
+            battle_deaths = set()  # 死亡的宝可梦ID
+
+            if battle_log:
+                for battle_info in battle_log:
+                    pokemon_id = battle_info.get("pokemon_id")
+                    battle_participants.add(pokemon_id)
+
+                    # 检查这只宝可梦是否在战斗中死亡
+                    # 在当前的逻辑中，只有失败的宝可梦才会继续让下一只上场
+                    if battle_info.get("result") == "fail":
+                        battle_deaths.add(pokemon_id)
+
+            # 计算每只宝可梦的经验值
+            for pokemon_id in team_pokemon_ids:
+                pokemon_id = int(pokemon_id)  # 确保是整数
+                current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+
+                if not current_pokemon:
+                    continue
+
+                # 确定该宝可梦的状态和对应的经验值
+                if pokemon_id in battle_deaths:
+                    # 死亡的宝可梦不获得经验
+                    pokemon_exp = 0
+                    exp_message = "宝可梦在战斗中死亡，未获得经验"
+                elif pokemon_id in battle_participants:
+                    # 出场的宝可梦获得100%经验
+                    pokemon_exp = base_exp_gained
+                    exp_message = "宝可梦参与战斗，获得全部经验"
+                else:
+                    # 未出场的宝可梦获得50%经验
+                    pokemon_exp = base_exp_gained // 2
+                    exp_message = "宝可梦未参与战斗，获得一半经验"
+
+                # 更新单个宝可梦的经验
+                pokemon_result = self.exp_service.update_pokemon_after_battle(
+                    user_id, pokemon_id, pokemon_exp, ev_gained
+                )
+                pokemon_result["message"] = exp_message
+                pokemon_result["original_base_exp"] = base_exp_gained
+                pokemon_result["applied_exp"] = pokemon_exp  # 添加实际应用的经验值
+
+                team_results.append(pokemon_result)
+
+        # 返回第一个参与战斗的宝可梦的结果作为主结果
+        primary_result = {}
+        if battle_log and team_results:
+            first_battle_pokemon_id = battle_log[0].get("pokemon_id") if battle_log else None
+            for result in team_results:
+                if result.get("pokemon_id") == first_battle_pokemon_id:
+                    primary_result = result
+                    break
+
+        if not primary_result and team_results:
+            primary_result = team_results[0]
 
         return {
-            "pokemon_exp": team_results[0] if team_results else {},
+            "pokemon_exp": primary_result,
             "ev_gained": ev_gained,
             "team_pokemon_results": team_results
         }
