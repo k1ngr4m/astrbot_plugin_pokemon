@@ -274,3 +274,37 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                               LIMIT ?
                               """, (user_id, limit))
         return [dict(row) for row in cursor.fetchall()]
+
+    def set_user_current_trainer_encounter(self, user_id: str, trainer_id: int) -> None:
+        """设置用户当前遭遇的训练家ID"""
+        # 需要借助用户仓储来更新用户表
+        # 由于循环依赖，我们直接在这里操作用户表
+        from .sqlite_user_repo import SqliteUserRepository
+        conn = self._get_connection()
+        with conn:
+            conn.execute("""
+                UPDATE users
+                SET current_trainer_encounter_id = ?
+                WHERE user_id = ?
+            """, (trainer_id, user_id))
+
+    def get_user_current_trainer_encounter(self, user_id: str) -> Optional[int]:
+        """获取用户当前遭遇的训练家ID"""
+        conn = self._get_connection()
+        cursor = conn.execute("""
+            SELECT current_trainer_encounter_id
+            FROM users
+            WHERE user_id = ?
+        """, (user_id,))
+        row = cursor.fetchone()
+        return row[0] if row and row[0] is not None else None
+
+    def clear_user_current_trainer_encounter(self, user_id: str) -> None:
+        """清除用户当前遭遇的训练家ID"""
+        conn = self._get_connection()
+        with conn:
+            conn.execute("""
+                UPDATE users
+                SET current_trainer_encounter_id = NULL
+                WHERE user_id = ?
+            """, (user_id,))

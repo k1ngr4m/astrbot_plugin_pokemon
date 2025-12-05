@@ -75,5 +75,9 @@ def up(cursor: sqlite3.Cursor):
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_trainer_locations_trainer ON trainer_locations(trainer_id)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_trainer_locations_location ON trainer_locations(location_id)")
 
+    cursor.execute("""
+        ALTER TABLE users
+        ADD COLUMN current_trainer_encounter_id INTEGER DEFAULT NULL
+    """)
 
     logger.info("训练家相关数据库表创建完成！")

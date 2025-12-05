@@ -9,6 +9,7 @@ from ..core.services.shop_service import ShopService
 from ..core.services.move_service import MoveService
 from ..core.services.evolution_service import EvolutionService
 from ..core.services.nature_service import NatureService
+from ..core.services.trainer_service import TrainerService
 
 from ..infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
 from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository
@@ -21,6 +22,7 @@ from ..infrastructure.repositories.sqlite_battle_repo import SqliteBattleReposit
 from ..infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
 from ..infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
 from ..infrastructure.repositories.sqlite_user_pokemon_repo import SqliteUserPokemonRepository
+from ..infrastructure.repositories.sqlite_trainer_repo import SqliteTrainerRepository
 
 
 class GameContainer:
@@ -43,6 +45,7 @@ class GameContainer:
         self.user_pokemon_repo = SqliteUserPokemonRepository(self.db_path)
         self.user_item_repo = SqliteUserItemRepository(self.db_path)
         self.nature_repo = SqliteNatureRepository(self.db_path)
+        self.trainer_repo = SqliteTrainerRepository(self.db_path)  # 添加训练家仓库
 
 
 
@@ -88,6 +91,13 @@ class GameContainer:
             config=self.config,
             nature_service=self.nature_service
         )
+        self.trainer_service = TrainerService(
+            trainer_repo=self.trainer_repo,
+            pokemon_repo=self.pokemon_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            user_repo=self.user_repo,
+            pokemon_service=self.pokemon_service
+        )
         self.adventure_service = AdventureService(
             adventure_repo=self.adventure_repo,
             pokemon_repo=self.pokemon_repo,
@@ -101,6 +111,8 @@ class GameContainer:
             exp_service=self.exp_service,
             config=self.config
         )
+        # 设置冒险服务中的训练家服务引用
+        self.adventure_service.set_trainer_service(self.trainer_service)
         self.item_service = ItemService(
             user_repo=self.user_repo,
             user_item_repo=self.user_item_repo

@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
+
+from ...core.models.trainer_models import TrainerEncounter, TrainerLocation
 from ...core.models.user_models import User, UserTeam, UserItems
 from ...core.models.pokemon_models import PokemonSpecies, UserPokemonInfo, \
     WildPokemonInfo, WildPokemonEncounterLog, PokemonMoves, PokemonEvolutionInfo
@@ -291,6 +293,19 @@ class AbstractUserPokemonRepository(ABC):
     @abstractmethod
     def get_latest_encounters(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]: pass
 
+    # ==========训练家遭遇管理==========
+    # 设置用户当前遭遇的训练家ID
+    @abstractmethod
+    def set_user_current_trainer_encounter(self, user_id: str, trainer_id: int) -> None: pass
+
+    # 获取用户当前遭遇的训练家ID
+    @abstractmethod
+    def get_user_current_trainer_encounter(self, user_id: str) -> Optional[int]: pass
+
+    # 清除用户当前遭遇的训练家ID
+    @abstractmethod
+    def clear_user_current_trainer_encounter(self, user_id: str) -> None: pass
+
 class AbstractUserItemRepository(ABC):
     """用户物品数据仓储接口"""
     # ==========增==========
@@ -335,3 +350,51 @@ class AbstractNatureRepository(ABC):
     # 根据性格ID获取性格属性
     @abstractmethod
     def get_nature_stats_by_nature_id(self, nature_id: int) -> List[Dict[str, Any]]: pass
+
+class AbstractTrainerRepository(ABC):
+    """训练家数据仓储接口"""
+    # ==========增==========
+    # 添加训练家
+    @abstractmethod
+    def create_trainer(self, trainer_data: Dict[str, Any]) -> None: pass
+
+    # 添加训练家宝可梦
+    @abstractmethod
+    def create_trainer_pokemon(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
+
+    # 添加训练家位置记录
+    @abstractmethod
+    def create_trainer_location(self, trainer_location: TrainerLocation) -> None: pass
+
+    # ==========改==========
+    # 更新训练家字段
+    @abstractmethod
+    def update_trainer_encounter(self, trainer_encounter_id: int, **kwargs) -> None: pass
+
+    # ==========查==========
+    # 根据ID获取训练家
+    @abstractmethod
+    def get_trainer_by_id(self, trainer_id: int) -> Optional[Dict[str, Any]]: pass
+
+    # 获取所有训练家
+    @abstractmethod
+    def get_all_trainers(self) -> List[Dict[str, Any]]: pass
+
+    # 根据训练家ID获取训练家宝可梦
+    @abstractmethod
+    def get_trainer_pokemon_by_trainer_id(self, trainer_id: int) -> List[Dict[str, Any]]: pass
+
+    # 根据训练家遭遇ID获取训练家遭遇记录
+    @abstractmethod
+    def get_trainer_encounter_by_id(self, user_id: str, trainer_id: int) -> Optional[TrainerEncounter]: pass
+
+
+    # 根据位置ID获取所有训练家
+    @abstractmethod
+    def get_trainers_at_location(self, location_id: int) -> List[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def get_trainer_detail(self, trainer_id: int) -> Optional[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def has_user_fought_trainer(self, user_id: str, trainer_id: int) -> bool: pass

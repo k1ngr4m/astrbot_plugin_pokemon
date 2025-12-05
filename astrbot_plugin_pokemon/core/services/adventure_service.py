@@ -12,6 +12,7 @@ from ..models.pokemon_models import (
     WildPokemonInfo, PokemonStats, PokemonIVs, PokemonEVs,
     UserPokemonInfo, WildPokemonEncounterLog, PokemonMoves
 )
+from ..models.trainer_models import BattleTrainer
 from ..models.user_models import UserTeam, UserItems
 from ...infrastructure.repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository,
@@ -90,6 +91,11 @@ class AdventureService:
         self.config = config
         self.move_repo = move_repo
         self.battle_repo = battle_repo
+        self.trainer_service = None  # 将在初始化后设置
+
+    def set_trainer_service(self, trainer_service):
+        """设置训练家服务"""
+        self.trainer_service = trainer_service
 
     def get_all_locations(self) -> BaseResult[List[LocationInfo]]:
         """获取所有可冒险的区域列表"""
@@ -114,30 +120,62 @@ class AdventureService:
         )
 
     def adventure_in_location(self, user_id: str, location_id: int) -> BaseResult[AdventureResult]:
-        """在指定区域进行冒险，随机刷新一只野生宝可梦"""
+        """在指定区域进行冒险，随机刷新一只野生宝可梦或训练家"""
         # 1. 获取区域信息
         location = self.adventure_repo.get_location_by_id(location_id)
         if not location:
             return BaseResult(success=False,
                               message=AnswerEnum.ADVENTURE_LOCATION_NOT_FOUND.value.format(location_id=location_id))
 
-        # 2. 获取该区域的宝可梦列表
+        # 2. 首先尝试遇到训练家（如果用户有队伍）
+        user_team_data = self.team_repo.get_user_team(user_id)
+        if user_team_data and user_team_data.team_pokemon_ids:
+            trainer_encounter_result = self.adventure_with_trainer(user_id, location_id)
+            if trainer_encounter_result.success and trainer_encounter_result.data is not None:
+                # 成功遇到训练家，返回包含训练家信息的AdventureResult
+                battle_trainer = trainer_encounter_result.data
+                wild_pokemon_info = WildPokemonInfo(
+                    id=0,
+                    species_id=0,  # 使用0作为占位符，表示遇到的是训练家
+                    name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
+                    gender="M",
+                    level=0,  # 使用0作为占位符
+                    exp=0,
+                    stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),  # 占位符
+                    ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),  # 占位符
+                    evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),  # 占位符
+                    moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),  # 占位符
+                    nature_id=0,
+                )
+
+                return BaseResult(
+                    success=True,
+                    message=AnswerEnum.ADVENTURE_SUCCESS.value,
+                    data=AdventureResult(
+                        wild_pokemon=wild_pokemon_info,
+                        location=LocationInfo(id=location.id, name=location.name),
+                        trainer=battle_trainer
+                    )
+                )
+
+        # 3. 没有遇到训练家，按原有逻辑遇到野生宝可梦
+        # 获取该区域的宝可梦列表
         location_pokemon_list = self.adventure_repo.get_location_pokemon_by_location_id(location_id)
         if not location_pokemon_list:
             return BaseResult(success=False, message=AnswerEnum.ADVENTURE_LOCATION_NO_POKEMON.value.format(
                 location_name=location.name))
 
-        # 3. 权重随机选择宝可梦 (优化：使用 random.choices)
+        # 4. 权重随机选择宝可梦 (优化：使用 random.choices)
         selected_location_pokemon = random.choices(
             location_pokemon_list,
             weights=[ap.encounter_rate for ap in location_pokemon_list],
             k=1
         )[0]
 
-        # 4. 生成随机等级
+        # 5. 生成随机等级
         wild_pokemon_level = random.randint(selected_location_pokemon.min_level, selected_location_pokemon.max_level)
 
-        # 5. 创建野生宝可梦
+        # 6. 创建野生宝可梦
         wild_pokemon_result = self.pokemon_service.create_single_pokemon(
             species_id=selected_location_pokemon.pokemon_species_id,
             max_level=wild_pokemon_level,
@@ -181,6 +219,7 @@ class AdventureService:
             data=AdventureResult(
                 wild_pokemon=wild_pokemon_info,
                 location=LocationInfo(id=location.id, name=location.name),
+                trainer=None  # 没有遇到训练家
             )
         )
 
@@ -478,8 +517,8 @@ class AdventureService:
         # 预计算最佳招式 (简单AI假设每回合都用这招，进一步加速模拟)
         # 如果需要更精确的模拟（例如考虑随机性导致最佳招式变化），需把这步放回循环内
         # 这里为了性能，我们假设AI总是选择期望伤害最高的招式
-        u_best_move_static = self.get_best_move_from_context(user_ctx, wild_ctx)
-        w_best_move_static = self.get_best_move_from_context(wild_ctx, user_ctx)
+        # u_best_move_static = self.get_best_move_from_context(user_ctx, wild_ctx)
+        # w_best_move_static = self.get_best_move_from_context(wild_ctx, user_ctx)
 
         for _ in range(simulations):
             cur_u_hp = u_start_hp
@@ -490,10 +529,10 @@ class AdventureService:
                 turn += 1
 
                 # 若需要每回合重新决策招式，取消注释下面两行，注释掉循环外的 static 定义
-                # u_move = self.get_best_move_from_context(user_ctx, wild_ctx)
-                # w_move = self.get_best_move_from_context(wild_ctx, user_ctx)
-                u_move = u_best_move_static
-                w_move = w_best_move_static
+                u_move = self.get_best_move_from_context(user_ctx, wild_ctx)
+                w_move = self.get_best_move_from_context(wild_ctx, user_ctx)
+                # u_move = u_best_move_static
+                # w_move = w_best_move_static
 
                 user_first = self._is_user_first_simple(u_speed, w_speed, u_move.priority, w_move.priority)
 
@@ -706,3 +745,267 @@ class AdventureService:
 
     def get_battle_log_by_id(self, log_id: int) -> Optional[Dict[str, Any]]:
         return self.battle_repo.get_battle_log_by_id(log_id)
+
+    def adventure_with_trainer(self, user_id: str, location_id: int) -> BaseResult:
+        """在指定区域尝试遇到训练家"""
+        if not self.trainer_service:
+            return BaseResult(success=False, message="训练家服务未初始化")
+
+        # 检查用户是否有队伍
+        user_team_data = self.team_repo.get_user_team(user_id)
+        if not user_team_data or not user_team_data.team_pokemon_ids:
+            return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
+
+        # 尝试在指定位置遇到一个训练家
+        trainer = self.trainer_service.get_random_trainer_at_location(location_id, user_id)
+        if not trainer:
+            # 没有可遇到的训练家，返回None表示只遇到野生宝可梦
+            return BaseResult(success=True, message="没有遇到训练家", data=None)
+
+        # 获取训练家的宝可梦信息用于战斗
+        battle_trainer = self.trainer_service.get_trainer_with_pokemon(trainer.id)
+        if not battle_trainer:
+            return BaseResult(success=False, message="获取训练家宝可梦失败")
+
+        # 记录当前训练家遭遇
+        self.user_pokemon_repo.set_user_current_trainer_encounter(user_id, trainer.id)
+
+        # 返回训练家信息，让玩家可以选择战斗或逃跑
+        return BaseResult(success=True, message="遇到了训练家！", data=battle_trainer)
+
+    def start_trainer_battle(self, user_id: str, battle_trainer: BattleTrainer, user_team_list: List[int]) -> BaseResult[BattleResult]:
+        """开始与训练家的战斗"""
+        if not user_team_list:
+            return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
+
+        # 使用训练家第一只宝可梦作为初始对手上下文
+        if not battle_trainer.pokemon_list:
+            return BaseResult(success=False, message="训练家没有宝可梦")
+
+        # 获取训练家王牌宝可梦（通常是最高等级的那只）
+        last_pokemon = battle_trainer.pokemon_list[-1]
+
+        # 记录训练家遭遇
+        self.trainer_service.record_trainer_encounter(user_id, battle_trainer.trainer.id)
+
+        # 保存当前所有训练家宝可梦的上下文
+        trainer_pokemon_contexts = [self._create_battle_context(pokemon, is_user=False) for pokemon in battle_trainer.pokemon_list]
+
+        current_pokemon_index = 0
+        current_trainer_pokemon_index = 0
+        battle_result_str = "fail"
+        final_user_pokemon_info = None
+        all_user_win_rates = []
+        all_trainer_win_rates = []
+        battle_log = []
+        log_id = 0
+
+        # 初始化训练家宝可梦上下文
+        if len(trainer_pokemon_contexts) > 0:
+            current_trainer_ctx = trainer_pokemon_contexts[current_trainer_pokemon_index]
+        else:
+            # 如果训练家没有宝可梦，返回错误
+            return BaseResult(success=False, message="训练家没有宝可梦")
+
+        while current_pokemon_index < len(user_team_list) and current_trainer_pokemon_index < len(trainer_pokemon_contexts):
+            user_pokemon_id = user_team_list[current_pokemon_index]
+            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
+
+            if not user_pokemon_info:
+                current_pokemon_index += 1
+                continue
+
+            # 预加载玩家宝可梦的 Context
+            user_ctx = self._create_battle_context(user_pokemon_info, is_user=True)
+            final_user_pokemon_info = user_pokemon_info
+
+            # 1. 计算胜率
+            user_ctx.current_hp = user_pokemon_info.stats.hp
+            if current_trainer_ctx:  # 确保上下文存在
+                current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
+                user_win_rate, trainer_win_rate = self.calculate_battle_win_rate(user_ctx, current_trainer_ctx)
+            else:
+                # 如果没有训练家宝可梦，继续下一只用户宝可梦
+                current_pokemon_index += 1
+                continue
+
+            all_user_win_rates.append(user_win_rate)
+            all_trainer_win_rates.append(trainer_win_rate)
+
+            # 2. 执行实际战斗
+            user_ctx.current_hp = user_pokemon_info.stats.hp
+            if current_trainer_ctx:  # 确保上下文存在
+                current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
+
+                battle_outcome, battle_log_data, remaining_trainer_hp = self.execute_real_battle(user_ctx, current_trainer_ctx)
+            else:
+                # 如果没有训练家宝可梦，战斗结果为失败（用户宝可梦胜利）
+                battle_outcome = "win"
+                battle_log_data = []
+                remaining_trainer_hp = 0
+
+            # 更新训练家宝可梦的血量
+            if current_trainer_ctx:
+                current_trainer_ctx.current_hp = max(0, remaining_trainer_hp)
+                trainer_pokemon_contexts[current_trainer_pokemon_index].current_hp = max(0, remaining_trainer_hp)
+
+            battle_log.append({
+                "pokemon_id": user_pokemon_info.id,
+                "pokemon_name": user_pokemon_info.name,
+                "species_name": user_pokemon_info.species_id,
+                "level": user_pokemon_info.level,
+                "trainer_pokemon_name": current_trainer_ctx.pokemon.name if current_trainer_ctx else "无",
+                "trainer_pokemon_level": current_trainer_ctx.pokemon.level if current_trainer_ctx else 0,
+                "win_rate": user_win_rate,
+                "result": battle_outcome,
+                "details": battle_log_data
+            })
+
+            if battle_outcome == "win":
+                # 训练家的宝可梦被击败，继续下一只
+                current_trainer_pokemon_index += 1
+                if current_trainer_pokemon_index < len(trainer_pokemon_contexts):
+                    current_trainer_ctx = trainer_pokemon_contexts[current_trainer_pokemon_index]
+                else:
+                    # 所有训练家宝可梦都被击败，战斗胜利
+                    battle_result_str = "success"
+                    break
+            else:
+                # 用户的宝可梦被击败，继续下一只
+                current_pokemon_index += 1
+
+        # 计算最终显示的胜率
+        final_u_rate, final_t_rate = 0.0, 100.0
+        if battle_result_str == "success":
+            final_u_rate, final_t_rate = all_user_win_rates[-1], all_trainer_win_rates[-1]
+        elif all_user_win_rates:
+            final_u_rate = round(sum(all_user_win_rates) / len(all_user_win_rates), 2)
+            final_t_rate = round(sum(all_trainer_win_rates) / len(all_trainer_win_rates), 2)
+
+        # 保存日志
+        if self.battle_repo:
+            log_id = self.battle_repo.save_battle_log(
+                user_id=user_id,
+                target_name=f"训练家 {battle_trainer.trainer.name if battle_trainer.trainer and battle_trainer.trainer.name else '未知训练家'}",
+                log_data=battle_log,
+                result=battle_result_str
+            )
+
+        # 处理经验值和奖励
+        exp_details = self._handle_trainer_battle_experience(user_id, battle_result_str, battle_trainer, battle_log, last_pokemon.level)
+
+        # 记录战斗结果
+        if battle_result_str == "success":
+            # 战斗胜利，给予金钱奖励并更新记录
+            rewards = self.trainer_service.calculate_trainer_battle_rewards(battle_trainer.trainer, last_pokemon.level)
+            self.trainer_service.handle_trainer_battle_win(user_id, battle_trainer.trainer.id, rewards["money_reward"])
+
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.BATTLE_SUCCESS.value if battle_result_str == "success" else "训练家对战失败",
+            data=BattleResult(
+                user_pokemon=self._format_pokemon_summary(final_user_pokemon_info),
+                wild_pokemon=self._format_pokemon_summary(last_pokemon, is_wild=True),  # 使用训练家最后一只宝可梦
+                win_rates={"user_win_rate": final_u_rate, "wild_win_rate": final_t_rate},
+                result=battle_result_str,
+                exp_details=exp_details,
+                battle_log=battle_log,
+                log_id=log_id
+            )
+        )
+
+    def _handle_trainer_battle_experience(self, user_id: str, result_str: str, battle_trainer: BattleTrainer, battle_log: List[Dict], last_pokemon_level: int):
+        """处理训练家战斗后的经验分配（训练家对战经验是野生宝可梦的1.5倍）"""
+        if not self.exp_service or result_str != "success":
+            return {
+                "pokemon_exp": {"success": False, "exp_gained": 0, "message": AnswerEnum.BATTLE_FAILURE_NO_EXP.value},
+                "ev_gained": {"hp_ev": 0, "attack_ev": 0, "defense_ev": 0, "sp_attack_ev": 0, "sp_defense_ev": 0, "speed_ev": 0},
+                "team_pokemon_results": [],
+                "trainer_battle": True
+            }
+
+        # 计算基础经验值并应用1.5倍加成
+        base_exp_gained = self.exp_service.calculate_pokemon_exp_gain(
+            wild_pokemon_id=battle_trainer.pokemon_list[0].species_id,  # 使用第一只宝可梦的种类
+            wild_pokemon_level=last_pokemon_level,  # 使用王牌宝可梦等级
+            battle_result=result_str
+        )
+
+        # 训练家对战经验加成
+        trainer_exp_multiplier = 1.5
+        base_exp_gained = int(base_exp_gained * trainer_exp_multiplier)
+
+        # 计算EV奖励
+        ev_gained = self.exp_service.calculate_pokemon_ev_gain(
+            wild_pokemon_species_id=battle_trainer.pokemon_list[0].species_id,
+            battle_result=result_str
+        )
+
+        user_team = self.team_repo.get_user_team(user_id)
+        team_results = []
+        if user_team and user_team.team_pokemon_ids:
+            # 根据战斗日志确定每只宝可梦的状态：出场、未出场或死亡
+            team_pokemon_ids = user_team.team_pokemon_ids
+            battle_participants = set()  # 出场的宝可梦ID
+            battle_deaths = set()  # 死亡的宝可梦ID
+
+            if battle_log:
+                for battle_info in battle_log:
+                    pokemon_id = battle_info.get("pokemon_id")
+                    battle_participants.add(pokemon_id)
+
+                    # 检查这只宝可梦是否在战斗中死亡
+                    if battle_info.get("result") == "fail":
+                        battle_deaths.add(pokemon_id)
+
+            # 计算每只宝可梦的经验值
+            for pokemon_id in team_pokemon_ids:
+                pokemon_id = int(pokemon_id)  # 确保是整数
+                current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+
+                if not current_pokemon:
+                    continue
+
+                # 确定该宝可梦的状态和对应的经验值
+                if pokemon_id in battle_deaths:
+                    # 死亡的宝可梦不获得经验
+                    pokemon_exp = 0
+                    exp_message = "宝可梦在战斗中死亡，未获得经验"
+                elif pokemon_id in battle_participants:
+                    # 出场的宝可梦获得100%经验
+                    pokemon_exp = base_exp_gained
+                    exp_message = f"宝可梦参与训练家对战，获得{base_exp_gained}经验"
+                else:
+                    # 未出场的宝可梦获得50%经验
+                    pokemon_exp = base_exp_gained // 2
+                    exp_message = f"宝可梦未参与训练家对战，获得{base_exp_gained // 2}经验"
+
+                # 更新单个宝可梦的经验
+                pokemon_result = self.exp_service.update_pokemon_after_battle(
+                    user_id, pokemon_id, pokemon_exp, ev_gained
+                )
+                pokemon_result["message"] = exp_message
+                pokemon_result["original_base_exp"] = base_exp_gained
+                pokemon_result["applied_exp"] = pokemon_exp  # 添加实际应用的经验值
+                pokemon_result["trainer_battle_exp"] = True  # 标识这是训练家对战经验
+
+                team_results.append(pokemon_result)
+
+        # 返回第一个参与战斗的宝可梦的结果作为主结果
+        primary_result = {}
+        if battle_log and team_results:
+            first_battle_pokemon_id = battle_log[0].get("pokemon_id") if battle_log else None
+            for result in team_results:
+                if result.get("pokemon_id") == first_battle_pokemon_id:
+                    primary_result = result
+                    break
+
+        if not primary_result and team_results:
+            primary_result = team_results[0]
+
+        return {
+            "pokemon_exp": primary_result,
+            "ev_gained": ev_gained,
+            "team_pokemon_results": team_results,
+            "trainer_battle": True
+        }

@@ -5,6 +5,8 @@ from typing import Optional, TypedDict, Dict, List
 from dataclasses import dataclass
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import WildPokemonInfo
+from typing import Optional
+from .trainer_models import BattleTrainer
 
 
 @dataclass
@@ -38,6 +40,7 @@ class LocationTemplate:
 class AdventureResult:
     wild_pokemon: WildPokemonInfo
     location: LocationInfo
+    trainer: Optional[BattleTrainer] = None  # 遇到的训练家信息
 
 @dataclass
 class BattleResult:

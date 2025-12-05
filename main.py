@@ -19,7 +19,6 @@ from .astrbot_plugin_pokemon.interface.commands.user_pokemon_handles import User
 from .astrbot_plugin_pokemon.interface.commands.evolution_handlers import EvolutionHandlers
 
 
-
 class PokemonPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -82,6 +81,7 @@ class PokemonPlugin(Star):
         self.item_service = self.container.item_service
         self.shop_service = self.container.shop_service
         self.move_service = self.container.move_service
+        self.trainer_service = self.container.trainer_service  # 添加训练家服务
 
         self.user_repo = self.container.user_repo
         self.pokemon_repo = self.container.pokemon_repo
@@ -92,6 +92,7 @@ class PokemonPlugin(Star):
         self.move_repo = self.container.move_repo
         self.battle_repo = self.container.battle_repo
         self.nature_repo = self.container.nature_repo
+        self.trainer_repo = self.container.trainer_repo  # 添加训练家仓库
 
     async def initialize(self):
         """
@@ -120,7 +121,8 @@ class PokemonPlugin(Star):
                 self.shop_repo,
                 self.move_repo,
                 self.item_repo,
-                self.nature_repo
+                self.nature_repo,
+                self.trainer_repo  # 添加训练家仓库
             )
             data_setup_service.setup_initial_data()
             logger.info(f"[{self.plugin_id}] 初始数据检查/写入完成。")

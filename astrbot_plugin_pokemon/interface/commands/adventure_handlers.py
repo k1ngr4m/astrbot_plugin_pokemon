@@ -72,6 +72,11 @@ class AdventureHandlers:
             yield event.plain_result(AnswerEnum.USER_ADVENTURE_ALREADY_ENCOUNTERED.value)
             return
 
+        # 检查是否有当前遭遇的训练家
+        if self.user_pokemon_service.get_user_current_trainer_encounter(user_id):
+            yield event.plain_result("您当前正在与训练家遭遇中，请先完成当前遭遇（使用 /战斗 或 /逃跑）。")
+            return
+
         user = self.user_service.get_user_by_id(user_id)
         if not user.success:
             yield event.plain_result(user.message)
@@ -112,12 +117,31 @@ class AdventureHandlers:
         d: AdventureResult = result.data
         self.user_service.update_user_last_adventure_time(user_id, time.time())  # 更新冷却
 
-        message = (
-            f"🌳 在 {d.location.name} 中冒险！\n\n"
-            f"✨ 遇到了野生的 {d.wild_pokemon.name}！\n"
-            f"等级: {d.wild_pokemon.level}\n"
-            f"{AnswerEnum.ADVENTURE_LOCATION_POKEMON_ENCOUNTERED.value}"
-        )
+        # 检查是否遭遇了训练家
+        if d.trainer:
+            # 遭遇了训练家
+            pokemon_names = [f"{pokemon.name}(Lv.{pokemon.level})" for pokemon in d.trainer.pokemon_list]
+            pokemon_list_str = ", ".join(pokemon_names)
+
+            message = (
+                f"🌳 在 {d.location.name} 中冒险！\n\n"
+                f"⚔️ 遇到了训练家 {d.trainer.trainer.name}！\n\n"
+                f"职业: {d.trainer.trainer.trainer_class}\n\n"
+                f"宝可梦: {pokemon_list_str}\n\n"
+                f"基础赏金: {d.trainer.trainer.base_payout}金币\n\n"
+                f"您可以选择：\n\n"
+                f"💡 /战斗 - 与训练家战斗\n\n"
+                f"🏃 /逃跑 - 逃离战斗"
+            )
+        else:
+            # 遭遇了野生宝可梦
+            message = (
+                f"🌳 在 {d.location.name} 中冒险！\n\n"
+                f"✨ 遇到了野生的 {d.wild_pokemon.name}！\n"
+                f"等级: {d.wild_pokemon.level}\n"
+                f"{AnswerEnum.ADVENTURE_LOCATION_POKEMON_ENCOUNTERED.value}"
+            )
+
         yield event.plain_result(message)
 
     async def battle(self, event: AstrMessageEvent):
@@ -129,20 +153,53 @@ class AdventureHandlers:
             yield event.plain_result(check_res.message)
             return
 
-        wild_pokemon_info = self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id)
-        if not wild_pokemon_info:
-            yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
-            return
+        # 检查是否遭遇了训练家
+        trainer_id = self.user_pokemon_service.get_user_current_trainer_encounter(user_id)
+        if trainer_id:
+            # 与训练家战斗
+            # 获取完整的训练家信息
+            battle_trainer = self.adventure_service.trainer_service.get_trainer_with_pokemon(trainer_id)
+            if not battle_trainer:
+                yield event.plain_result("获取训练家信息失败")
+                return
 
-        # 执行战斗逻辑
-        result = self.adventure_service.adventure_in_battle(user_id, wild_pokemon_info)
-        if not result.success:
-            yield event.plain_result(result.message)
-            return
+            # 获取用户队伍
+            user_team_result = self.team_service.get_user_team(user_id)
+            if not user_team_result.success or not user_team_result.data or len(user_team_result.data) == 0:
+                yield event.plain_result(AnswerEnum.USER_TEAM_NOT_SET.value)
+                return
 
-        # 格式化输出 (逻辑抽取到私有方法)
-        message = self._format_battle_result_message(result.data)
-        yield event.plain_result(message)
+            user_team_data = user_team_result.data
+            # 获取队伍宝可梦ID列表
+            user_team_list = [pokemon.id for pokemon in user_team_data]
+            # 开始训练家战斗
+            result = self.adventure_service.start_trainer_battle(user_id, battle_trainer, user_team_list)
+            if not result.success:
+                yield event.plain_result(result.message)
+                return
+
+            # 格式化输出 (逻辑抽取到私有方法)
+            message = self._format_battle_result_message(result.data)
+            yield event.plain_result(message)
+
+            # 清除当前训练家遭遇
+            self.user_pokemon_service.clear_user_current_trainer_encounter(user_id)
+        else:
+            # 与野生宝可梦战斗
+            wild_pokemon_info = self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id)
+            if not wild_pokemon_info:
+                yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
+                return
+
+            # 执行战斗逻辑
+            result = self.adventure_service.adventure_in_battle(user_id, wild_pokemon_info)
+            if not result.success:
+                yield event.plain_result(result.message)
+                return
+
+            # 格式化输出 (逻辑抽取到私有方法)
+            message = self._format_battle_result_message(result.data)
+            yield event.plain_result(message)
 
     async def view_battle_log(self, event: AstrMessageEvent):
         """查看战斗日志"""
@@ -168,10 +225,10 @@ class AdventureHandlers:
 
         # 格式化日志详情
         message = [
-            f"📜 战斗日志 #{log['id']}",
-            f"时间: {log['created_at']}",
-            f"对手: {log['target_name']}",
-            f"结果: {'胜利' if log['result'] == 'success' else '失败'}\n"
+            f"📜 战斗日志 #{log['id']}\n\n",
+            f"时间: {log['created_at']}\n\n",
+            f"对手: {log['target_name']}\n\n",
+            f"结果: {'胜利' if log['result'] == 'success' else '失败'}\n\n",
         ]
 
         for i, skirmish in enumerate(log['log_data'], 1):
@@ -250,16 +307,33 @@ class AdventureHandlers:
         if not check_res.success:
             yield event.plain_result(check_res.message)
             return
-        wild_pokemon = self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id)
-        if not wild_pokemon:
-            yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
-            return
 
-        if random.random() < 0.8:  # 80% 几率逃跑
-            self.user_service._update_encounter_log(user_id, wild_pokemon.id, deleted=True)
-            yield event.plain_result(f"🏃 您成功从 {wild_pokemon.name} 身边逃跑了！")
+        # 检查是否遭遇了训练家
+        trainer_id = self.user_pokemon_service.get_user_current_trainer_encounter(user_id)
+        if trainer_id:
+            # 逃离训练家遭遇
+            if random.random() < 0.9:  # 90% 几率逃跑（对训练家可能更高，因为可能比较困难）
+                self.user_pokemon_service.clear_user_current_trainer_encounter(user_id)
+                # 获取训练家信息用于显示
+                trainer = self.adventure_service.trainer_service.get_trainer_by_id(trainer_id)
+                trainer_name = trainer.name if trainer else "未知训练家"
+                yield event.plain_result(f"🏃 您成功从训练家 {trainer_name} 身边逃跑了！")
+            else:
+                # 在这里重新获取训练家信息
+                current_trainer = self.adventure_service.trainer_service.get_trainer_by_id(trainer_id)
+                yield event.plain_result(f"😅 逃跑失败！训练家 {current_trainer.name if current_trainer and current_trainer.name else '未知训练家'} 挑战了你！\n请选择 /战斗 或再次 /逃跑。")
         else:
-            yield event.plain_result(f"😅 逃跑失败！{wild_pokemon.name} 还在盯着你...\n请选择 /战斗 或再次 /逃跑。")
+            # 逃离野生宝可梦遭遇
+            wild_pokemon = self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id)
+            if not wild_pokemon:
+                yield event.plain_result(AnswerEnum.USER_ADVENTURE_NOT_ENCOUNTERED.value)
+                return
+
+            if random.random() < 0.8:  # 80% 几率逃跑
+                self.user_service._update_encounter_log(user_id, wild_pokemon.id, deleted=True)
+                yield event.plain_result(f"🏃 您成功从 {wild_pokemon.name} 身边逃跑了！")
+            else:
+                yield event.plain_result(f"😅 逃跑失败！{wild_pokemon.name} 还在盯着你...\n请选择 /战斗 或再次 /逃跑。")
 
     async def learn_move(self, event: AstrMessageEvent):
         """处理学习新技能指令 (入口)"""

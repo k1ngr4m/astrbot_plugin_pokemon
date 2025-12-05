@@ -220,3 +220,30 @@ class UserPokemonService:
         wild_pokemon_id = encountered_wild_pokemon.wild_pokemon_id
         wild_pokemon_info = self.pokemon_repo.get_wild_pokemon_by_id(wild_pokemon_id)
         return wild_pokemon_info
+
+    def get_user_current_trainer_encounter(self, user_id: str) -> Optional[int]:
+        """
+        获取用户当前遭遇的训练家ID
+        Args:
+            user_id (str): 用户ID
+        Returns:
+            Optional[int]: 训练家ID，如果不存在则返回None
+        """
+        return self.user_pokemon_repo.get_user_current_trainer_encounter(user_id)
+
+    def set_user_current_trainer_encounter(self, user_id: str, trainer_id: int) -> None:
+        """
+        设置用户当前遭遇的训练家
+        Args:
+            user_id (str): 用户ID
+            trainer_id (int): 训练家ID
+        """
+        self.user_pokemon_repo.set_user_current_trainer_encounter(user_id, trainer_id)
+
+    def clear_user_current_trainer_encounter(self, user_id: str) -> None:
+        """
+        清除用户当前遭遇的训练家
+        Args:
+            user_id (str): 用户ID
+        """
+        self.user_pokemon_repo.clear_user_current_trainer_encounter(user_id)
