@@ -364,72 +364,103 @@ class DataSetupService:
                         for data in stats_list:
                             self.nature_repo.add_nature_stat_template(data)
 
-            # 13. 填充训练家数据（如果训练家仓库已提供）
+            # 13. 填充训练家数据
             if self.trainer_repo:
-                # 检查是否已存在训练家数据（通过查询ID=1的记录）
                 try:
+                    # 检查是否已存在训练家数据（通过查询ID=1的记录）
                     first_trainer_exists = self.trainer_repo.get_trainer_by_id(1) is not None
+
                     if not first_trainer_exists:
                         logger.info("正在初始化训练家数据...")
 
-                        # 读取训练家数据
+                        # --- 13.1 训练家基础信息 (Trainers) ---
                         trainers_df = self._read_csv_data("trainers.csv")
                         if not trainers_df.empty:
                             trainers_df = trainers_df.where(pd.notnull(trainers_df), None)
-                            for row in trainers_df.to_dict('records'):
-                                try:
-                                    trainer_data = {
-                                        "id": int(row['id']),
-                                        "name": str(row['name']),
-                                        "trainer_class": str(row['trainer_class']),
-                                        "base_payout": int(row['base_payout']),
-                                        "description": str(row['description']) if row['description'] else None
-                                    }
-                                    # 使用Trainer模型创建训练家对象
-                                    from ..models.trainer_models import Trainer
-                                    trainer = Trainer(**trainer_data)
-                                    self.trainer_repo.create_trainer(trainer)
-                                except Exception as e:
-                                    logger.error(f"训练家数据错误 (ID: {row.get('id')}): {e}")
 
-                        # 读取训练家宝可梦数据
+                            # 预处理数据
+                            trainers_data_list = [
+                                {
+                                    "id": int(row['id']),
+                                    "name": str(row['name']),
+                                    "trainer_class": str(row['trainer_class']),
+                                    "base_payout": int(row['base_payout']),
+                                    "description": str(row['description']) if row['description'] else None
+                                }
+                                for row in trainers_df.to_dict('records')
+                            ]
+
+                            # 尝试批量插入，如果Repo不支持则降级为单条插入
+                            if hasattr(self.trainer_repo, 'create_trainers_batch'):
+                                from ..models.trainer_models import Trainer
+                                # 将字典转换为Trainer对象列表
+                                trainer_list = [Trainer(**data) for data in trainers_data_list if data]
+                                self.trainer_repo.create_trainers_batch(trainer_list)
+                            else:
+                                from ..models.trainer_models import Trainer
+                                for data in trainers_data_list:
+                                    try:
+                                        self.trainer_repo.create_trainer(Trainer(**data))
+                                    except Exception as e:
+                                        logger.error(f"训练家插入失败 (ID: {data.get('id')}): {e}")
+
+                        # --- 13.2 训练家宝可梦 (Trainer Pokemon) ---
                         trainer_pokemon_df = self._read_csv_data("trainer_pokemon.csv")
                         if not trainer_pokemon_df.empty:
-                            trainer_pokemon_df = trainer_pokemon_df.where(pd.notnull(trainer_pokemon_df), None)
-                            for row in trainer_pokemon_df.to_dict('records'):
-                                try:
-                                    from ..models.trainer_models import TrainerPokemon
-                                    trainer_pokemon_data = TrainerPokemon(
-                                        id=int(row['id']),
-                                        trainer_id=int(row['trainer_id']),
-                                        pokemon_species_id=int(row['pokemon_species_id']),
-                                        level=int(row['level']),
-                                        position=int(row['position'])
-                                    )
-                                    self.trainer_repo.create_trainer_pokemon(trainer_pokemon_data)
-                                except Exception as e:
-                                    logger.error(f"训练家宝可梦数据错误 (ID: {row.get('id')}): {e}")
+                            trainer_pokemon_df = trainer_pokemon_df.where(pd.notnull(trainer_pokemon_df),
+                                                                          None)
 
-                        # 读取训练家位置数据（这个需要直接操作数据库）
-                        trainer_locations_df = self._read_csv_data("trainer_locations.csv")
-                        if not trainer_locations_df.empty:
-                            conn = self.trainer_repo._get_connection()
-                            with conn:
-                                # 清空现有数据以便重新加载
-                                conn.execute("DELETE FROM trainer_locations")
+                            tp_data_list = [
+                                {
+                                    "id": int(row['id']),
+                                    "trainer_id": int(row['trainer_id']),
+                                    "pokemon_species_id": int(row['pokemon_species_id']),
+                                    "level": int(row['level']),
+                                    "position": int(row['position'])
+                                }
+                                for row in trainer_pokemon_df.to_dict('records')
+                            ]
 
-                                for row in trainer_locations_df.to_dict('records'):
+                            if hasattr(self.trainer_repo, 'create_trainer_pokemons_batch'):
+                                from ..models.trainer_models import TrainerPokemon
+                                # 将字典转换为TrainerPokemon对象列表
+                                trainer_pokemon_list = [TrainerPokemon(**data) for data in tp_data_list if data]
+                                self.trainer_repo.create_trainer_pokemons_batch(trainer_pokemon_list)
+                            else:
+                                from ..models.trainer_models import TrainerPokemon
+                                for data in tp_data_list:
                                     try:
-                                        conn.execute("""
-                                            INSERT INTO trainer_locations (id, trainer_id, location_id, encounter_rate)
-                                            VALUES (?, ?, ?, ?)
-                                        """, (int(row['id']), int(row['trainer_id']), int(row['location_id']), float(row['encounter_rate'])))
+                                        self.trainer_repo.create_trainer_pokemon(TrainerPokemon(**data))
                                     except Exception as e:
-                                        logger.error(f"训练家位置数据错误 (ID: {row.get('id')}): {e}")
+                                        logger.error(f"训练家宝可梦插入失败 (ID: {data.get('id')}): {e}")
+
+                        # --- 13.3 训练家分布位置 (Trainer Locations) ---
+                        location_trainers_df = self._read_csv_data("location_trainers.csv")
+                        if not location_trainers_df.empty:
+                            location_trainers_df = location_trainers_df.where(
+                                pd.notnull(location_trainers_df), None)
+
+                            # 准备批量插入的元组列表
+                            tl_params = [
+                                {
+                                    "id": int(row['id']),
+                                    "trainer_id": int(row['trainer_id']),
+                                    "location_id": int(row['location_id']),
+                                    "encounter_rate": float(row['encounter_rate'])
+                                }
+                                for row in location_trainers_df.to_dict('records')
+                            ]
+
+                            if hasattr(self.trainer_repo, 'create_location_trainers_batch'):
+                                from ..models.trainer_models import TrainerLocation
+                                # 将字典转换为TrainerLocation对象列表
+                                location_trainers_list = [TrainerLocation(**data) for data in tl_params if data]
+                                self.trainer_repo.create_location_trainers_batch(location_trainers_list)
 
                         logger.info("训练家数据初始化完成")
                     else:
-                        logger.info("训练家数据已存在，跳过初始化")
+                        # 这是一个幂等检查，如果数据已存在则静默跳过或打印debug
+                        pass
                 except Exception as e:
                     logger.error(f"初始化训练家数据时发生错误: {e}")
 

@@ -56,7 +56,7 @@ def up(cursor: sqlite3.Cursor):
 
     # 创建训练家位置表 (训练家在哪些区域出现)
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS trainer_locations (
+        CREATE TABLE IF NOT EXISTS location_trainers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             trainer_id INTEGER NOT NULL,
             location_id INTEGER NOT NULL,
@@ -72,8 +72,8 @@ def up(cursor: sqlite3.Cursor):
     # 创建索引以提高查询性能
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_trainers_class ON trainers(trainer_class)")
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_trainers_encounters_user ON trainer_encounters(user_id, trainer_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trainer_locations_trainer ON trainer_locations(trainer_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trainer_locations_location ON trainer_locations(location_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_location_trainers_trainer ON location_trainers(trainer_id)")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_location_trainers_location ON location_trainers(location_id)")
 
     cursor.execute("""
         ALTER TABLE users

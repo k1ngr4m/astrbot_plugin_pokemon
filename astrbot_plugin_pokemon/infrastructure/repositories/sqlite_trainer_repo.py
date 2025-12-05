@@ -81,6 +81,17 @@ class SqliteTrainerRepository(AbstractTrainerRepository):
             cursor.execute(sql, (trainer.name, trainer.trainer_class, trainer.base_payout, trainer.description))
             return cursor.lastrowid
 
+    def create_trainers_batch(self, trainer_list: List[Trainer]) -> None:
+        """批量创建训练家"""
+        sql = """
+        INSERT INTO trainers (name, trainer_class, base_payout, description)
+        VALUES (?, ?, ?, ?)
+        """
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.executemany(sql, [(t.name, t.trainer_class, t.base_payout, t.description) for t in trainer_list])
+
     def create_trainer_pokemon(self, trainer_pokemon: TrainerPokemon) -> int:
         """创建训练家宝可梦"""
         sql = """
@@ -94,6 +105,17 @@ class SqliteTrainerRepository(AbstractTrainerRepository):
                                 trainer_pokemon.level, trainer_pokemon.position))
             return cursor.lastrowid
 
+    def create_trainer_pokemons_batch(self, trainer_pokemon_list: List[TrainerPokemon]) -> None:
+        """批量创建训练家宝可梦"""
+        sql = """
+        INSERT INTO trainer_pokemon (trainer_id, pokemon_species_id, level, position)
+        VALUES (?, ?, ?, ?)
+        """
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.executemany(sql, [(tp.trainer_id, tp.pokemon_species_id, tp.level, tp.position) for tp in trainer_pokemon_list])
+
     def create_trainer_encounter(self, encounter: TrainerEncounter) -> int:
         """创建训练家遭遇记录"""
         sql = """
@@ -106,10 +128,10 @@ class SqliteTrainerRepository(AbstractTrainerRepository):
             cursor.execute(sql, (encounter.user_id, encounter.trainer_id, encounter.battle_result))
             return cursor.lastrowid
 
-    def create_trainer_location(self, location: TrainerLocation) -> int:
+    def create_location_trainers(self, location: TrainerLocation) -> int:
         """创建训练家位置记录"""
         sql = """
-        INSERT INTO trainer_locations (trainer_id, location_id, encounter_rate)
+        INSERT INTO location_trainers (trainer_id, location_id, encounter_rate)
         VALUES (?, ?, ?)
         """
         conn = self._get_connection()
@@ -118,6 +140,16 @@ class SqliteTrainerRepository(AbstractTrainerRepository):
             cursor.execute(sql, (location.trainer_id, location.location_id, location.encounter_rate))
             return cursor.lastrowid
 
+    def create_location_trainers_batch(self, location_trainer_list: List[TrainerLocation]) -> None:
+        """批量创建训练家位置记录"""
+        sql = """
+        INSERT INTO location_trainers (trainer_id, location_id, encounter_rate)
+        VALUES (?, ?, ?)
+        """
+        conn = self._get_connection()
+        with conn:
+            cursor = conn.cursor()
+            cursor.executemany(sql, [(tl.trainer_id, tl.location_id, tl.encounter_rate) for tl in location_trainer_list])
 
     # ========= 改 =========
     def update_trainer_encounter(self, encounter_id: int, **kwargs) -> None:
@@ -175,7 +207,7 @@ class SqliteTrainerRepository(AbstractTrainerRepository):
 
     def get_trainers_at_location(self, location_id: int) -> List[TrainerLocation]:
         """获取特定位置的训练家"""
-        sql = "SELECT * FROM trainer_locations WHERE location_id = ? AND isdel = 0"
+        sql = "SELECT * FROM location_trainers WHERE location_id = ? AND isdel = 0"
         cursor = self._get_connection().execute(sql, (location_id,))
         return [self._row_to_trainer_location(row) for row in cursor.fetchall()]
 
@@ -188,7 +220,7 @@ class SqliteTrainerRepository(AbstractTrainerRepository):
         pokemon_list = self.get_trainer_pokemon_by_trainer_id(trainer_id)
 
         # 获取训练家出现的位置
-        sql = "SELECT location_id FROM trainer_locations WHERE trainer_id = ? AND isdel = 0"
+        sql = "SELECT location_id FROM location_trainers WHERE trainer_id = ? AND isdel = 0"
         cursor = self._get_connection().execute(sql, (trainer_id,))
         location_ids = [row[0] for row in cursor.fetchall()]
 

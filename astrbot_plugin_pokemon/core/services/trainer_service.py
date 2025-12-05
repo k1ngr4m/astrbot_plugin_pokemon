@@ -111,17 +111,22 @@ class TrainerService:
             )
 
     def get_random_trainer_at_location(self, location_id: int, user_id: str) -> Optional[Trainer]:
-        """在特定位置随机获取一个训练家，确保用户未与之战斗过"""
+        """在特定位置随机获取一个训练家，允许战斗失败的用户再次挑战"""
         location_records = self.trainer_repo.get_trainers_at_location(location_id)
 
-        # 过滤出用户尚未战斗过的训练家
+        # 过滤出用户未战胜过的训练家（包括未战斗过的）
         available_trainers = []
         for record in location_records:
             trainer = self.trainer_repo.get_trainer_by_id(record.trainer_id)
-            if trainer and not self.has_user_fought_trainer(user_id, trainer.id):
-                # 根据遭遇率决定是否加入可选列表
-                if random.random() < record.encounter_rate:
-                    available_trainers.append(trainer)
+            if trainer:
+                # 检查用户与该训练家的遭遇记录
+                encounter = self.trainer_repo.get_trainer_encounter_by_id(user_id, trainer.id)
+                # 只有当用户已经战胜过该训练家时，才不显示（防止玩家打完就没了）
+                # 如果是未战斗过或者战斗失败（lose），仍然可以遇到
+                if not encounter or encounter.battle_result != 'win':
+                    # 根据遭遇率决定是否加入可选列表
+                    if random.random() < record.encounter_rate:
+                        available_trainers.append(trainer)
 
         if available_trainers:
             return random.choice(available_trainers)

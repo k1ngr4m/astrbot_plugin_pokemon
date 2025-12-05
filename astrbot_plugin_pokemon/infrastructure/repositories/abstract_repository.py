@@ -358,14 +358,22 @@ class AbstractTrainerRepository(ABC):
     @abstractmethod
     def create_trainer(self, trainer_data: Dict[str, Any]) -> None: pass
 
+    @abstractmethod
+    def create_trainers_batch(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
+
     # 添加训练家宝可梦
     @abstractmethod
     def create_trainer_pokemon(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
 
+    @abstractmethod
+    def create_trainer_pokemons_batch(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
+
     # 添加训练家位置记录
     @abstractmethod
-    def create_trainer_location(self, trainer_location: TrainerLocation) -> None: pass
+    def create_location_trainers(self, location_trainer: TrainerLocation) -> None: pass
 
+    @abstractmethod
+    def create_location_trainers_batch(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
     # ==========改==========
     # 更新训练家字段
     @abstractmethod

@@ -119,7 +119,7 @@ class AdventureService:
             data=formatted_locations
         )
 
-    def adventure_in_location(self, user_id: str, location_id: int) -> BaseResult[AdventureResult]:
+    def adventure_in_location(self, user_id: str, location_id: int, encounter_npc: bool = False) -> BaseResult[AdventureResult]:
         """在指定区域进行冒险，随机刷新一只野生宝可梦或训练家"""
         # 1. 获取区域信息
         location = self.adventure_repo.get_location_by_id(location_id)
@@ -127,38 +127,39 @@ class AdventureService:
             return BaseResult(success=False,
                               message=AnswerEnum.ADVENTURE_LOCATION_NOT_FOUND.value.format(location_id=location_id))
 
-        # 2. 首先尝试遇到训练家（如果用户有队伍）
-        user_team_data = self.team_repo.get_user_team(user_id)
-        if user_team_data and user_team_data.team_pokemon_ids:
-            trainer_encounter_result = self.adventure_with_trainer(user_id, location_id)
-            if trainer_encounter_result.success and trainer_encounter_result.data is not None:
-                # 成功遇到训练家，返回包含训练家信息的AdventureResult
-                battle_trainer = trainer_encounter_result.data
-                wild_pokemon_info = WildPokemonInfo(
-                    id=0,
-                    species_id=0,  # 使用0作为占位符，表示遇到的是训练家
-                    name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
-                    gender="M",
-                    level=0,  # 使用0作为占位符
-                    exp=0,
-                    stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),  # 占位符
-                    ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),  # 占位符
-                    evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),  # 占位符
-                    moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),  # 占位符
-                    nature_id=0,
-                )
-
-                return BaseResult(
-                    success=True,
-                    message=AnswerEnum.ADVENTURE_SUCCESS.value,
-                    data=AdventureResult(
-                        wild_pokemon=wild_pokemon_info,
-                        location=LocationInfo(id=location.id, name=location.name),
-                        trainer=battle_trainer
+        # 2. 如果指定遇到NPC，则尝试遇到训练家
+        if encounter_npc:
+            user_team_data = self.team_repo.get_user_team(user_id)
+            if user_team_data and user_team_data.team_pokemon_ids:
+                trainer_encounter_result = self.adventure_with_trainer(user_id, location_id)
+                if trainer_encounter_result.success and trainer_encounter_result.data is not None:
+                    # 成功遇到训练家，返回包含训练家信息的AdventureResult
+                    battle_trainer = trainer_encounter_result.data
+                    wild_pokemon_info = WildPokemonInfo(
+                        id=0,
+                        species_id=0,  # 使用0作为占位符，表示遇到的是训练家
+                        name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
+                        gender="M",
+                        level=0,  # 使用0作为占位符
+                        exp=0,
+                        stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),  # 占位符
+                        ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),  # 占位符
+                        evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),  # 占位符
+                        moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),  # 占位符
+                        nature_id=0,
                     )
-                )
 
-        # 3. 没有遇到训练家，按原有逻辑遇到野生宝可梦
+                    return BaseResult(
+                        success=True,
+                        message=AnswerEnum.ADVENTURE_SUCCESS.value,
+                        data=AdventureResult(
+                            wild_pokemon=wild_pokemon_info,
+                            location=LocationInfo(id=location.id, name=location.name),
+                            trainer=battle_trainer
+                        )
+                    )
+
+        # 3. 遇到野生宝可梦
         # 获取该区域的宝可梦列表
         location_pokemon_list = self.adventure_repo.get_location_pokemon_by_location_id(location_id)
         if not location_pokemon_list:
@@ -332,7 +333,8 @@ class AdventureService:
                 result=battle_result_str,
                 exp_details=exp_details,
                 battle_log=battle_log,
-                log_id=log_id
+                log_id=log_id,
+                is_trainer_battle=False  # 标记为非训练家战斗（野生宝可梦战斗）
             )
         )
 
@@ -910,7 +912,8 @@ class AdventureService:
                 result=battle_result_str,
                 exp_details=exp_details,
                 battle_log=battle_log,
-                log_id=log_id
+                log_id=log_id,
+                is_trainer_battle=True  # 标记为训练家战斗
             )
         )
 

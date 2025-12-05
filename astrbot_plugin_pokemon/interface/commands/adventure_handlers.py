@@ -7,7 +7,7 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import UserPokemonInfo
 from ...core.models.adventure_models import LocationInfo, AdventureResult, BattleResult
 from ...core.models.common_models import BaseResult
-from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog
+from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog, PokemonStats, PokemonIVs, PokemonEVs, PokemonMoves
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
 
@@ -107,14 +107,68 @@ class AdventureHandlers:
             yield event.plain_result(AnswerEnum.ADVENTURE_LOCATION_INVALID.value.format(location_id=args[1]))
             return
 
+        # 检查是否指定了只遭遇训练家（输入了"npc"参数）
+        encounter_npc_only = len(args) > 2 and args[2].lower() == 'npc'
+
         # 3. 执行冒险
-        result = self.adventure_service.adventure_in_location(user_id, location_id)
-        if not result.success:
-            yield event.plain_result(result.message)
-            return
+        if encounter_npc_only:
+            # 只遭遇训练家
+            result = self.adventure_service.adventure_with_trainer(user_id, location_id)
+            if not result.success:
+                yield event.plain_result(result.message)
+                return
+
+            if result.data is not None:
+                # 成功遇到训练家
+                battle_trainer = result.data
+                location_data = self.adventure_service.adventure_repo.get_location_by_id(location_id)
+                if not location_data:
+                    yield event.plain_result(AnswerEnum.ADVENTURE_LOCATION_NOT_FOUND.value.format(location_id=location_id))
+                    return
+
+                # 将LocationTemplate转换为LocationInfo
+                location_info = LocationInfo(
+                    id=location_data.id,
+                    name=location_data.name,
+                    description=location_data.description,
+                    min_level=location_data.min_level,
+                    max_level=location_data.max_level
+                )
+
+                d = AdventureResult(
+                    wild_pokemon=WildPokemonInfo(
+                        id=0,
+                        species_id=0,
+                        name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
+                        gender="M",
+                        level=0,
+                        exp=0,
+                        stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),
+                        ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),
+                        evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),
+                        moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),
+                        nature_id=0,
+                    ),
+                    location=location_info,
+                    trainer=battle_trainer
+                )
+
+                # 记录当前训练家遭遇
+                self.user_pokemon_service.set_user_current_trainer_encounter(user_id, battle_trainer.trainer.id)
+            else:
+                # 没有遇到训练家
+                yield event.plain_result(f"在 {args[1]} 区域没有遇到可挑战的训练家。")
+                return
+        else:
+            # 正常冒险，只遭遇野生宝可梦，不主动寻找训练家
+            result = self.adventure_service.adventure_in_location(user_id, location_id, encounter_npc=False)
+            if not result.success:
+                yield event.plain_result(result.message)
+                return
+
+            d: AdventureResult = result.data
 
         # 4. 成功后处理
-        d: AdventureResult = result.data
         self.user_service.update_user_last_adventure_time(user_id, time.time())  # 更新冷却
 
         # 检查是否遭遇了训练家
@@ -363,17 +417,35 @@ class AdventureHandlers:
     def _format_battle_result_message(self, d: BattleResult) -> str:
         """格式化战斗结果文本"""
         wild = d.wild_pokemon
-        lines = [
-            "⚔️ 宝可梦战斗开始！",
-            f"野生宝可梦: {wild['name']} (Lv.{wild['level']})\n"
-        ]
+
+        if d.is_trainer_battle:
+            # 训练家战斗：显示训练家信息而不是野生宝可梦
+            lines = [
+                "⚔️ 宝可梦对战开始！\n\n",
+                # f"训练家: {wild['name']}\n"  # wild['name'] 在训练家战斗中是训练家名称
+            ]
+        else:
+            # 野生宝可梦战斗
+            lines = [
+                "⚔️ 宝可梦战斗开始！",
+                f"野生宝可梦: {wild['name']} (Lv.{wild['level']})\n"
+            ]
 
         if d.battle_log:
             lines.append("👥 参战宝可梦:")
             for i, record in enumerate(d.battle_log, 1):
                 res = "获胜" if record['result'] == 'win' else "失败"
+
+                # 检查是否包含对手宝可梦信息（训练家战斗）
+                if 'trainer_pokemon_name' in record and record['trainer_pokemon_name']:
+                    # 训练家战斗：显示对手宝可梦信息
+                    opponent_info = f" vs {record['trainer_pokemon_name']} (Lv.{record['trainer_pokemon_level']})"
+                else:
+                    # 野生宝可梦战斗：使用野生宝可梦信息
+                    opponent_info = f" vs {wild['name']} (Lv.{wild['level']})"
+
                 lines.append(
-                    f"  {i}. {record['pokemon_name']} (Lv.{record['level']}) - {res} (胜率:{record['win_rate']}%)")
+                    f"  {i}. {record['pokemon_name']} (Lv.{record['level']}){opponent_info} - {res} (胜率:{record['win_rate']}%)")
             lines.append("")
 
         lines.append(f"🎯 战斗结果: {'胜利' if d.result == 'success' else '失败'}")
