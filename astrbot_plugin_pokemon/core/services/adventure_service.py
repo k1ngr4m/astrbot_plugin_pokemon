@@ -436,7 +436,7 @@ class AdventureService:
         基于预加载的 Context 选择最佳招式 (纯内存计算)
         """
         default_move = BattleMoveInfo(
-            power=50, accuracy=100.0, type_name='normal',
+            power=0, accuracy=100.0, type_name='normal',
             damage_class_id=2, priority=0, type_effectiveness=1.0, stab_bonus=1.0,
             max_pp=5, current_pp=5, move_id=0, move_name="默认招式"
         )
