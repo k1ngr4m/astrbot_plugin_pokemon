@@ -142,7 +142,15 @@ class UserPokemonService:
             BaseResult
         """
         try:
-            self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_id, moves=moves)
+            # 将PokemonMoves对象分解为单独字段进行更新
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id,
+                pokemon_id,
+                move1_id=moves.move1_id,
+                move2_id=moves.move2_id,
+                move3_id=moves.move3_id,
+                move4_id=moves.move4_id
+            )
             return BaseResult(
                 success=True,
                 message="技能更新成功"

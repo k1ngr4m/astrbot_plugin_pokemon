@@ -212,7 +212,7 @@ class UserService:
             message=AnswerEnum.USER_ITEM_ADDED.value
         )
 
-    def _update_encounter_log(self, user_id: str, wild_id: int, captured: bool = False):
+    def _update_encounter_log(self, user_id: str, wild_id: int, captured: bool = False, deleted: bool = False):
         """更新遭遇日志 (封装Repo操作)"""
         try:
             logs = self.user_pokemon_repo.get_user_encounters(user_id, limit=5)
@@ -223,7 +223,7 @@ class UserService:
                 self.user_pokemon_repo.update_encounter_log(
                     log_id=target_log.id,
                     is_captured=1 if captured else 0,
-                    isdel=1
+                    isdel=1 if deleted else 0
                 )
         except Exception as e:
             # 日志更新失败不应阻断主流程，打印错误即可

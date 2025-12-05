@@ -107,66 +107,13 @@ class AdventureHandlers:
             yield event.plain_result(AnswerEnum.ADVENTURE_LOCATION_INVALID.value.format(location_id=args[1]))
             return
 
-        # 检查是否指定了只遭遇训练家（输入了"npc"参数）
-        encounter_npc_only = len(args) > 2 and args[2].lower() == 'npc'
+        # 3. 执行冒险 - 按7:3比例遭遇野生宝可梦和训练家
+        result = self.adventure_service.adventure_in_location(user_id, location_id, encounter_npc_only=False)
+        if not result.success:
+            yield event.plain_result(result.message)
+            return
 
-        # 3. 执行冒险
-        if encounter_npc_only:
-            # 只遭遇训练家
-            result = self.adventure_service.adventure_with_trainer(user_id, location_id)
-            if not result.success:
-                yield event.plain_result(result.message)
-                return
-
-            if result.data is not None:
-                # 成功遇到训练家
-                battle_trainer = result.data
-                location_data = self.adventure_service.adventure_repo.get_location_by_id(location_id)
-                if not location_data:
-                    yield event.plain_result(AnswerEnum.ADVENTURE_LOCATION_NOT_FOUND.value.format(location_id=location_id))
-                    return
-
-                # 将LocationTemplate转换为LocationInfo
-                location_info = LocationInfo(
-                    id=location_data.id,
-                    name=location_data.name,
-                    description=location_data.description,
-                    min_level=location_data.min_level,
-                    max_level=location_data.max_level
-                )
-
-                d = AdventureResult(
-                    wild_pokemon=WildPokemonInfo(
-                        id=0,
-                        species_id=0,
-                        name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
-                        gender="M",
-                        level=0,
-                        exp=0,
-                        stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),
-                        ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),
-                        evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),
-                        moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),
-                        nature_id=0,
-                    ),
-                    location=location_info,
-                    trainer=battle_trainer
-                )
-
-                # 记录当前训练家遭遇
-                self.user_pokemon_service.set_user_current_trainer_encounter(user_id, battle_trainer.trainer.id)
-            else:
-                # 没有遇到训练家
-                yield event.plain_result(f"在 {args[1]} 区域没有遇到可挑战的训练家。")
-                return
-        else:
-            # 正常冒险，只遭遇野生宝可梦，不主动寻找训练家
-            result = self.adventure_service.adventure_in_location(user_id, location_id, encounter_npc=False)
-            if not result.success:
-                yield event.plain_result(result.message)
-                return
-
-            d: AdventureResult = result.data
+        d: AdventureResult = result.data
 
         # 4. 成功后处理
         self.user_service.update_user_last_adventure_time(user_id, time.time())  # 更新冷却
@@ -336,7 +283,7 @@ class AdventureHandlers:
         if is_success:
             # 构造并保存宝可梦
             new_pokemon = self.user_pokemon_service._create_and_save_caught_pokemon(user_id, wild_pokemon)
-            self.user_service._update_encounter_log(user_id, wild_pokemon.id, captured=True)
+            self.user_service._update_encounter_log(user_id, wild_pokemon.id, captured=True, deleted=True)
 
             message += (
                 f"🎉 捕捉成功！\n"

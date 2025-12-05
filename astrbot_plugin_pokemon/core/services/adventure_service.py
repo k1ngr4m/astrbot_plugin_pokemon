@@ -119,7 +119,7 @@ class AdventureService:
             data=formatted_locations
         )
 
-    def adventure_in_location(self, user_id: str, location_id: int, encounter_npc: bool = False) -> BaseResult[AdventureResult]:
+    def adventure_in_location(self, user_id: str, location_id: int, encounter_npc_only: bool = False) -> BaseResult[AdventureResult]:
         """在指定区域进行冒险，随机刷新一只野生宝可梦或训练家"""
         # 1. 获取区域信息
         location = self.adventure_repo.get_location_by_id(location_id)
@@ -127,8 +127,8 @@ class AdventureService:
             return BaseResult(success=False,
                               message=AnswerEnum.ADVENTURE_LOCATION_NOT_FOUND.value.format(location_id=location_id))
 
-        # 2. 如果指定遇到NPC，则尝试遇到训练家
-        if encounter_npc:
+        # 2. 如果指定只遇到NPC，则直接尝试遇到训练家
+        if encounter_npc_only:
             user_team_data = self.team_repo.get_user_team(user_id)
             if user_team_data and user_team_data.team_pokemon_ids:
                 trainer_encounter_result = self.adventure_with_trainer(user_id, location_id)
@@ -158,25 +158,62 @@ class AdventureService:
                             trainer=battle_trainer
                         )
                     )
+            # 如果没有遇到训练家，返回错误
+            return BaseResult(success=False, message="没有遇到可挑战的训练家")
 
-        # 3. 遇到野生宝可梦
+        # 3. 正常冒险模式：按7:3比例随机选择野生宝可梦或训练家
+        # 检查用户是否有队伍来决定是否可以遇到训练家
+        user_team_data = self.team_repo.get_user_team(user_id)
+        has_team = user_team_data and user_team_data.team_pokemon_ids
+
+        # 按7:3比例决定是遇到野生宝可梦还是训练家
+        if has_team and random.random() < 0.3:  # 30% 几率遇到训练家
+            trainer_encounter_result = self.adventure_with_trainer(user_id, location_id)
+            if trainer_encounter_result.success and trainer_encounter_result.data is not None:
+                # 成功遇到训练家，返回包含训练家信息的AdventureResult
+                battle_trainer = trainer_encounter_result.data
+                wild_pokemon_info = WildPokemonInfo(
+                    id=0,
+                    species_id=0,  # 使用0作为占位符，表示遇到的是训练家
+                    name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
+                    gender="M",
+                    level=0,  # 使用0作为占位符
+                    exp=0,
+                    stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),  # 占位符
+                    ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),  # 占位符
+                    evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),  # 占位符
+                    moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),  # 占位符
+                    nature_id=0,
+                )
+
+                return BaseResult(
+                    success=True,
+                    message=AnswerEnum.ADVENTURE_SUCCESS.value,
+                    data=AdventureResult(
+                        wild_pokemon=wild_pokemon_info,
+                        location=LocationInfo(id=location.id, name=location.name),
+                        trainer=battle_trainer
+                    )
+                )
+
+        # 4. 遫星宝可梦模式（70%几率）
         # 获取该区域的宝可梦列表
         location_pokemon_list = self.adventure_repo.get_location_pokemon_by_location_id(location_id)
         if not location_pokemon_list:
             return BaseResult(success=False, message=AnswerEnum.ADVENTURE_LOCATION_NO_POKEMON.value.format(
                 location_name=location.name))
 
-        # 4. 权重随机选择宝可梦 (优化：使用 random.choices)
+        # 5. 权重随机选择宝可梦 (优化：使用 random.choices)
         selected_location_pokemon = random.choices(
             location_pokemon_list,
             weights=[ap.encounter_rate for ap in location_pokemon_list],
             k=1
         )[0]
 
-        # 5. 生成随机等级
+        # 6. 生成随机等级
         wild_pokemon_level = random.randint(selected_location_pokemon.min_level, selected_location_pokemon.max_level)
 
-        # 6. 创建野生宝可梦
+        # 7. 创建野生宝可梦
         wild_pokemon_result = self.pokemon_service.create_single_pokemon(
             species_id=selected_location_pokemon.pokemon_species_id,
             max_level=wild_pokemon_level,
@@ -351,6 +388,22 @@ class AdventureService:
             is_user=is_user
         )
 
+    def _create_move_backup(self, move: BattleMoveInfo, pp_value: int) -> BattleMoveInfo:
+        """创建技能副本用于模拟"""
+        return BattleMoveInfo(
+            power=move.power,
+            accuracy=move.accuracy,
+            type_name=move.type_name,
+            damage_class_id=move.damage_class_id,
+            priority=move.priority,
+            type_effectiveness=move.type_effectiveness,
+            stab_bonus=move.stab_bonus,
+            max_pp=move.max_pp,
+            current_pp=pp_value,  # 使用指定的PP值
+            move_id=move.move_id,
+            move_name=move.move_name
+        )
+
     def _preload_moves(self, pokemon: Any) -> List[BattleMoveInfo]:
         """批量加载宝可梦的所有招式详情，避免循环查库"""
         move_ids = [pokemon.moves.move1_id, pokemon.moves.move2_id, pokemon.moves.move3_id, pokemon.moves.move4_id]
@@ -361,6 +414,8 @@ class AdventureService:
             for mid in valid_ids:
                 m_data = self.move_repo.get_move_by_id(mid)
                 if m_data:
+                    # 获取技能的PP值，默认为5
+                    max_pp = m_data.get('pp', 5) or 5
                     loaded_moves.append(BattleMoveInfo(
                         power=m_data.get('power', 0) or 0,
                         accuracy=m_data.get('accuracy', 100) or 100,
@@ -370,7 +425,9 @@ class AdventureService:
                         type_effectiveness=1.0,
                         stab_bonus=1.0,
                         move_id=mid,
-                        move_name=m_data.get('name_zh', 'Unknown Move')
+                        move_name=m_data.get('name_zh', 'Unknown Move'),
+                        max_pp=max_pp,
+                        current_pp=max_pp  # 初始时PP为最大值
                     ))
         return loaded_moves
 
@@ -380,7 +437,8 @@ class AdventureService:
         """
         default_move = BattleMoveInfo(
             power=50, accuracy=100.0, type_name='normal',
-            damage_class_id=2, priority=0, type_effectiveness=1.0, stab_bonus=1.0, move_id=0, move_name="默认招式"
+            damage_class_id=2, priority=0, type_effectiveness=1.0, stab_bonus=1.0,
+            max_pp=5, current_pp=5, move_id=0, move_name="默认招式"
         )
 
         if not attacker_ctx.moves:
@@ -390,7 +448,7 @@ class AdventureService:
         max_score = -1.0
 
         for move in attacker_ctx.moves:
-            if move.power == 0: continue  # 暂时忽略变化类招式
+            if move.power == 0 or move.current_pp <= 0: continue  # 暂时忽略变化类招式或PP不足的招式
 
             score = self._get_move_damage_score(attacker_ctx, defender_ctx, move)
             if score > max_score:
@@ -473,9 +531,32 @@ class AdventureService:
 
             # 行动序列
             # 1. 先手攻击
-            dmg1 = self.resolve_damage(first_ctx, second_ctx, first_move)
-            second_ctx.current_hp -= dmg1
-            log_lines.append(f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！造成 {dmg1} 点伤害。\n\n")
+            if first_move and first_move.current_pp > 0:
+                # 减少PP
+                first_move.current_pp -= 1
+                dmg1 = self.resolve_damage(first_ctx, second_ctx, first_move)
+                second_ctx.current_hp -= dmg1
+                log_lines.append(f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！造成 {dmg1} 点伤害。PP: {first_move.current_pp}/{first_move.max_pp}\n\n")
+            else:
+                # PP不足时使用默认攻击（如抓）
+                default_power = 40
+                # 创建临时攻击技能
+                temp_move = BattleMoveInfo(
+                    power=default_power,
+                    accuracy=100.0,
+                    type_name='normal',
+                    damage_class_id=2,
+                    priority=0,
+                    type_effectiveness=1.0,
+                    stab_bonus=1.0,
+                    max_pp=0,
+                    current_pp=0,
+                    move_id=0,
+                    move_name="抓"
+                )
+                dmg1 = self.resolve_damage(first_ctx, second_ctx, temp_move)
+                second_ctx.current_hp -= dmg1
+                log_lines.append(f"{first_ctx.pokemon.name} 使用了普通攻击！造成 {dmg1} 点伤害。（无PP可用）\n\n")
 
             if second_ctx.current_hp <= 0:
                 log_lines.append(f"{second_ctx.pokemon.name} 倒下了！\n\n")
@@ -483,9 +564,32 @@ class AdventureService:
                 break
 
             # 2. 后手攻击
-            dmg2 = self.resolve_damage(second_ctx, first_ctx, second_move)
-            first_ctx.current_hp -= dmg2
-            log_lines.append(f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！造成 {dmg2} 点伤害。\n\n")
+            if second_move and second_move.current_pp > 0:
+                # 减少PP
+                second_move.current_pp -= 1
+                dmg2 = self.resolve_damage(second_ctx, first_ctx, second_move)
+                first_ctx.current_hp -= dmg2
+                log_lines.append(f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！造成 {dmg2} 点伤害。PP: {second_move.current_pp}/{second_move.max_pp}\n\n")
+            else:
+                # PP不足时使用默认攻击（如抓）
+                default_power = 40
+                # 创建临时攻击技能
+                temp_move = BattleMoveInfo(
+                    power=default_power,
+                    accuracy=100.0,
+                    type_name='normal',
+                    damage_class_id=2,
+                    priority=0,
+                    type_effectiveness=1.0,
+                    stab_bonus=1.0,
+                    max_pp=0,
+                    current_pp=0,
+                    move_id=0,
+                    move_name="抓"
+                )
+                dmg2 = self.resolve_damage(second_ctx, first_ctx, temp_move)
+                first_ctx.current_hp -= dmg2
+                log_lines.append(f"{second_ctx.pokemon.name} 使用了普通攻击！造成 {dmg2} 点伤害。（无PP可用）\n\n")
 
             if first_ctx.current_hp <= 0:
                 log_lines.append(f"{first_ctx.pokemon.name} 倒下了！\n\n")
@@ -527,33 +631,67 @@ class AdventureService:
             cur_w_hp = w_start_hp
             turn = 0
 
+            # 创建技能PP的副本，用于模拟
+            user_moves_pp = [move.current_pp for move in user_ctx.moves]  # 保存初始PP
+            wild_moves_pp = [move.current_pp for move in wild_ctx.moves]  # 保存初始PP
+
+            # 创建技能副本（复制PP值）
+            user_moves_backup = [self._create_move_backup(move, user_moves_pp[i]) for i, move in enumerate(user_ctx.moves)]
+            wild_moves_backup = [self._create_move_backup(move, wild_moves_pp[i]) for i, move in enumerate(wild_ctx.moves)]
+
+            # 创建临时战斗上下文用于模拟
+            temp_user_ctx = BattleContext(
+                pokemon=user_ctx.pokemon,
+                moves=user_moves_backup,
+                types=user_ctx.types,
+                current_hp=cur_u_hp,
+                is_user=True
+            )
+            temp_wild_ctx = BattleContext(
+                pokemon=wild_ctx.pokemon,
+                moves=wild_moves_backup,
+                types=wild_ctx.types,
+                current_hp=cur_w_hp,
+                is_user=False
+            )
+
             while cur_u_hp > 0 and cur_w_hp > 0 and turn < 20:  # 减少模拟回合上限
                 turn += 1
 
-                # 若需要每回合重新决策招式，取消注释下面两行，注释掉循环外的 static 定义
-                u_move = self.get_best_move_from_context(user_ctx, wild_ctx)
-                w_move = self.get_best_move_from_context(wild_ctx, user_ctx)
-                # u_move = u_best_move_static
-                # w_move = w_best_move_static
+                # 获取当前PP下的最佳招式
+                u_move = self.get_best_move_from_context(temp_user_ctx, temp_wild_ctx)
+                w_move = self.get_best_move_from_context(temp_wild_ctx, temp_user_ctx)
 
                 user_first = self._is_user_first_simple(u_speed, w_speed, u_move.priority, w_move.priority)
 
                 if user_first:
                     # User attacks Wild
-                    dmg = self.resolve_damage(user_ctx, wild_ctx, u_move)
+                    if u_move and u_move.current_pp > 0:
+                        u_move.current_pp -= 1  # 减少PP
+                    dmg = self.resolve_damage(temp_user_ctx, temp_wild_ctx, u_move)
                     cur_w_hp -= dmg
+                    temp_wild_ctx.current_hp = cur_w_hp  # 同步HP
                     if cur_w_hp <= 0: break
                     # Wild attacks User
-                    dmg = self.resolve_damage(wild_ctx, user_ctx, w_move)
+                    if w_move and w_move.current_pp > 0:
+                        w_move.current_pp -= 1  # 减少PP
+                    dmg = self.resolve_damage(temp_wild_ctx, temp_user_ctx, w_move)
                     cur_u_hp -= dmg
+                    temp_user_ctx.current_hp = cur_u_hp  # 同步HP
                 else:
                     # Wild attacks User
-                    dmg = self.resolve_damage(wild_ctx, user_ctx, w_move)
+                    if w_move and w_move.current_pp > 0:
+                        w_move.current_pp -= 1  # 减少PP
+                    dmg = self.resolve_damage(temp_wild_ctx, temp_user_ctx, w_move)
                     cur_u_hp -= dmg
+                    temp_user_ctx.current_hp = cur_u_hp  # 同步HP
                     if cur_u_hp <= 0: break
                     # User attacks Wild
-                    dmg = self.resolve_damage(user_ctx, wild_ctx, u_move)
+                    if u_move and u_move.current_pp > 0:
+                        u_move.current_pp -= 1  # 减少PP
+                    dmg = self.resolve_damage(temp_user_ctx, temp_wild_ctx, u_move)
                     cur_w_hp -= dmg
+                    temp_wild_ctx.current_hp = cur_w_hp  # 同步HP
 
             if cur_u_hp > 0:
                 user_wins += 1

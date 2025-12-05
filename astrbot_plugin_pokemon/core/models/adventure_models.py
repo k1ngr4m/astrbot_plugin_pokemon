@@ -62,5 +62,7 @@ class BattleMoveInfo:
     priority: int
     type_effectiveness: float
     stab_bonus: float
+    max_pp: int = 0  # 技能最大使用次数
+    current_pp: int = 0  # 当前剩余使用次数
     move_id: int = 0
     move_name: str = ""

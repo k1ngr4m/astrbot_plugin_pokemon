@@ -635,8 +635,15 @@ class ExpService:
                     if not move_info:
                         move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
 
-            # 更新宝可梦的技能
-            self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_data.id, moves=updated_moves)
+            # 更新宝可梦的技能 - 将PokemonMoves对象分解为单独字段
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id,
+                pokemon_data.id,
+                move1_id=updated_moves.move1_id,
+                move2_id=updated_moves.move2_id,
+                move3_id=updated_moves.move3_id,
+                move4_id=updated_moves.move4_id
+            )
 
             return {
                 "success": True,
@@ -729,8 +736,15 @@ class ExpService:
                     if not move_info:
                         move_info = {"id": new_move_id, "name_zh": f"技能{new_move_id}", "name_en": f"Move{new_move_id}"}
 
-            # 更新宝可梦的技能
-            self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_data.id, moves=updated_moves)
+            # 更新宝可梦的技能 - 将PokemonMoves对象分解为单独字段
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id,
+                pokemon_data.id,
+                move1_id=updated_moves.move1_id,
+                move2_id=updated_moves.move2_id,
+                move3_id=updated_moves.move3_id,
+                move4_id=updated_moves.move4_id
+            )
 
             return {
                 "success": True,
