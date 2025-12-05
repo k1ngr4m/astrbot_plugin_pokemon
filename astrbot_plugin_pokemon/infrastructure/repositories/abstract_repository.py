@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 
-from ...core.models.trainer_models import TrainerEncounter, TrainerLocation
+from ...core.models.trainer_models import TrainerEncounter, TrainerLocation, TrainerPokemon, Trainer
 from ...core.models.user_models import User, UserTeam, UserItems
 from ...core.models.pokemon_models import PokemonSpecies, UserPokemonInfo, \
     WildPokemonInfo, WildPokemonEncounterLog, PokemonMoves, PokemonEvolutionInfo
@@ -356,24 +356,24 @@ class AbstractTrainerRepository(ABC):
     # ==========增==========
     # 添加训练家
     @abstractmethod
-    def create_trainer(self, trainer_data: Dict[str, Any]) -> None: pass
+    def create_trainer(self, trainer: Trainer) -> None: pass
 
     @abstractmethod
-    def create_trainers_batch(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
+    def create_trainers_batch(self, trainers_list: List[Trainer]) -> None: pass
 
     # 添加训练家宝可梦
     @abstractmethod
-    def create_trainer_pokemon(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
+    def create_trainer_pokemon(self, trainer_pokemon: TrainerPokemon) -> None: pass
 
     @abstractmethod
-    def create_trainer_pokemons_batch(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
+    def create_trainer_pokemons_batch(self, trainer_pokemons_list: List[TrainerPokemon]) -> None: pass
 
     # 添加训练家位置记录
     @abstractmethod
     def create_location_trainers(self, location_trainer: TrainerLocation) -> None: pass
 
     @abstractmethod
-    def create_location_trainers_batch(self, trainer_data_list: List[Dict[str, Any]]) -> None: pass
+    def create_location_trainers_batch(self, location_trainers_list: List[TrainerLocation]) -> None: pass
     # ==========改==========
     # 更新训练家字段
     @abstractmethod
