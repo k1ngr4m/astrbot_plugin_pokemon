@@ -55,28 +55,17 @@ class EvolutionService:
                 current_pokemon.nature_id  # 使用原来的性格
             )
 
-            # 5. 构建更新数据对象
-            # 注意：保持原有ID、性别、捕获时间、性格等不变
-            evolved_pokemon_data = UserPokemonInfo(
-                id=current_pokemon.id,
+            # 6. 写入数据库
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id, pokemon_id,
                 species_id=evolved_species.id,
                 name=evolved_species.name_zh,
-                gender=current_pokemon.gender,
-                level=current_pokemon.level,
-                exp=current_pokemon.exp,
-                stats=new_stats,
-                ivs=current_pokemon.ivs,
-                evs=current_pokemon.evs,
-                moves=current_pokemon.moves,  # 进化是否自动学招式？通常需要额外逻辑，此处保持原样
-                caught_time=current_pokemon.caught_time,
-                nature_id=current_pokemon.nature_id  # 保持原有性格不变
-            )
-
-            # 6. 写入数据库
-            self.user_pokemon_repo.update_user_pokemon_after_evolution(
-                user_id=user_id,
-                pokemon_id=pokemon_id,
-                pokemon_info=evolved_pokemon_data
+                hp=new_stats.hp,
+                attack=new_stats.attack,
+                defense=new_stats.defense,
+                special_attack=new_stats.sp_attack,
+                special_defense=new_stats.sp_defense,
+                speed=new_stats.speed,
             )
 
             logger.info(f"User {user_id}'s Pokemon {current_pokemon.name} evolved into {evolved_species.name_zh}")

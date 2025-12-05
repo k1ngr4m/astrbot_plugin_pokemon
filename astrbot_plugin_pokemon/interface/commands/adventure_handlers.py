@@ -175,9 +175,9 @@ class AdventureHandlers:
         ]
 
         for i, skirmish in enumerate(log['log_data'], 1):
-            message.append(f"=== 第 {i} 场对战 ===")
+            message.append(f"=== 第 {i} 场对战 ===\n\n")
             message.append(f"我方: {skirmish['pokemon_name']} (Lv.{skirmish['level']})")
-            message.append(f"预测胜率: {skirmish['win_rate']}%")
+            message.append(f"预测胜率: {skirmish['win_rate']}%\n\n")
             message.append("详细过程:")
             message.extend([f"  {line}" for line in skirmish['details']])
             message.append(f"本场结果: {'胜利' if skirmish['result'] == 'win' else '失败'}\n")

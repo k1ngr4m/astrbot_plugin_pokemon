@@ -122,6 +122,7 @@ class UserPokemonService:
                 ivs = pokemon["ivs"],
                 evs = pokemon["evs"],
                 moves = pokemon["moves"],
+                nature_id=pokemon["nature_id"],
             ))
 
         return BaseResult(
@@ -141,7 +142,7 @@ class UserPokemonService:
             BaseResult
         """
         try:
-            self.user_pokemon_repo.update_pokemon_moves(moves, pokemon_id, user_id)
+            self.user_pokemon_repo._update_user_pokemon_fields(user_id, pokemon_id, moves=moves)
             return BaseResult(
                 success=True,
                 message="技能更新成功"
