@@ -505,6 +505,44 @@ class AdventureService:
         final_damage = base_damage * move.type_effectiveness * move.stab_bonus * crit_multiplier * random_multiplier
         return int(final_damage)
 
+    def calculate_damage_with_effects(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> Tuple[int, Dict[str, any]]:
+        """计算伤害并返回效果信息（用于丰富战斗日志）"""
+        # 检查是否击中
+        if random.random() * 100 > move.accuracy:
+            return 0, {"missed": True, "type_effectiveness": 1.0, "is_crit": False}
+
+        # 重新计算攻防，因为Context可能变了? 不，Context里的Pokemon Stats是不变的，Stat变化应在Context里维护
+        # 这里简化处理，直接取 stats
+        atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
+        def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
+
+        level = attacker_ctx.pokemon.level
+
+        # 基础伤害公式
+        base_damage = ((2 * level / 5 + 2) * move.power * atk_stat / max(1, def_stat)) / 50 + 2
+
+        # 随机波动
+        is_crit = random.random() < 0.0625
+        crit_multiplier = 1.5 if is_crit else 1.0
+        random_multiplier = random.uniform(0.85, 1.0)
+
+        # move.type_effectiveness 和 stab_bonus 已经在 get_best_move_from_context -> _get_move_damage_score 中计算并赋值了
+        # 如果是随机招式，可能没赋值，这里做一个兜底
+        if move.type_effectiveness == 1.0 and move.move_id != 0:
+            move.type_effectiveness = self.calculate_type_effectiveness([move.type_name], defender_ctx.types)
+            move.stab_bonus = 1.5 if move.type_name in attacker_ctx.types else 1.0
+
+        final_damage = base_damage * move.type_effectiveness * move.stab_bonus * crit_multiplier * random_multiplier
+
+        effect_info = {
+            "missed": False,
+            "type_effectiveness": move.type_effectiveness,
+            "is_crit": is_crit,
+            "stab_bonus": move.stab_bonus
+        }
+
+        return int(final_damage), effect_info
+
     def execute_real_battle(self, user_ctx: BattleContext, wild_ctx: BattleContext) -> Tuple[str, List[str], int]:
         """执行带日志的战斗"""
         log_lines = [
@@ -534,9 +572,29 @@ class AdventureService:
             if first_move and first_move.current_pp > 0:
                 # 减少PP
                 first_move.current_pp -= 1
-                dmg1 = self.resolve_damage(first_ctx, second_ctx, first_move)
+                dmg1, effect_info1 = self.calculate_damage_with_effects(first_ctx, second_ctx, first_move)
                 second_ctx.current_hp -= dmg1
-                log_lines.append(f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！造成 {dmg1} 点伤害。PP: {first_move.current_pp}/{first_move.max_pp}\n\n")
+
+                # 构建详细攻击描述
+                attack_text = f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！造成 {dmg1} 点伤害。PP: {first_move.current_pp}/{first_move.max_pp}\n\n"
+                log_lines.append(attack_text)
+
+                # 添加效果描述
+                if effect_info1["missed"]:
+                    log_lines.append(f"没有击中目标！\n\n")
+                else:
+                    # 添加暴击提示
+                    if effect_info1["is_crit"]:
+                        log_lines.append(f"{first_ctx.pokemon.name} 集中了要害！\n\n")
+
+                    # 添加效果倍率提示
+                    eff = effect_info1["type_effectiveness"]
+                    if eff > 1.0:  # 2倍或更强效果
+                        log_lines.append(f"效果绝佳！\n\n")
+                    elif eff == 0.0:  # 无效果
+                        log_lines.append(f"似乎没有效果！\n\n")
+                    elif eff < 1.0:  # 0.5倍或0.25倍效果
+                        log_lines.append(f"效果不佳！\n\n")
             else:
                 # PP不足时使用默认攻击（如抓）
                 default_power = 40
@@ -554,9 +612,31 @@ class AdventureService:
                     move_id=0,
                     move_name="抓"
                 )
-                dmg1 = self.resolve_damage(first_ctx, second_ctx, temp_move)
+                dmg1, effect_info1 = self.calculate_damage_with_effects(first_ctx, second_ctx, temp_move)
                 second_ctx.current_hp -= dmg1
-                log_lines.append(f"{first_ctx.pokemon.name} 使用了普通攻击！造成 {dmg1} 点伤害。（无PP可用）\n\n")
+
+                # 构建详细攻击描述
+                attack_text = f"{first_ctx.pokemon.name} 使用了普通攻击！造成 {dmg1} 点伤害。（无PP可用）\n\n"
+                log_lines.append(attack_text)
+
+                # 添加效果描述
+                if effect_info1["missed"]:
+                    log_lines.append(f"没有击中目标！\n\n")
+                else:
+                    # 添加暴击提示
+                    if effect_info1["is_crit"]:
+                        log_lines.append(f"{first_ctx.pokemon.name} 集中了要害！\n\n")
+
+                    # 添加效果倍率提示
+                    eff = effect_info1["type_effectiveness"]
+                    if eff > 2.0:  # 超强效果 - 4倍或更高
+                        log_lines.append(f"效果绝佳！\n\n")
+                    elif eff > 1.0:  # 2倍效果
+                        log_lines.append(f"效果绝佳！\n\n")
+                    elif eff == 0.0:  # 无效果
+                        log_lines.append(f"似乎没有效果！\n\n")
+                    elif eff < 1.0:  # 0.5倍或0.25倍效果
+                        log_lines.append(f"效果不佳！\n\n")
 
             if second_ctx.current_hp <= 0:
                 log_lines.append(f"{second_ctx.pokemon.name} 倒下了！\n\n")
@@ -567,9 +647,29 @@ class AdventureService:
             if second_move and second_move.current_pp > 0:
                 # 减少PP
                 second_move.current_pp -= 1
-                dmg2 = self.resolve_damage(second_ctx, first_ctx, second_move)
+                dmg2, effect_info2 = self.calculate_damage_with_effects(second_ctx, first_ctx, second_move)
                 first_ctx.current_hp -= dmg2
-                log_lines.append(f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！造成 {dmg2} 点伤害。PP: {second_move.current_pp}/{second_move.max_pp}\n\n")
+
+                # 构建详细攻击描述
+                attack_text = f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！造成 {dmg2} 点伤害。PP: {second_move.current_pp}/{second_move.max_pp}\n\n"
+                log_lines.append(attack_text)
+
+                # 添加效果描述
+                if effect_info2["missed"]:
+                    log_lines.append(f"没有击中目标！\n\n")
+                else:
+                    # 添加暴击提示
+                    if effect_info2["is_crit"]:
+                        log_lines.append(f"{second_ctx.pokemon.name} 集中了要害！\n\n")
+
+                    # 添加效果倍率提示
+                    eff = effect_info2["type_effectiveness"]
+                    if eff > 1.0:  # 2倍或更强效果
+                        log_lines.append(f"效果绝佳！\n\n")
+                    elif eff == 0.0:  # 无效果
+                        log_lines.append(f"似乎没有效果！\n\n")
+                    elif eff < 1.0:  # 0.5倍或0.25倍效果
+                        log_lines.append(f"效果不佳！\n\n")
             else:
                 # PP不足时使用默认攻击（如抓）
                 default_power = 40
@@ -587,9 +687,31 @@ class AdventureService:
                     move_id=0,
                     move_name="抓"
                 )
-                dmg2 = self.resolve_damage(second_ctx, first_ctx, temp_move)
+                dmg2, effect_info2 = self.calculate_damage_with_effects(second_ctx, first_ctx, temp_move)
                 first_ctx.current_hp -= dmg2
-                log_lines.append(f"{second_ctx.pokemon.name} 使用了普通攻击！造成 {dmg2} 点伤害。（无PP可用）\n\n")
+
+                # 构建详细攻击描述
+                attack_text = f"{second_ctx.pokemon.name} 使用了普通攻击！造成 {dmg2} 点伤害。（无PP可用）\n\n"
+                log_lines.append(attack_text)
+
+                # 添加效果描述
+                if effect_info2["missed"]:
+                    log_lines.append(f"没有击中目标！\n\n")
+                else:
+                    # 添加暴击提示
+                    if effect_info2["is_crit"]:
+                        log_lines.append(f"{second_ctx.pokemon.name} 集中了要害！\n\n")
+
+                    # 添加效果倍率提示
+                    eff = effect_info2["type_effectiveness"]
+                    if eff > 2.0:  # 超强效果 - 4倍或更高
+                        log_lines.append(f"效果绝佳！\n\n")
+                    elif eff > 1.0:  # 2倍效果
+                        log_lines.append(f"效果绝佳！\n\n")
+                    elif eff == 0.0:  # 无效果
+                        log_lines.append(f"似乎没有效果！\n\n")
+                    elif eff < 1.0:  # 0.5倍或0.25倍效果
+                        log_lines.append(f"效果不佳！\n\n")
 
             if first_ctx.current_hp <= 0:
                 log_lines.append(f"{first_ctx.pokemon.name} 倒下了！\n\n")
