@@ -1035,10 +1035,12 @@ class AdventureService:
         exp_details = self._handle_trainer_battle_experience(user_id, battle_result_str, battle_trainer, battle_log, last_pokemon.level)
 
         # 记录战斗结果
+        money_reward = 0
         if battle_result_str == "success":
             # 战斗胜利，给予金钱奖励并更新记录
             rewards = self.trainer_service.calculate_trainer_battle_rewards(battle_trainer.trainer, last_pokemon.level)
-            self.trainer_service.handle_trainer_battle_win(user_id, battle_trainer.trainer.id, rewards["money_reward"])
+            money_reward = rewards["money_reward"]
+            self.trainer_service.handle_trainer_battle_win(user_id, battle_trainer.trainer.id, money_reward)
 
         return BaseResult(
             success=True,
@@ -1051,7 +1053,8 @@ class AdventureService:
                 exp_details=exp_details,
                 battle_log=battle_log,
                 log_id=log_id,
-                is_trainer_battle=True  # 标记为训练家战斗
+                is_trainer_battle=True,  # 标记为训练家战斗
+                money_reward=money_reward  # 金钱奖励
             )
         )
 

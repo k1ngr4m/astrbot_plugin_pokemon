@@ -397,6 +397,10 @@ class AdventureHandlers:
 
         lines.append(f"🎯 战斗结果: {'胜利' if d.result == 'success' else '失败'}")
 
+        # 如果是训练家战斗且胜利，显示获得的金币
+        if d.is_trainer_battle and d.result == 'success' and d.money_reward > 0:
+            lines.append(f"💰 获得金币: {d.money_reward} 金币")
+
         if d.log_id:
             lines.append(f"📜 日志ID: {d.log_id} (使用 /查看战斗 {d.log_id} 查看详情)")
 
