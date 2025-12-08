@@ -263,6 +263,31 @@ class AdventureHandlers:
             yield event.plain_result("❌ 无效的道具ID格式。")
             return
 
+        # 获取用户信息以检查等级限制
+        user_result = self.user_service.check_user_registered(user_id)
+        if not user_result.success:
+            yield event.plain_result(user_result.message)
+            return
+        user = user_result.data
+
+        # 根据玩家等级限制可捕捉的宝可梦等级
+        user_level = user.level
+        max_catchable_level = 10  # 默认10级
+
+        if user_level >= 30:
+            max_catchable_level = 50
+        elif user_level >= 20:
+            max_catchable_level = 40
+        elif user_level >= 10:
+            max_catchable_level = 30
+        elif user_level >= 5:
+            max_catchable_level = 20
+
+        if wild_pokemon.level > max_catchable_level:
+            yield event.plain_result(f"❌ 您的等级({user_level})不足以捕捉此宝可梦({wild_pokemon.name} Lv.{wild_pokemon.level})。\n" +
+                                   f"等级 {user_level} 的训练家最多可捕捉等级 {max_catchable_level} 的宝可梦。")
+            return
+
         # 计算概率
         rate_result = self.adventure_service.calculate_catch_success_rate(user_id, wild_pokemon, item_id)
         if not rate_result['success']:
