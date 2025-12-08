@@ -53,6 +53,15 @@ class GameContainer:
         self.nature_service = NatureService(
             nature_repo=self.nature_repo
         )
+        self.exp_service = ExpService(
+            user_repo=self.user_repo,
+            pokemon_repo=self.pokemon_repo,
+            team_repo=self.team_repo,
+            move_repo=self.move_repo,
+            user_pokemon_repo=self.user_pokemon_repo,
+            config=self.config,
+            nature_service=self.nature_service
+        )
         self.pokemon_service = PokemonService(
             pokemon_repo=self.pokemon_repo,
             move_repo=self.move_repo,
@@ -66,6 +75,7 @@ class GameContainer:
             item_repo=self.item_repo,
             user_pokemon_repo=self.user_pokemon_repo,
             user_item_repo=self.user_item_repo,
+            exp_service=self.exp_service,
             config=self.config
         )
         self.user_pokemon_service = UserPokemonService(
@@ -82,15 +92,7 @@ class GameContainer:
             user_pokemon_repo=self.user_pokemon_repo,
             config=self.config
         )
-        self.exp_service = ExpService(
-            user_repo=self.user_repo,
-            pokemon_repo=self.pokemon_repo,
-            team_repo=self.team_repo,
-            move_repo=self.move_repo,
-            user_pokemon_repo=self.user_pokemon_repo,
-            config=self.config,
-            nature_service=self.nature_service
-        )
+
         self.trainer_service = TrainerService(
             trainer_repo=self.trainer_repo,
             pokemon_repo=self.pokemon_repo,

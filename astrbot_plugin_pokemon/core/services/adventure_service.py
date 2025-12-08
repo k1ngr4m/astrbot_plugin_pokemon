@@ -360,6 +360,11 @@ class AdventureService:
         # 更新图鉴/遭遇日志
         self._update_encounter_log(user_id, wild_pokemon_info.id, battle_result_str)
 
+        # 如果胜利，给予击败野生宝可梦的额外用户经验奖励
+        user_battle_exp_result = None
+        if battle_result_str == "success":
+            user_battle_exp_result = self.exp_service.add_exp_for_defeating_wild_pokemon(user_id, wild_pokemon_info.level)
+
         return BaseResult(
             success=True,
             message=AnswerEnum.BATTLE_SUCCESS.value,
@@ -371,7 +376,8 @@ class AdventureService:
                 exp_details=exp_details,
                 battle_log=battle_log,
                 log_id=log_id,
-                is_trainer_battle=False  # 标记为非训练家战斗（野生宝可梦战斗）
+                is_trainer_battle=False,  # 标记为非训练家战斗（野生宝可梦战斗）
+                user_battle_exp_result=user_battle_exp_result  # 添加用户战斗经验结果
             )
         )
 
@@ -1327,11 +1333,15 @@ class AdventureService:
 
         # 记录战斗结果
         money_reward = 0
+        user_trainer_battle_exp_result = None
         if battle_result_str == "success":
             # 战斗胜利，给予金钱奖励并更新记录
             rewards = self.trainer_service.calculate_trainer_battle_rewards(battle_trainer.trainer, last_pokemon.level)
             money_reward = rewards["money_reward"]
             self.trainer_service.handle_trainer_battle_win(user_id, battle_trainer.trainer.id, money_reward)
+
+            # 给予击败NPC训练家的额外用户经验奖励
+            user_trainer_battle_exp_result = self.exp_service.add_exp_for_defeating_npc_trainer(user_id, battle_trainer.trainer.base_payout)
 
         return BaseResult(
             success=True,
@@ -1345,7 +1355,8 @@ class AdventureService:
                 battle_log=battle_log,
                 log_id=log_id,
                 is_trainer_battle=True,  # 标记为训练家战斗
-                money_reward=money_reward  # 金钱奖励
+                money_reward=money_reward,  # 金钱奖励
+                user_battle_exp_result=user_trainer_battle_exp_result  # 用户训练家战斗经验结果
             )
         )
 

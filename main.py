@@ -140,6 +140,12 @@ class PokemonPlugin(Star):
         async for r in self.user_handlers.register_user(event):
             yield r
 
+    @filter.command("宝可梦个人资料", alias={"个人资料", "查看状态", "查看个人资料", "status"})
+    async def profile(self, event: AstrMessageEvent):
+        """查看用户个人资料，包括等级、经验和金币"""
+        async for r in self.user_handlers.profile(event):
+            yield r
+
     @filter.command("宝可梦签到")
     async def checkin(self, event: AstrMessageEvent):
         """每日签到，获得金币和道具奖励"""

@@ -281,15 +281,38 @@ class AdventureHandlers:
         message = f"您尝试捕捉野生的 {wild_pokemon.name} (Lv.{wild_pokemon.level})，成功率 {success_rate * 100:.2f}%。\n\n"
 
         if is_success:
+            # 检查这是否为首次捕捉该物种的宝可梦
+            pokedex_result = self.user_pokemon_service.get_user_pokedex_ids(user_id)
+            is_first_catch = False
+            if pokedex_result.success and wild_pokemon.species_id not in pokedex_result.data.get("caught", set()):
+                is_first_catch = True
+
             # 构造并保存宝可梦
             new_pokemon = self.user_pokemon_service._create_and_save_caught_pokemon(user_id, wild_pokemon)
             self.user_service._update_encounter_log(user_id, wild_pokemon.id, captured=True, deleted=True)
 
-            message += (
-                f"🎉 捕捉成功！\n"
-                f"已添加 {wild_pokemon.name} 到收藏 (ID: {new_pokemon.id})。\n"
+            # 如果是首次捕捉该物种，给予额外经验值奖励
+            first_catch_exp_result = None
+            if is_first_catch:
+                first_catch_exp_result = self.exp_service.add_exp_for_first_time_capture(user_id, wild_pokemon.level)
+
+            message_parts = [
+                f"🎉 捕捉成功！\n",
+                f"已添加 {wild_pokemon.name} 到收藏 (ID: {new_pokemon.id})。\n",
                 f"消耗: [{pokeball.item_id}] {pokeball.name_zh} (剩余: {pokeball.quantity - 1})"
-            )
+            ]
+
+            # 如果是首次捕捉，添加经验奖励信息
+            if is_first_catch and first_catch_exp_result and first_catch_exp_result.get("success"):
+                exp_gained = first_catch_exp_result.get("exp_gained", 0)
+                new_level = first_catch_exp_result.get("new_level", 0)
+                levels_gained = first_catch_exp_result.get("levels_gained", 0)
+
+                message_parts.append(f"\n✨ 首次捕捉奖励: +{exp_gained} 经验")
+                if levels_gained > 0:
+                    message_parts.append(f"📈 玩家升至 {new_level} 级! (提升了 {levels_gained} 级)")
+
+            message = "".join(message_parts)
 
         else:
             message += (
@@ -432,6 +455,16 @@ class AdventureHandlers:
                         print(evolution_info)
                         lines.append(f"\n\n  🔄 可以进化为: {evolution_info['evolved_species_name']} (ID: {evolution_info['evolved_species_id']})")
                 lines.append("")
+
+        # 添加用户经验奖励信息（如果有的话）
+        if d.user_battle_exp_result and d.user_battle_exp_result.get("success"):
+            exp_gained = d.user_battle_exp_result.get("exp_gained", 0)
+            levels_gained = d.user_battle_exp_result.get("levels_gained", 0)
+            new_level = d.user_battle_exp_result.get("new_level", 0)
+
+            lines.append(f"\n✨ 玩家经验奖励: +{exp_gained} 经验")
+            if levels_gained > 0:
+                lines.append(f"📈 玩家升至 {new_level} 级! (提升了 {levels_gained} 级)")
 
         return "\n".join(lines)
 

@@ -22,6 +22,7 @@ class UserService:
             item_repo: AbstractItemRepository,
             user_item_repo: AbstractUserItemRepository,
             user_pokemon_repo: AbstractUserPokemonRepository,
+            exp_service,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
@@ -29,6 +30,7 @@ class UserService:
         self.item_repo = item_repo
         self.user_item_repo = user_item_repo
         self.user_pokemon_repo = user_pokemon_repo
+        self.exp_service = exp_service
         self.config = config
 
     def register(self, user_id: str, nickname: str) -> BaseResult:
@@ -244,4 +246,37 @@ class UserService:
         return BaseResult(
             success=True,
             message=AnswerEnum.USER_ENCOUNTERS_UPDATED.value
+        )
+
+    def get_user_profile(self, user_id: str) -> BaseResult[Dict[str, Any]]:
+        """获取用户个人资料，包括等级、经验、金币等信息"""
+        user_result = self.check_user_registered(user_id)
+        if not user_result.success:
+            return user_result
+
+        user = self.user_repo.get_user_by_id(user_id)
+        if not user:
+            return BaseResult(success=False, message=AnswerEnum.USER_NOT_EXISTS.value)
+
+        # 计算下一级所需经验
+        if self.exp_service:
+            required_exp_for_next = self.exp_service.get_required_exp_for_level(user.level + 1)
+            exp_needed_for_next = required_exp_for_next - user.exp if user.level < 100 else 0
+        else:
+            exp_needed_for_next = 0
+
+        profile_data = {
+            "user_id": user.user_id,
+            "nickname": user.nickname,
+            "level": user.level,
+            "exp": user.exp,
+            "exp_needed_for_next": exp_needed_for_next,
+            "coins": user.coins,
+            "created_at": user.created_at
+        }
+
+        return BaseResult(
+            success=True,
+            message="用户资料获取成功",
+            data=profile_data
         )

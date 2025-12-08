@@ -53,6 +53,7 @@ class BattleResult:
     log_id: int = 0  # 战斗日志ID
     is_trainer_battle: bool = False  # 是否为训练家战斗
     money_reward: int = 0  # 金钱奖励
+    user_battle_exp_result: Dict[str, any] = None  # 用户战斗经验奖励结果
 
 @dataclass
 class BattleMoveInfo:

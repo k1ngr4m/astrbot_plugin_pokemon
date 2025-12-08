@@ -1,3 +1,4 @@
+import math
 from typing import Dict, Any
 
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats, \
@@ -29,14 +30,17 @@ class ExpService:
         self.config = config
         self.nature_service = nature_service
 
-    # 计算达到指定等级所需的总经验值（基于n³公式）
+    # 计算达到指定等级所需的总经验值（基于 level^1.2 公式）
     def get_required_exp_for_level(self, level: int) -> int:
         """
-        计算达到指定等级所需的总经验值（基于n³公式）
+        计算达到指定等级所需的总经验值（基于 base × level^1.2 公式）
         """
         if level <= 1:
-            return 1
-        return level ** 3
+            return 0
+        # 使用公式: 基础值 × (等级^1.2)
+        # 这里将基础值设为100，可以根据游戏平衡性调整
+        base_value = 100
+        return int(base_value * (level ** 1.2))
 
     # 计算从当前等级升到下一级所需的经验值
     def get_exp_needed_for_next_level(self, current_level: int) -> int:
@@ -798,6 +802,45 @@ class ExpService:
         将新技能添加到宝可梦的技能列表中
         """
         return self._add_move_to_pokemon(moves, new_move_id)
+
+    def add_exp_for_defeating_wild_pokemon(self, user_id: str, wild_pokemon_level: int) -> Dict[str, Any]:
+        """
+        为击败野生宝可梦添加经验奖励 (50-200 EXP)
+        """
+        import random
+        # 基础奖励 50-200 EXP，可以根据野生宝可梦的等级进行微调
+        exp_gained = random.randint(50, 200)
+
+        # 更新用户经验
+        result = self.update_user_after_battle(user_id, exp_gained)
+        result["source"] = "defeating_wild_pokemon"
+        return result
+
+    def add_exp_for_defeating_npc_trainer(self, user_id: str, trainer_level: int) -> Dict[str, Any]:
+        """
+        为击败NPC训练家添加经验奖励 (200-1000 EXP)
+        """
+        import random
+        # 基础奖励 200-1000 EXP，可以根据训练家的等级进行微调
+        exp_gained = random.randint(200, 1000)
+
+        # 更新用户经验
+        result = self.update_user_after_battle(user_id, exp_gained)
+        result["source"] = "defeating_npc_trainer"
+        return result
+
+    def add_exp_for_first_time_capture(self, user_id: str, captured_pokemon_level: int) -> Dict[str, Any]:
+        """
+        为首次捕捉宝可梦添加经验奖励 (100-500 EXP)
+        """
+        import random
+        # 基础奖励 100-500 EXP，可以根据捕捉的宝可梦等级进行微调
+        exp_gained = random.randint(100, 500)
+
+        # 更新用户经验
+        result = self.update_user_after_battle(user_id, exp_gained)
+        result["source"] = "first_time_capture"
+        return result
 
     # 战斗后更新用户的经验值和等级（考虑EV值）
     def update_user_after_battle(self, user_id: str, exp_gained: int) -> Dict[str, Any]:
