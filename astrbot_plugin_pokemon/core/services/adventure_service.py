@@ -605,54 +605,74 @@ class AdventureService:
             if first_move and first_move.current_pp > 0:
                 # 减少PP
                 first_move.current_pp -= 1
-                dmg1, effect_info1 = self.calculate_damage_with_effects(first_ctx, second_ctx, first_move)
 
-                # 检查是否使用了挣扎招式
-                is_struggle = first_move.move_id == -1 and first_move.move_name == "挣扎"
+                # 检查是否为变化技能（damage_class_id == 1）
+                is_status_move = first_move.damage_class_id == 1
 
-                # 对对手造成伤害
-                second_ctx.current_hp -= dmg1
-
-                # 构建详细攻击描述
-                attack_text = f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！造成 {dmg1} 点伤害。PP: {first_move.current_pp}/{first_move.max_pp}\n\n"
-                log_lines.append(attack_text)
-
-                # 添加效果描述
-                if effect_info1["missed"]:
-                    log_lines.append(f"没有击中目标！\n\n")
+                if is_status_move:
+                    # 变化技能不造成伤害，直接设置伤害为0
+                    dmg1 = 0
+                    effect_info1 = {"missed": False, "type_effectiveness": 1.0, "is_crit": False}
+                    # 构建变化技能描述
+                    attack_text = f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！PP: {first_move.current_pp}/{first_move.max_pp}\n\n"
+                    log_lines.append(attack_text)
                 else:
-                    # 添加暴击提示
-                    if effect_info1["is_crit"]:
-                        log_lines.append(f"{first_ctx.pokemon.name} 集中了要害！\n\n")
+                    # 攻击技能计算伤害
+                    dmg1, effect_info1 = self.calculate_damage_with_effects(first_ctx, second_ctx, first_move)
 
-                    # 添加效果倍率提示
-                    eff = effect_info1["type_effectiveness"]
-                    if eff > 1.0:  # 2倍或更强效果
-                        log_lines.append(f"效果绝佳！\n\n")
-                    elif eff == 0.0:  # 无效果
-                        log_lines.append(f"似乎没有效果！\n\n")
-                    elif eff < 1.0:  # 0.5倍或0.25倍效果
-                        log_lines.append(f"效果不佳！\n\n")
+                    # 检查是否使用了挣扎招式
+                    is_struggle = first_move.move_id == -1 and first_move.move_name == "挣扎"
 
-                # 如果是挣扎招式，对使用者本身造成伤害
-                if is_struggle:
-                    self_damage = max(1, first_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
-                    first_ctx.current_hp -= self_damage
-                    log_lines.append(f"{first_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
+                    # 构建详细攻击描述
+                    attack_text = f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！造成 {dmg1} 点伤害。PP: {first_move.current_pp}/{first_move.max_pp}\n\n"
+                    log_lines.append(attack_text)
 
-                # 检查对手是否倒下
-                if second_ctx.current_hp <= 0:
-                    log_lines.append(f"{second_ctx.pokemon.name} 倒下了！\n\n")
-                    winner = "user" if user_first else "wild"
-                    break
+                    # 添加效果描述
+                    if effect_info1["missed"]:
+                        log_lines.append(f"没有击中目标！\n\n")
+                    else:
+                        # 添加暴击提示
+                        if effect_info1["is_crit"]:
+                            log_lines.append(f"{first_ctx.pokemon.name} 集中了要害！\n\n")
+
+                        # 添加效果倍率提示
+                        eff = effect_info1["type_effectiveness"]
+                        if eff > 1.0:  # 2倍或更强效果
+                            log_lines.append(f"效果绝佳！\n\n")
+                        elif eff == 0.0:  # 无效果
+                            log_lines.append(f"似乎没有效果！\n\n")
+                        elif eff < 1.0:  # 0.5倍或0.25倍效果
+                            log_lines.append(f"效果不佳！\n\n")
+
+                    # 如果是挣扎招式，对使用者本身造成伤害
+                    if is_struggle:
+                        self_damage = max(1, first_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
+                        first_ctx.current_hp -= self_damage
+                        log_lines.append(f"{first_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
+
+                # 对对手造成伤害（仅攻击技能）
+                if not is_status_move:
+                    second_ctx.current_hp -= dmg1
+
+                    # 检查对手是否倒下
+                    if second_ctx.current_hp <= 0:
+                        log_lines.append(f"{second_ctx.pokemon.name} 倒下了！\n\n")
+                        winner = "user" if user_first else "wild"
+                        break
+
+                # 对于变化技能，应用其效果（暂时仅记录）
+                # if is_status_move:
+                    # 记录变化技能使用
+                    # log_lines.append(f"{first_ctx.pokemon.name} 的能力变化了！\n\n")
 
                 # 检查使用者（如果是挣扎招式）是否因自伤倒下
-                if is_struggle and first_ctx.current_hp <= 0:
+                if not is_status_move and first_move.move_id == -1 and first_move.move_name == "挣扎" and first_ctx.current_hp <= 0:
                     log_lines.append(f"{first_ctx.pokemon.name} 因挣扎的反作用伤害倒下了！\n\n")
                     winner = "wild" if user_first else "user"  # 攻击者倒下，对手获胜
                     break
             else:
                 # PP不足时使用挣扎招式（宝可梦所有技能PP耗尽时的标准行为）
+                # 注意：挣扎是攻击技能（damage_class_id=2），不属于变化技能
                 struggle_move = BattleMoveInfo(
                     power=40,  # 挣扎造成少量伤害
                     accuracy=100.0,
@@ -722,54 +742,74 @@ class AdventureService:
             if second_move and second_move.current_pp > 0:
                 # 减少PP
                 second_move.current_pp -= 1
-                dmg2, effect_info2 = self.calculate_damage_with_effects(second_ctx, first_ctx, second_move)
 
-                # 检查是否使用了挣扎招式
-                is_struggle = second_move.move_id == -1 and second_move.move_name == "挣扎"
+                # 检查是否为变化技能（damage_class_id == 1）
+                is_status_move = second_move.damage_class_id == 1
 
-                # 对对手造成伤害
-                first_ctx.current_hp -= dmg2
-
-                # 构建详细攻击描述
-                attack_text = f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！造成 {dmg2} 点伤害。PP: {second_move.current_pp}/{second_move.max_pp}\n\n"
-                log_lines.append(attack_text)
-
-                # 添加效果描述
-                if effect_info2["missed"]:
-                    log_lines.append(f"没有击中目标！\n\n")
+                if is_status_move:
+                    # 变化技能不造成伤害，直接设置伤害为0
+                    dmg2 = 0
+                    effect_info2 = {"missed": False, "type_effectiveness": 1.0, "is_crit": False}
+                    # 构建变化技能描述
+                    attack_text = f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！PP: {second_move.current_pp}/{second_move.max_pp}\n\n"
+                    log_lines.append(attack_text)
                 else:
-                    # 添加暴击提示
-                    if effect_info2["is_crit"]:
-                        log_lines.append(f"{second_ctx.pokemon.name} 集中了要害！\n\n")
+                    # 攻击技能计算伤害
+                    dmg2, effect_info2 = self.calculate_damage_with_effects(second_ctx, first_ctx, second_move)
 
-                    # 添加效果倍率提示
-                    eff = effect_info2["type_effectiveness"]
-                    if eff > 1.0:  # 2倍或更强效果
-                        log_lines.append(f"效果绝佳！\n\n")
-                    elif eff == 0.0:  # 无效果
-                        log_lines.append(f"似乎没有效果！\n\n")
-                    elif eff < 1.0:  # 0.5倍或0.25倍效果
-                        log_lines.append(f"效果不佳！\n\n")
+                    # 检查是否使用了挣扎招式
+                    is_struggle = second_move.move_id == -1 and second_move.move_name == "挣扎"
 
-                # 如果是挣扎招式，对使用者本身造成伤害
-                if is_struggle:
-                    self_damage = max(1, second_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
-                    second_ctx.current_hp -= self_damage
-                    log_lines.append(f"{second_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
+                    # 构建详细攻击描述
+                    attack_text = f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！造成 {dmg2} 点伤害。PP: {second_move.current_pp}/{second_move.max_pp}\n\n"
+                    log_lines.append(attack_text)
 
-                # 检查对手是否倒下
-                if first_ctx.current_hp <= 0:
-                    log_lines.append(f"{first_ctx.pokemon.name} 倒下了！\n\n")
-                    winner = "wild" if user_first else "user"
-                    break
+                    # 添加效果描述
+                    if effect_info2["missed"]:
+                        log_lines.append(f"没有击中目标！\n\n")
+                    else:
+                        # 添加暴击提示
+                        if effect_info2["is_crit"]:
+                            log_lines.append(f"{second_ctx.pokemon.name} 集中了要害！\n\n")
+
+                        # 添加效果倍率提示
+                        eff = effect_info2["type_effectiveness"]
+                        if eff > 1.0:  # 2倍或更强效果
+                            log_lines.append(f"效果绝佳！\n\n")
+                        elif eff == 0.0:  # 无效果
+                            log_lines.append(f"似乎没有效果！\n\n")
+                        elif eff < 1.0:  # 0.5倍或0.25倍效果
+                            log_lines.append(f"效果不佳！\n\n")
+
+                    # 如果是挣扎招式，对使用者本身造成伤害
+                    if is_struggle:
+                        self_damage = max(1, second_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
+                        second_ctx.current_hp -= self_damage
+                        log_lines.append(f"{second_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
+
+                # 对对手造成伤害（仅攻击技能）
+                if not is_status_move:
+                    first_ctx.current_hp -= dmg2
+
+                    # 检查对手是否倒下
+                    if first_ctx.current_hp <= 0:
+                        log_lines.append(f"{first_ctx.pokemon.name} 倒下了！\n\n")
+                        winner = "wild" if user_first else "user"
+                        break
+
+                # 对于变化技能，应用其效果（暂时仅记录）
+                # if is_status_move:
+                    # 记录变化技能使用
+                    # log_lines.append(f"{second_ctx.pokemon.name} 的能力变化了！\n\n")
 
                 # 检查使用者（如果是挣扎招式）是否因自伤倒下
-                if is_struggle and second_ctx.current_hp <= 0:
+                if not is_status_move and second_move.move_id == -1 and second_move.move_name == "挣扎" and second_ctx.current_hp <= 0:
                     log_lines.append(f"{second_ctx.pokemon.name} 因挣扎的反作用伤害倒下了！\n\n")
                     winner = "user" if user_first else "wild"  # 攻击者倒下，对手获胜
                     break
             else:
                 # PP不足时使用挣扎招式（宝可梦所有技能PP耗尽时的标准行为）
+                # 注意：挣扎是攻击技能（damage_class_id=2），不属于变化技能
                 struggle_move = BattleMoveInfo(
                     power=40,  # 挣扎造成少量伤害
                     accuracy=100.0,
