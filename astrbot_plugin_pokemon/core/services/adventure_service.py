@@ -931,6 +931,14 @@ class AdventureService:
         # 保存当前所有训练家宝可梦的上下文
         trainer_pokemon_contexts = [self._create_battle_context(pokemon, is_user=False) for pokemon in battle_trainer.pokemon_list]
 
+        # 保存用户所有宝可梦的上下文，用于状态继承
+        user_pokemon_contexts = []
+        for pokemon_id in user_team_list:
+            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+            if user_pokemon_info:
+                user_ctx = self._create_battle_context(user_pokemon_info, is_user=True)
+                user_pokemon_contexts.append(user_ctx)
+
         current_pokemon_index = 0
         current_trainer_pokemon_index = 0
         battle_result_str = "fail"
@@ -955,12 +963,11 @@ class AdventureService:
                 current_pokemon_index += 1
                 continue
 
-            # 预加载玩家宝可梦的 Context
-            user_ctx = self._create_battle_context(user_pokemon_info, is_user=True)
+            # 使用已保存的上下文，以继承状态（血量、PP等）
+            user_ctx = user_pokemon_contexts[current_pokemon_index]
             final_user_pokemon_info = user_pokemon_info
 
             # 1. 计算胜率
-            user_ctx.current_hp = user_pokemon_info.stats.hp
             if current_trainer_ctx:  # 确保上下文存在
                 current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
                 user_win_rate, trainer_win_rate = self.calculate_battle_win_rate(user_ctx, current_trainer_ctx)
@@ -973,7 +980,6 @@ class AdventureService:
             all_trainer_win_rates.append(trainer_win_rate)
 
             # 2. 执行实际战斗
-            user_ctx.current_hp = user_pokemon_info.stats.hp
             if current_trainer_ctx:  # 确保上下文存在
                 current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
 
@@ -988,6 +994,12 @@ class AdventureService:
             if current_trainer_ctx:
                 current_trainer_ctx.current_hp = max(0, remaining_trainer_hp)
                 trainer_pokemon_contexts[current_trainer_pokemon_index].current_hp = max(0, remaining_trainer_hp)
+
+            # 更新用户宝可梦的战斗状态（血量、PP），使其能够继承到下一场战斗
+            # 无论战斗输赢，都需要更新当前宝可梦的战斗状态（血量、PP）到上下文
+            user_pokemon_contexts[current_pokemon_index].current_hp = user_ctx.current_hp
+            # 更新所有技能的PP状态，确保PP消耗被正确继承
+            user_pokemon_contexts[current_pokemon_index].moves = [self._create_move_backup(move, move.current_pp) for move in user_ctx.moves]
 
             battle_log.append({
                 "pokemon_id": user_pokemon_info.id,
