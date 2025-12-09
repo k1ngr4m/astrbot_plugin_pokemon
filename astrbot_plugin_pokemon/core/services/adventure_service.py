@@ -1,7 +1,7 @@
 import math
 import random
 from typing import Dict, Any, List, Tuple, Optional, Union
-from dataclasses import dataclass, field
+from dataclasses import dataclass, replace
 
 from . import user_pokemon_service
 from .exp_service import ExpService
@@ -22,7 +22,7 @@ from ..models.adventure_models import AdventureResult, LocationInfo, BattleResul
 from astrbot.api import logger
 
 
-# 定义一个简易的战斗上下文，用于在模拟和实战中传递预加载的数据
+# 定义一个简易的战斗上下文
 @dataclass
 class BattleContext:
     pokemon: Union[UserPokemonInfo, WildPokemonInfo]
@@ -35,9 +35,11 @@ class BattleContext:
 class AdventureService:
     """冒险区域相关的业务逻辑服务"""
 
-    # ----------------------
-    # 宝可梦属性克制表（类常量）
-    # ----------------------
+    # --- 常量定义 ---
+    TRAINER_ENCOUNTER_RATE = 0.3  # 训练家遭遇几率
+    CRIT_RATE = 0.0625  # 暴击几率
+    STRUGGLE_MOVE_ID = -1  # 挣扎技能ID
+
     TYPE_CHART = {
         'normal': {'rock': 0.5, 'ghost': 0.0, 'steel': 0.5},
         'fire': {'fire': 0.5, 'water': 0.5, 'grass': 2.0, 'ice': 2.0, 'bug': 2.0, 'rock': 0.5, 'dragon': 0.5,
@@ -78,7 +80,6 @@ class AdventureService:
             exp_service: ExpService,
             config: Dict[str, Any],
             move_repo=None,
-
     ):
         self.adventure_repo = adventure_repo
         self.pokemon_repo = pokemon_repo
@@ -91,7 +92,7 @@ class AdventureService:
         self.config = config
         self.move_repo = move_repo
         self.battle_repo = battle_repo
-        self.trainer_service = None  # 将在初始化后设置
+        self.trainer_service = None
 
     def set_trainer_service(self, trainer_service):
         """设置训练家服务"""
@@ -119,137 +120,95 @@ class AdventureService:
             data=formatted_locations
         )
 
-    def adventure_in_location(self, user_id: str, location_id: int, encounter_npc_only: bool = False) -> BaseResult[AdventureResult]:
+    def _create_placeholder_pokemon(self, name: str) -> WildPokemonInfo:
+        """创建用于训练家占位的 WildPokemonInfo 对象"""
+        return WildPokemonInfo(
+            id=0, species_id=0, name=name, gender="M", level=0, exp=0,
+            stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),
+            ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),
+            evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),
+            moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),
+            nature_id=0,
+        )
+
+    def adventure_in_location(self, user_id: str, location_id: int, encounter_npc_only: bool = False) -> BaseResult[
+        AdventureResult]:
         """在指定区域进行冒险，随机刷新一只野生宝可梦或训练家"""
-        # 1. 获取区域信息
         location = self.adventure_repo.get_location_by_id(location_id)
         if not location:
             return BaseResult(success=False,
                               message=AnswerEnum.ADVENTURE_LOCATION_NOT_FOUND.value.format(location_id=location_id))
 
-        # 2. 如果指定只遇到NPC，则直接尝试遇到训练家
-        if encounter_npc_only:
-            user_team_data = self.team_repo.get_user_team(user_id)
-            if user_team_data and user_team_data.team_pokemon_ids:
-                trainer_encounter_result = self.adventure_with_trainer(user_id, location_id)
-                if trainer_encounter_result.success and trainer_encounter_result.data is not None:
-                    # 成功遇到训练家，返回包含训练家信息的AdventureResult
-                    battle_trainer = trainer_encounter_result.data
-                    wild_pokemon_info = WildPokemonInfo(
-                        id=0,
-                        species_id=0,  # 使用0作为占位符，表示遇到的是训练家
-                        name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
-                        gender="M",
-                        level=0,  # 使用0作为占位符
-                        exp=0,
-                        stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),  # 占位符
-                        ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),  # 占位符
-                        evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),  # 占位符
-                        moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),  # 占位符
-                        nature_id=0,
-                    )
-
-                    return BaseResult(
-                        success=True,
-                        message=AnswerEnum.ADVENTURE_SUCCESS.value,
-                        data=AdventureResult(
-                            wild_pokemon=wild_pokemon_info,
-                            location=LocationInfo(id=location.id, name=location.name),
-                            trainer=battle_trainer
-                        )
-                    )
-            # 如果没有遇到训练家，返回错误
-            return BaseResult(success=False, message="没有遇到可挑战的训练家")
-
-        # 3. 正常冒险模式：按7:3比例随机选择野生宝可梦或训练家
-        # 检查用户是否有队伍来决定是否可以遇到训练家
         user_team_data = self.team_repo.get_user_team(user_id)
         has_team = user_team_data and user_team_data.team_pokemon_ids
 
-        # 按7:3比例决定是遇到野生宝可梦还是训练家
-        if has_team and random.random() < 0.3:  # 30% 几率遇到训练家
-            trainer_encounter_result = self.adventure_with_trainer(user_id, location_id)
-            if trainer_encounter_result.success and trainer_encounter_result.data is not None:
-                # 成功遇到训练家，返回包含训练家信息的AdventureResult
-                battle_trainer = trainer_encounter_result.data
-                wild_pokemon_info = WildPokemonInfo(
-                    id=0,
-                    species_id=0,  # 使用0作为占位符，表示遇到的是训练家
-                    name=battle_trainer.trainer.name if battle_trainer.trainer else "训练家",
-                    gender="M",
-                    level=0,  # 使用0作为占位符
-                    exp=0,
-                    stats=PokemonStats(hp=0, attack=0, defense=0, sp_attack=0, sp_defense=0, speed=0),  # 占位符
-                    ivs=PokemonIVs(hp_iv=0, attack_iv=0, defense_iv=0, sp_attack_iv=0, sp_defense_iv=0, speed_iv=0),  # 占位符
-                    evs=PokemonEVs(hp_ev=0, attack_ev=0, defense_ev=0, sp_attack_ev=0, sp_defense_ev=0, speed_ev=0),  # 占位符
-                    moves=PokemonMoves(move1_id=0, move2_id=0, move3_id=0, move4_id=0),  # 占位符
-                    nature_id=0,
-                )
+        # 判断是否触发训练家遭遇 (强制NPC 或 概率触发)
+        should_encounter_trainer = encounter_npc_only or (has_team and random.random() < self.TRAINER_ENCOUNTER_RATE)
 
+        if should_encounter_trainer:
+            trainer_result = self.adventure_with_trainer(user_id, location_id)
+            if trainer_result.success and trainer_result.data:
+                battle_trainer = trainer_result.data
+                trainer_name = battle_trainer.trainer.name if battle_trainer.trainer else "训练家"
                 return BaseResult(
                     success=True,
                     message=AnswerEnum.ADVENTURE_SUCCESS.value,
                     data=AdventureResult(
-                        wild_pokemon=wild_pokemon_info,
+                        wild_pokemon=self._create_placeholder_pokemon(trainer_name),
                         location=LocationInfo(id=location.id, name=location.name),
                         trainer=battle_trainer
                     )
                 )
+            elif encounter_npc_only:
+                return BaseResult(success=False, message="没有遇到可挑战的训练家")
 
-        # 4. 遫星宝可梦模式（70%几率）
-        # 获取该区域的宝可梦列表
+        # --- 正常遇到野生宝可梦 ---
         location_pokemon_list = self.adventure_repo.get_location_pokemon_by_location_id(location_id)
         if not location_pokemon_list:
             return BaseResult(success=False, message=AnswerEnum.ADVENTURE_LOCATION_NO_POKEMON.value.format(
                 location_name=location.name))
 
-        # 5. 权重随机选择宝可梦 (优化：使用 random.choices)
-        selected_location_pokemon = random.choices(
+        # 权重随机选择
+        selected_ap = random.choices(
             location_pokemon_list,
             weights=[ap.encounter_rate for ap in location_pokemon_list],
             k=1
         )[0]
 
-        # 6. 生成随机等级
-        wild_pokemon_level = random.randint(selected_location_pokemon.min_level, selected_location_pokemon.max_level)
-
-        # 7. 创建野生宝可梦
-        wild_pokemon_result = self.pokemon_service.create_single_pokemon(
-            species_id=selected_location_pokemon.pokemon_species_id,
-            max_level=wild_pokemon_level,
-            min_level=wild_pokemon_level
+        wild_level = random.randint(selected_ap.min_level, selected_ap.max_level)
+        wild_res = self.pokemon_service.create_single_pokemon(
+            species_id=selected_ap.pokemon_species_id,
+            max_level=wild_level,
+            min_level=wild_level
         )
-        if not wild_pokemon_result.success:
-            return BaseResult(success=False, message=wild_pokemon_result.message)
+        if not wild_res.success:
+            return BaseResult(success=False, message=wild_res.message)
 
-        wild_pokemon = wild_pokemon_result.data
-        # 构建 info 对象 (属性拷贝)
+        wild_pokemon = wild_res.data
+        # 构建 info 对象
         wild_pokemon_info = WildPokemonInfo(
             id=0,
             species_id=wild_pokemon.base_pokemon.id,
             name=wild_pokemon.base_pokemon.name_zh,
             gender=wild_pokemon.gender,
-            level=wild_pokemon_level,
+            level=wild_level,
             exp=wild_pokemon.exp,
-            stats=PokemonStats(**wild_pokemon.stats.__dict__),  # 假设是dataclass或dict兼容
+            stats=PokemonStats(**wild_pokemon.stats.__dict__),
             ivs=PokemonIVs(**wild_pokemon.ivs.__dict__),
             evs=PokemonEVs(**wild_pokemon.evs.__dict__),
             moves=PokemonMoves(
-                move1_id=wild_pokemon.moves.move1_id,
-                move2_id=wild_pokemon.moves.move2_id,
-                move3_id=wild_pokemon.moves.move3_id,
-                move4_id=wild_pokemon.moves.move4_id,
+                move1_id=wild_pokemon.moves.move1_id, move2_id=wild_pokemon.moves.move2_id,
+                move3_id=wild_pokemon.moves.move3_id, move4_id=wild_pokemon.moves.move4_id,
             ),
             nature_id=wild_pokemon.nature_id,
         )
 
         wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
-
         self.user_pokemon_repo.add_user_encountered_wild_pokemon(
             user_id=user_id,
             wild_pokemon_id=wild_pokemon_id,
             location_id=location.id,
-            encounter_rate=selected_location_pokemon.encounter_rate,
+            encounter_rate=selected_ap.encounter_rate,
         )
         return BaseResult(
             success=True,
@@ -257,7 +216,7 @@ class AdventureService:
             data=AdventureResult(
                 wild_pokemon=wild_pokemon_info,
                 location=LocationInfo(id=location.id, name=location.name),
-                trainer=None  # 没有遇到训练家
+                trainer=None
             )
         )
 
@@ -278,88 +237,77 @@ class AdventureService:
                 return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
             user_team_list = user_team_data.team_pokemon_ids
 
-        # 预加载野生宝可梦的 Context (包含招式数据，避免循环内查询数据库)
         wild_ctx = self._create_battle_context(wild_pokemon_info, is_user=False)
-
-        # 保存用户所有宝可梦的上下文，用于状态继承
         user_pokemon_contexts = []
-        for pokemon_id in user_team_list:
-            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
-            if user_pokemon_info:
-                user_ctx = self._create_battle_context(user_pokemon_info, is_user=True)
-                user_pokemon_contexts.append(user_ctx)
+        for pid in user_team_list:
+            u_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
+            if u_info:
+                user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True))
 
-        current_pokemon_index = 0
+        current_idx = 0
         battle_result_str = "fail"
-        final_user_pokemon_info = None
-        all_user_win_rates = []
-        all_wild_win_rates = []
+        final_user_info = None
+        all_win_rates = []
         battle_log = []
         log_id = 0
 
-        while current_pokemon_index < len(user_team_list):
-            user_pokemon_id = user_team_list[current_pokemon_index]
-            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
+        while current_idx < len(user_team_list):
+            if current_idx >= len(user_pokemon_contexts):  # 防御性编程
+                break
 
-            if not user_pokemon_info:
-                current_pokemon_index += 1
-                continue
+            user_ctx = user_pokemon_contexts[current_idx]
+            final_user_info = user_ctx.pokemon  # 使用 Context 里的引用
 
-            # 使用已保存的上下文，以继承状态（血量、PP等）
-            user_ctx = user_pokemon_contexts[current_pokemon_index]
-            final_user_pokemon_info = user_pokemon_info
+            # 模拟前重置 HP
+            sim_u_hp = user_ctx.current_hp
+            sim_w_hp = wild_ctx.current_hp
 
-            # 1. 计算胜率 (使用预加载数据的Context，大幅提升性能)
-            # 重置HP用于模拟
-            user_ctx.current_hp = user_pokemon_info.stats.hp
+            # 计算胜率 (仅用于展示)
+            user_ctx.current_hp = user_ctx.pokemon.stats.hp
             wild_ctx.current_hp = wild_pokemon_info.stats.hp
-            user_win_rate, wild_win_rate = self.calculate_battle_win_rate(user_ctx, wild_ctx)
+            u_win_rate, w_win_rate = self.calculate_battle_win_rate(user_ctx, wild_ctx)
 
-            all_user_win_rates.append(user_win_rate)
-            all_wild_win_rates.append(wild_win_rate)
+            # 恢复实际 HP
+            user_ctx.current_hp = sim_u_hp
+            wild_ctx.current_hp = sim_w_hp
 
-            # 2. 执行实际战斗
-            # 确保实战使用当前的HP状态 (如果野生怪之前受过伤)
-            user_ctx.current_hp = user_pokemon_info.stats.hp
-            wild_ctx.current_hp = wild_pokemon_info.stats.hp  # 实战开始，重置为当前实际值
+            all_win_rates.append((u_win_rate, w_win_rate))
 
-            battle_outcome, battle_log_data, remaining_wild_hp = self.execute_real_battle(user_ctx, wild_ctx)
+            # 实战
+            battle_outcome, log_data, rem_wild_hp = self.execute_real_battle(user_ctx, wild_ctx)
 
-            # 更新野生宝可梦数据对象，以便下一轮（如果输了）继承血量
-            wild_pokemon_info.stats.hp = max(0, remaining_wild_hp)
-            wild_ctx.current_hp = wild_pokemon_info.stats.hp  # 更新 Context
+            # 更新野生怪状态
+            wild_pokemon_info.stats.hp = max(0, rem_wild_hp)
+            wild_ctx.current_hp = wild_pokemon_info.stats.hp
 
-            # 更新用户宝可梦的战斗状态（血量、PP），使其能够继承到下一场战斗
-            # 无论战斗输赢，都需要更新当前宝可梦的战斗状态（血量、PP）到上下文
-            user_pokemon_contexts[current_pokemon_index].current_hp = user_ctx.current_hp
-            # 更新所有技能的PP状态，确保PP消耗被正确继承
-            user_pokemon_contexts[current_pokemon_index].moves = [self._create_move_backup(move, move.current_pp) for move in user_ctx.moves]
-
+            # 上下文已经在 execute_real_battle 中被修改了 (HP, PP)，这里不需要显式回写
+            # 只需要将数据记录到日志
             battle_log.append({
-                "pokemon_id": user_pokemon_info.id,
-                "pokemon_name": user_pokemon_info.name,
-                "species_name": user_pokemon_info.species_id,
-                "level": user_pokemon_info.level,
-                "win_rate": user_win_rate,
+                "pokemon_id": user_ctx.pokemon.id,
+                "pokemon_name": user_ctx.pokemon.name,
+                "species_name": user_ctx.pokemon.species_id,
+                "level": user_ctx.pokemon.level,
+                "win_rate": u_win_rate,
                 "result": battle_outcome,
-                "details": battle_log_data
+                "details": log_data
             })
 
             if battle_outcome == "win":
                 battle_result_str = "success"
                 break
             else:
-                current_pokemon_index += 1
+                current_idx += 1
 
-        # 计算最终显示的胜率（如果赢了显示当前只，输了显示平均）
+        # 计算最终胜率
         final_u_rate, final_w_rate = 0.0, 100.0
-        if battle_result_str == "success":
-            final_u_rate, final_w_rate = all_user_win_rates[-1], all_wild_win_rates[-1]
-        elif all_user_win_rates:
-            final_u_rate = round(sum(all_user_win_rates) / len(all_user_win_rates), 2)
-            final_w_rate = round(sum(all_wild_win_rates) / len(all_wild_win_rates), 2)
+        if battle_result_str == "success" and all_win_rates:
+            final_u_rate, final_w_rate = all_win_rates[-1]
+        elif all_win_rates:
+            u_rates = [r[0] for r in all_win_rates]
+            w_rates = [r[1] for r in all_win_rates]
+            final_u_rate = round(sum(u_rates) / len(u_rates), 2)
+            final_w_rate = round(sum(w_rates) / len(w_rates), 2)
 
-        # 保存日志
         if self.battle_repo:
             log_id = self.battle_repo.save_battle_log(
                 user_id=user_id,
@@ -368,36 +316,31 @@ class AdventureService:
                 result=battle_result_str
             )
 
-        # 处理经验值
         exp_details = self._handle_battle_experience(user_id, battle_result_str, wild_pokemon_info, battle_log)
-
-        # 更新图鉴/遭遇日志
         self._update_encounter_log(user_id, wild_pokemon_info.id, battle_result_str)
 
-        # 如果胜利，给予击败野生宝可梦的额外用户经验奖励
-        user_battle_exp_result = None
+        user_exp_result = None
         if battle_result_str == "success":
-            user_battle_exp_result = self.exp_service.add_exp_for_defeating_wild_pokemon(user_id, wild_pokemon_info.level)
+            user_exp_result = self.exp_service.add_exp_for_defeating_wild_pokemon(user_id, wild_pokemon_info.level)
 
         return BaseResult(
             success=True,
             message=AnswerEnum.BATTLE_SUCCESS.value,
             data=BattleResult(
-                user_pokemon=self._format_pokemon_summary(final_user_pokemon_info),
+                user_pokemon=self._format_pokemon_summary(final_user_info),
                 wild_pokemon=self._format_pokemon_summary(wild_pokemon_info, is_wild=True),
                 win_rates={"user_win_rate": final_u_rate, "wild_win_rate": final_w_rate},
                 result=battle_result_str,
                 exp_details=exp_details,
                 battle_log=battle_log,
                 log_id=log_id,
-                is_trainer_battle=False,  # 标记为非训练家战斗（野生宝可梦战斗）
-                user_battle_exp_result=user_battle_exp_result  # 添加用户战斗经验结果
+                is_trainer_battle=False,
+                user_battle_exp_result=user_exp_result
             )
         )
 
     def _create_battle_context(self, pokemon_info: Union[UserPokemonInfo, WildPokemonInfo],
                                is_user: bool) -> BattleContext:
-        """辅助方法：创建战斗上下文，预加载招式和属性"""
         types = self.pokemon_repo.get_pokemon_types(pokemon_info.species_id) or ['normal']
         moves_list = self._preload_moves(pokemon_info)
         return BattleContext(
@@ -408,33 +351,15 @@ class AdventureService:
             is_user=is_user
         )
 
-    def _create_move_backup(self, move: BattleMoveInfo, pp_value: int) -> BattleMoveInfo:
-        """创建技能副本用于模拟"""
-        return BattleMoveInfo(
-            power=move.power,
-            accuracy=move.accuracy,
-            type_name=move.type_name,
-            damage_class_id=move.damage_class_id,
-            priority=move.priority,
-            type_effectiveness=move.type_effectiveness,
-            stab_bonus=move.stab_bonus,
-            max_pp=move.max_pp,
-            current_pp=pp_value,  # 使用指定的PP值
-            move_id=move.move_id,
-            move_name=move.move_name
-        )
-
     def _preload_moves(self, pokemon: Any) -> List[BattleMoveInfo]:
-        """批量加载宝可梦的所有招式详情，避免循环查库"""
+        """批量加载宝可梦的所有招式详情"""
         move_ids = [pokemon.moves.move1_id, pokemon.moves.move2_id, pokemon.moves.move3_id, pokemon.moves.move4_id]
         valid_ids = [m for m in move_ids if m and m > 0]
-
         loaded_moves = []
         if self.move_repo:
             for mid in valid_ids:
                 m_data = self.move_repo.get_move_by_id(mid)
                 if m_data:
-                    # 获取技能的PP值，默认为5
                     max_pp = m_data.get('pp', 5) or 5
                     loaded_moves.append(BattleMoveInfo(
                         power=m_data.get('power', 0) or 0,
@@ -447,157 +372,107 @@ class AdventureService:
                         move_id=mid,
                         move_name=m_data.get('name_zh', 'Unknown Move'),
                         max_pp=max_pp,
-                        current_pp=max_pp  # 初始时PP为最大值
+                        current_pp=max_pp
                     ))
         return loaded_moves
 
-    def get_best_move_from_context(self, attacker_ctx: BattleContext, defender_ctx: BattleContext) -> BattleMoveInfo:
-        """
-        基于预加载的 Context 选择最佳招式 (纯内存计算)
-        """
-        # 创建挣扎招式
-        struggle_move = BattleMoveInfo(
-            power=40,  # 挣扎造成少量伤害
-            accuracy=100.0,
-            type_name='normal',
-            damage_class_id=2,
-            priority=0,
-            type_effectiveness=1.0,
-            stab_bonus=1.0,
-            max_pp=10,
-            current_pp=10,  # 挣扎通常不会用完PP，但这里设置为10
-            move_id=-1,  # 特殊ID表示挣扎
-            move_name="挣扎"
+    def _get_struggle_move(self) -> BattleMoveInfo:
+        """获取挣扎招式的单例/常量"""
+        return BattleMoveInfo(
+            power=40, accuracy=100.0, type_name='normal', damage_class_id=2,
+            priority=0, type_effectiveness=1.0, stab_bonus=1.0,
+            max_pp=10, current_pp=10, move_id=self.STRUGGLE_MOVE_ID, move_name="挣扎"
         )
 
-        if not attacker_ctx.moves:
-            return struggle_move
+    def get_best_move_from_context(self, attacker_ctx: BattleContext, defender_ctx: BattleContext,
+                                   current_pps: List[int] = None) -> BattleMoveInfo:
+        """
+        选择最佳招式。
+        current_pps: 可选，仅用于模拟时传入临时的PP列表，避免修改对象。如果不传则使用 attacker_ctx.moves 里的值。
+        """
+        moves = attacker_ctx.moves
 
-        # 检查是否有可用的攻击招式（造成伤害且PP > 0）
-        attack_moves = [move for move in attacker_ctx.moves if move.power > 0 and move.current_pp > 0]
-
-        # 检查是否有可用的变化招式（不造成伤害但PP > 0）
-        status_moves = [move for move in attacker_ctx.moves if move.power == 0 and move.current_pp > 0]
-
-        # 合并所有可用招式
-        all_available_moves = attack_moves + status_moves
-
-        # 如果只有一个可用招式，直接使用它
-        if len(all_available_moves) == 1:
-            return all_available_moves[0]
-
-        # 如果没有可用招式（所有PP都为0），返回挣扎招式
-        if len(all_available_moves) == 0:
-            return struggle_move
-
-        # 如果有攻击招式，优先选择最佳攻击招式
-        if len(attack_moves) > 0:
-            best_move = None
-            max_score = -1.0
-
-            for move in attack_moves:
-                score = self._get_move_damage_score(attacker_ctx, defender_ctx, move)
-                if score > max_score:
-                    max_score = score
-                    best_move = move
-
-            return best_move if best_move else struggle_move
-
-        # 如果只有变化招式可用，从中选择一个（可以随机选择或按某种逻辑选择）
+        # 确定可用招式
+        available_moves = []
+        if current_pps:
+            # 模拟模式
+            for i, move in enumerate(moves):
+                if current_pps[i] > 0:
+                    available_moves.append(move)
         else:
-            # 如果只有变化招式，随机选择一个
-            import random
-            return random.choice(status_moves)
+            # 实战模式
+            available_moves = [m for m in moves if m.current_pp > 0]
 
+        if not available_moves:
+            return self._get_struggle_move()
 
-    def _get_move_damage_score(self, attacker_ctx: BattleContext, defender_ctx: BattleContext,
-                               move: BattleMoveInfo) -> float:
-        """计算招式评分 (用于AI决策)"""
-        # 1. 属性克制
+        # 分离攻击和变化招式
+        attack_moves = [m for m in available_moves if m.power > 0]
+        status_moves = [m for m in available_moves if m.power == 0]
+
+        if not attack_moves:
+            return random.choice(status_moves) if status_moves else self._get_struggle_move()
+
+        # 选择评分最高的攻击招式
+        best_move = max(attack_moves, key=lambda m: self._calculate_move_score(attacker_ctx, defender_ctx, m))
+        return best_move
+
+    def _calculate_move_score(self, attacker_ctx: BattleContext, defender_ctx: BattleContext,
+                              move: BattleMoveInfo) -> float:
         eff = self.calculate_type_effectiveness([move.type_name], defender_ctx.types)
-        # 2. 本系加成 (STAB)
         stab = 1.5 if move.type_name in attacker_ctx.types else 1.0
 
-        # 3. 攻防数值
-        atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
-        def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
-
-        # 临时保存计算好的系数到 move 对象中，供 resolve_damage 使用 (避免重复计算)
+        # 缓存计算结果到 move 对象 (副作用，但在实战中是有益的)
         move.type_effectiveness = eff
         move.stab_bonus = stab
 
-        # 评分公式
-        return move.power * (move.accuracy / 100.0) * eff * stab * (atk_stat / max(1, def_stat))
-
-    def resolve_damage(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> int:
-        """计算实际伤害"""
-        if random.random() * 100 > move.accuracy:
-            return 0
-
-        # 重新计算攻防，因为Context可能变了? 不，Context里的Pokemon Stats是不变的，Stat变化应在Context里维护
-        # 这里简化处理，直接取 stats
         atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
         def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
 
-        level = attacker_ctx.pokemon.level
+        return move.power * (move.accuracy / 100.0) * eff * stab * (atk_stat / max(1, def_stat))
 
-        # 基础伤害公式
-        base_damage = ((2 * level / 5 + 2) * move.power * atk_stat / max(1, def_stat)) / 50 + 2
-
-        # 随机波动
-        is_crit = random.random() < 0.0625
-        crit_multiplier = 1.5 if is_crit else 1.0
-        random_multiplier = random.uniform(0.85, 1.0)
-
-        # move.type_effectiveness 和 stab_bonus 已经在 get_best_move_from_context -> _get_move_damage_score 中计算并赋值了
-        # 如果是随机招式，可能没赋值，这里做一个兜底
-        if move.type_effectiveness == 1.0 and move.move_id != 0:
-            move.type_effectiveness = self.calculate_type_effectiveness([move.type_name], defender_ctx.types)
-            move.stab_bonus = 1.5 if move.type_name in attacker_ctx.types else 1.0
-
-        final_damage = base_damage * move.type_effectiveness * move.stab_bonus * crit_multiplier * random_multiplier
-        return int(final_damage)
-
-    def calculate_damage_with_effects(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> Tuple[int, Dict[str, any]]:
-        """计算伤害并返回效果信息（用于丰富战斗日志）"""
-        # 检查是否击中
+    def _calculate_damage_core(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> \
+    Tuple[int, Dict[str, Any]]:
+        """统一的核心伤害计算逻辑"""
+        # 命中判定
         if random.random() * 100 > move.accuracy:
             return 0, {"missed": True, "type_effectiveness": 1.0, "is_crit": False}
 
-        # 重新计算攻防，因为Context可能变了? 不，Context里的Pokemon Stats是不变的，Stat变化应在Context里维护
-        # 这里简化处理，直接取 stats
         atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
         def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
-
         level = attacker_ctx.pokemon.level
 
-        # 基础伤害公式
         base_damage = ((2 * level / 5 + 2) * move.power * atk_stat / max(1, def_stat)) / 50 + 2
 
-        # 随机波动
-        is_crit = random.random() < 0.0625
+        is_crit = random.random() < self.CRIT_RATE
         crit_multiplier = 1.5 if is_crit else 1.0
         random_multiplier = random.uniform(0.85, 1.0)
 
-        # move.type_effectiveness 和 stab_bonus 已经在 get_best_move_from_context -> _get_move_damage_score 中计算并赋值了
-        # 如果是随机招式，可能没赋值，这里做一个兜底
-        if move.type_effectiveness == 1.0 and move.move_id != 0:
+        # 确保系数存在
+        if move.type_effectiveness == 1.0 and move.move_id != 0 and move.type_name:
             move.type_effectiveness = self.calculate_type_effectiveness([move.type_name], defender_ctx.types)
-            move.stab_bonus = 1.5 if move.type_name in attacker_ctx.types else 1.0
+        if move.stab_bonus == 1.0 and move.type_name in attacker_ctx.types:
+            move.stab_bonus = 1.5
 
         final_damage = base_damage * move.type_effectiveness * move.stab_bonus * crit_multiplier * random_multiplier
 
-        effect_info = {
+        return int(final_damage), {
             "missed": False,
             "type_effectiveness": move.type_effectiveness,
             "is_crit": is_crit,
             "stab_bonus": move.stab_bonus
         }
 
-        return int(final_damage), effect_info
+    def resolve_damage(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> int:
+        dmg, _ = self._calculate_damage_core(attacker_ctx, defender_ctx, move)
+        return dmg
+
+    def calculate_damage_with_effects(self, attacker_ctx: BattleContext, defender_ctx: BattleContext,
+                                      move: BattleMoveInfo) -> Tuple[int, Dict[str, any]]:
+        return self._calculate_damage_core(attacker_ctx, defender_ctx, move)
 
     def execute_real_battle(self, user_ctx: BattleContext, wild_ctx: BattleContext) -> Tuple[str, List[str], int]:
-        """执行带日志的战斗"""
+        """执行实战，生成详细日志"""
         log_lines = [
             f"战斗开始！{user_ctx.pokemon.name} (Lv.{user_ctx.pokemon.level}) VS {wild_ctx.pokemon.name} (Lv.{wild_ctx.pokemon.level})\n\n",
             f"{user_ctx.pokemon.name} HP: {user_ctx.current_hp}, {wild_ctx.pokemon.name} HP: {wild_ctx.current_hp}\n\n"
@@ -614,383 +489,176 @@ class AdventureService:
             u_move = self.get_best_move_from_context(user_ctx, wild_ctx)
             w_move = self.get_best_move_from_context(wild_ctx, user_ctx)
 
-            # 决定顺序
             user_first = self._is_user_first(user_ctx, wild_ctx, u_move, w_move)
 
-            first_ctx, first_move = (user_ctx, u_move) if user_first else (wild_ctx, w_move)
-            second_ctx, second_move = (wild_ctx, w_move) if user_first else (user_ctx, u_move)
+            first_unit, second_unit = (user_ctx, u_move), (wild_ctx, w_move)
+            if not user_first:
+                first_unit, second_unit = second_unit, first_unit
 
-            # 行动序列
-            # 1. 先手攻击
-            if first_move and first_move.current_pp > 0:
-                # 减少PP
-                first_move.current_pp -= 1
-
-                # 检查是否为变化技能（damage_class_id == 1）
-                is_status_move = first_move.damage_class_id == 1
-
-                if is_status_move:
-                    # 变化技能不造成伤害，直接设置伤害为0
-                    dmg1 = 0
-                    effect_info1 = {"missed": False, "type_effectiveness": 1.0, "is_crit": False}
-                    # 构建变化技能描述
-                    attack_text = f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！PP: {first_move.current_pp}/{first_move.max_pp}\n\n"
-                    log_lines.append(attack_text)
-                else:
-                    # 攻击技能计算伤害
-                    dmg1, effect_info1 = self.calculate_damage_with_effects(first_ctx, second_ctx, first_move)
-
-                    # 检查是否使用了挣扎招式
-                    is_struggle = first_move.move_id == -1 and first_move.move_name == "挣扎"
-
-                    # 构建详细攻击描述
-                    attack_text = f"{first_ctx.pokemon.name} 使用了 {first_move.move_name}！造成 {dmg1} 点伤害。PP: {first_move.current_pp}/{first_move.max_pp}\n\n"
-                    log_lines.append(attack_text)
-
-                    # 添加效果描述
-                    if effect_info1["missed"]:
-                        log_lines.append(f"没有击中目标！\n\n")
-                    else:
-                        # 添加暴击提示
-                        if effect_info1["is_crit"]:
-                            log_lines.append(f"{first_ctx.pokemon.name} 集中了要害！\n\n")
-
-                        # 添加效果倍率提示
-                        eff = effect_info1["type_effectiveness"]
-                        if eff > 1.0:  # 2倍或更强效果
-                            log_lines.append(f"效果绝佳！\n\n")
-                        elif eff == 0.0:  # 无效果
-                            log_lines.append(f"似乎没有效果！\n\n")
-                        elif eff < 1.0:  # 0.5倍或0.25倍效果
-                            log_lines.append(f"效果不佳！\n\n")
-
-                    # 如果是挣扎招式，对使用者本身造成伤害
-                    if is_struggle:
-                        self_damage = max(1, first_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
-                        first_ctx.current_hp -= self_damage
-                        log_lines.append(f"{first_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
-
-                # 对对手造成伤害（仅攻击技能）
-                if not is_status_move:
-                    second_ctx.current_hp -= dmg1
-
-                    # 检查对手是否倒下
-                    if second_ctx.current_hp <= 0:
-                        log_lines.append(f"{second_ctx.pokemon.name} 倒下了！\n\n")
-                        winner = "user" if user_first else "wild"
-                        break
-
-                # 对于变化技能，应用其效果（暂时仅记录）
-                # if is_status_move:
-                    # 记录变化技能使用
-                    # log_lines.append(f"{first_ctx.pokemon.name} 的能力变化了！\n\n")
-
-                # 检查使用者（如果是挣扎招式）是否因自伤倒下
-                if not is_status_move and first_move.move_id == -1 and first_move.move_name == "挣扎" and first_ctx.current_hp <= 0:
-                    log_lines.append(f"{first_ctx.pokemon.name} 因挣扎的反作用伤害倒下了！\n\n")
-                    winner = "wild" if user_first else "user"  # 攻击者倒下，对手获胜
-                    break
-            else:
-                # PP不足时使用挣扎招式（宝可梦所有技能PP耗尽时的标准行为）
-                # 注意：挣扎是攻击技能（damage_class_id=2），不属于变化技能
-                struggle_move = BattleMoveInfo(
-                    power=40,  # 挣扎造成少量伤害
-                    accuracy=100.0,
-                    type_name='normal',
-                    damage_class_id=2,
-                    priority=0,
-                    type_effectiveness=1.0,
-                    stab_bonus=1.0,
-                    max_pp=10,
-                    current_pp=10,  # 挣扎通常不会用完PP，但这里设置为10
-                    move_id=-1,  # 特殊ID表示挣扎
-                    move_name="挣扎"
-                )
-                dmg1, effect_info1 = self.calculate_damage_with_effects(first_ctx, second_ctx, struggle_move)
-
-                # 检查是否使用了挣扎招式
-                is_struggle = struggle_move.move_id == -1 and struggle_move.move_name == "挣扎"
-
-                # 对对手造成伤害
-                second_ctx.current_hp -= dmg1
-
-                # 构建详细攻击描述
-                attack_text = f"{first_ctx.pokemon.name} 使用了挣扎！造成 {dmg1} 点伤害。（所有技能PP耗尽）\n\n"
-                log_lines.append(attack_text)
-
-                # 添加效果描述
-                if effect_info1["missed"]:
-                    log_lines.append(f"没有击中目标！\n\n")
-                else:
-                    # 添加暴击提示
-                    if effect_info1["is_crit"]:
-                        log_lines.append(f"{first_ctx.pokemon.name} 集中了要害！\n\n")
-
-                    # 添加效果倍率提示
-                    eff = effect_info1["type_effectiveness"]
-                    if eff > 1.0:  # 2倍或更强效果
-                        log_lines.append(f"效果绝佳！\n\n")
-                    elif eff == 0.0:  # 无效果
-                        log_lines.append(f"似乎没有效果！\n\n")
-                    elif eff < 1.0:  # 0.5倍或0.25倍效果
-                        log_lines.append(f"效果不佳！\n\n")
-
-                # 如果是挣扎招式，对使用者本身造成伤害
-                if is_struggle:
-                    self_damage = max(1, first_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
-                    first_ctx.current_hp -= self_damage
-                    log_lines.append(f"{first_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
-
-                # 检查对手是否倒下
-                if second_ctx.current_hp <= 0:
-                    log_lines.append(f"{second_ctx.pokemon.name} 倒下了！\n\n")
-                    winner = "user" if user_first else "wild"
-                    break
-
-                # 检查使用者（如果是挣扎招式）是否因自伤倒下
-                if is_struggle and first_ctx.current_hp <= 0:
-                    log_lines.append(f"{first_ctx.pokemon.name} 因挣扎的反作用伤害倒下了！\n\n")
-                    winner = "wild" if user_first else "user"  # 攻击者倒下，对手获胜
-                    break
-
-            if second_ctx.current_hp <= 0:
-                log_lines.append(f"{second_ctx.pokemon.name} 倒下了！\n\n")
-                winner = "user" if user_first else "wild"
+            # 执行先手
+            if self._process_turn_action(first_unit[0], second_unit[0], first_unit[1], log_lines):
+                winner = "user" if user_first else "wild"  # 对手倒下
+                break  # 战斗结束
+            if first_unit[0].current_hp <= 0:  # 检查反伤自杀
+                winner = "wild" if user_first else "user"
                 break
 
-            # 2. 后手攻击
-            if second_move and second_move.current_pp > 0:
-                # 减少PP
-                second_move.current_pp -= 1
-
-                # 检查是否为变化技能（damage_class_id == 1）
-                is_status_move = second_move.damage_class_id == 1
-
-                if is_status_move:
-                    # 变化技能不造成伤害，直接设置伤害为0
-                    dmg2 = 0
-                    effect_info2 = {"missed": False, "type_effectiveness": 1.0, "is_crit": False}
-                    # 构建变化技能描述
-                    attack_text = f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！PP: {second_move.current_pp}/{second_move.max_pp}\n\n"
-                    log_lines.append(attack_text)
-                else:
-                    # 攻击技能计算伤害
-                    dmg2, effect_info2 = self.calculate_damage_with_effects(second_ctx, first_ctx, second_move)
-
-                    # 检查是否使用了挣扎招式
-                    is_struggle = second_move.move_id == -1 and second_move.move_name == "挣扎"
-
-                    # 构建详细攻击描述
-                    attack_text = f"{second_ctx.pokemon.name} 使用了 {second_move.move_name}！造成 {dmg2} 点伤害。PP: {second_move.current_pp}/{second_move.max_pp}\n\n"
-                    log_lines.append(attack_text)
-
-                    # 添加效果描述
-                    if effect_info2["missed"]:
-                        log_lines.append(f"没有击中目标！\n\n")
-                    else:
-                        # 添加暴击提示
-                        if effect_info2["is_crit"]:
-                            log_lines.append(f"{second_ctx.pokemon.name} 集中了要害！\n\n")
-
-                        # 添加效果倍率提示
-                        eff = effect_info2["type_effectiveness"]
-                        if eff > 1.0:  # 2倍或更强效果
-                            log_lines.append(f"效果绝佳！\n\n")
-                        elif eff == 0.0:  # 无效果
-                            log_lines.append(f"似乎没有效果！\n\n")
-                        elif eff < 1.0:  # 0.5倍或0.25倍效果
-                            log_lines.append(f"效果不佳！\n\n")
-
-                    # 如果是挣扎招式，对使用者本身造成伤害
-                    if is_struggle:
-                        self_damage = max(1, second_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
-                        second_ctx.current_hp -= self_damage
-                        log_lines.append(f"{second_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
-
-                # 对对手造成伤害（仅攻击技能）
-                if not is_status_move:
-                    first_ctx.current_hp -= dmg2
-
-                    # 检查对手是否倒下
-                    if first_ctx.current_hp <= 0:
-                        log_lines.append(f"{first_ctx.pokemon.name} 倒下了！\n\n")
-                        winner = "wild" if user_first else "user"
-                        break
-
-                # 对于变化技能，应用其效果（暂时仅记录）
-                # if is_status_move:
-                    # 记录变化技能使用
-                    # log_lines.append(f"{second_ctx.pokemon.name} 的能力变化了！\n\n")
-
-                # 检查使用者（如果是挣扎招式）是否因自伤倒下
-                if not is_status_move and second_move.move_id == -1 and second_move.move_name == "挣扎" and second_ctx.current_hp <= 0:
-                    log_lines.append(f"{second_ctx.pokemon.name} 因挣扎的反作用伤害倒下了！\n\n")
-                    winner = "user" if user_first else "wild"  # 攻击者倒下，对手获胜
-                    break
-            else:
-                # PP不足时使用挣扎招式（宝可梦所有技能PP耗尽时的标准行为）
-                # 注意：挣扎是攻击技能（damage_class_id=2），不属于变化技能
-                struggle_move = BattleMoveInfo(
-                    power=40,  # 挣扎造成少量伤害
-                    accuracy=100.0,
-                    type_name='normal',
-                    damage_class_id=2,
-                    priority=0,
-                    type_effectiveness=1.0,
-                    stab_bonus=1.0,
-                    max_pp=10,
-                    current_pp=10,  # 挣扎通常不会用完PP，但这里设置为10
-                    move_id=-1,  # 特殊ID表示挣扎
-                    move_name="挣扎"
-                )
-                dmg2, effect_info2 = self.calculate_damage_with_effects(second_ctx, first_ctx, struggle_move)
-
-                # 检查是否使用了挣扎招式
-                is_struggle = struggle_move.move_id == -1 and struggle_move.move_name == "挣扎"
-
-                # 对对手造成伤害
-                first_ctx.current_hp -= dmg2
-
-                # 构建详细攻击描述
-                attack_text = f"{second_ctx.pokemon.name} 使用了挣扎！造成 {dmg2} 点伤害。（所有技能PP耗尽）\n\n"
-                log_lines.append(attack_text)
-
-                # 添加效果描述
-                if effect_info2["missed"]:
-                    log_lines.append(f"没有击中目标！\n\n")
-                else:
-                    # 添加暴击提示
-                    if effect_info2["is_crit"]:
-                        log_lines.append(f"{second_ctx.pokemon.name} 集中了要害！\n\n")
-
-                    # 添加效果倍率提示
-                    eff = effect_info2["type_effectiveness"]
-                    if eff > 1.0:  # 2倍或更强效果
-                        log_lines.append(f"效果绝佳！\n\n")
-                    elif eff == 0.0:  # 无效果
-                        log_lines.append(f"似乎没有效果！\n\n")
-                    elif eff < 1.0:  # 0.5倍或0.25倍效果
-                        log_lines.append(f"效果不佳！\n\n")
-
-                # 如果是挣扎招式，对使用者本身造成伤害
-                if is_struggle:
-                    self_damage = max(1, second_ctx.pokemon.stats.hp // 4)  # 最大HP的25%，至少为1
-                    second_ctx.current_hp -= self_damage
-                    log_lines.append(f"{second_ctx.pokemon.name} 因为使用挣扎受到了 {self_damage} 点反作用伤害！\n\n")
-
-                # 检查对手是否倒下
-                if first_ctx.current_hp <= 0:
-                    log_lines.append(f"{first_ctx.pokemon.name} 倒下了！\n\n")
-                    winner = "wild" if user_first else "user"
-                    break
-
-                # 检查使用者（如果是挣扎招式）是否因自伤倒下
-                if is_struggle and second_ctx.current_hp <= 0:
-                    log_lines.append(f"{second_ctx.pokemon.name} 因挣扎的反作用伤害倒下了！\n\n")
-                    winner = "user" if user_first else "wild"  # 攻击者倒下，对手获胜
-                    break
-
-            if first_ctx.current_hp <= 0:
-                log_lines.append(f"{first_ctx.pokemon.name} 倒下了！\n\n")
+            # 执行后手
+            if self._process_turn_action(second_unit[0], first_unit[0], second_unit[1], log_lines):
                 winner = "wild" if user_first else "user"
+                break
+            if second_unit[0].current_hp <= 0:  # 检查反伤自杀
+                winner = "user" if user_first else "wild"
                 break
 
             log_lines.append(
                 f"剩余HP - {user_ctx.pokemon.name}: {max(0, user_ctx.current_hp)}, {wild_ctx.pokemon.name}: {max(0, wild_ctx.current_hp)}\n\n")
 
-        result = "win" if winner == "user" else "fail"
         if not winner:
+            result = "fail"
             log_lines.append("战斗超时，强制结束。\n\n")
+        else:
+            result = "win" if winner == "user" else "fail"
 
         return result, log_lines, wild_ctx.current_hp
 
+    def _process_turn_action(self, attacker: BattleContext, defender: BattleContext, move: BattleMoveInfo,
+                             logs: List[str]) -> bool:
+        """
+        处理单次回合行动。
+        返回 True 表示由于此次攻击对手倒下（战斗结束）。
+        """
+        is_struggle = (move.move_id == self.STRUGGLE_MOVE_ID)
+
+        # 扣除 PP
+        if not is_struggle and move.current_pp > 0:
+            move.current_pp -= 1
+
+        # 变化技能处理
+        if move.damage_class_id == 1:
+            logs.append(f"{attacker.pokemon.name} 使用了 {move.move_name}！PP: {move.current_pp}/{move.max_pp}\n\n")
+            return False  # 变化技暂无伤害，不会导致对手倒下
+
+        # 攻击技能处理
+        dmg, effects = self._calculate_damage_core(attacker, defender, move)
+        defender.current_hp -= dmg
+
+        desc = f"{attacker.pokemon.name} 使用了 {move.move_name}！"
+        if is_struggle:
+            desc = f"{attacker.pokemon.name} 使用了挣扎！（PP耗尽）"
+        logs.append(f"{desc} 造成 {dmg} 点伤害。PP: {move.current_pp}/{move.max_pp}\n\n")
+
+        if effects["missed"]:
+            logs.append("没有击中目标！\n\n")
+        else:
+            if effects["is_crit"]: logs.append("击中要害！\n\n")
+            eff = effects["type_effectiveness"]
+            if eff > 1.0:
+                logs.append("效果绝佳！\n\n")
+            elif eff == 0.0:
+                logs.append("似乎没有效果！\n\n")
+            elif eff < 1.0:
+                logs.append("效果不佳！\n\n")
+
+        # 挣扎反伤
+        if is_struggle:
+            recoil = max(1, attacker.pokemon.stats.hp // 4)
+            attacker.current_hp -= recoil
+            logs.append(f"{attacker.pokemon.name} 因挣扎受到 {recoil} 点反作用伤害！\n\n")
+
+        if defender.current_hp <= 0:
+            logs.append(f"{defender.pokemon.name} 倒下了！\n\n")
+            return True
+
+        return False
+
     def calculate_battle_win_rate(self, user_ctx: BattleContext, wild_ctx: BattleContext, simulations: int = 100) -> \
     Tuple[float, float]:
-        """
-        计算胜率 (蒙特卡洛模拟) - 极致优化版
-        注意：传入的 ctx.current_hp 会在模拟中被修改，所以每次模拟前要重置，或者使用临时变量。
-        这里我们在循环内使用局部变量跟踪HP。
-        """
+        """优化版蒙特卡洛模拟：减少对象创建，仅追踪整数PP"""
         user_wins = 0
 
-        # 缓存频繁访问的属性
+        # 提取速度和初始HP，避免属性查找开销
         u_speed = user_ctx.pokemon.stats.speed
         w_speed = wild_ctx.pokemon.stats.speed
-        u_start_hp = user_ctx.current_hp
-        w_start_hp = wild_ctx.current_hp
+        u_hp_start = user_ctx.current_hp
+        w_hp_start = wild_ctx.current_hp
 
-        # 预计算最佳招式 (简单AI假设每回合都用这招，进一步加速模拟)
-        # 如果需要更精确的模拟（例如考虑随机性导致最佳招式变化），需把这步放回循环内
-        # 这里为了性能，我们假设AI总是选择期望伤害最高的招式
-        # u_best_move_static = self.get_best_move_from_context(user_ctx, wild_ctx)
-        # w_best_move_static = self.get_best_move_from_context(wild_ctx, user_ctx)
+        # 提取 moves 的初始 PP 列表
+        u_pp_start = [m.current_pp for m in user_ctx.moves]
+        w_pp_start = [m.current_pp for m in wild_ctx.moves]
+
+        # 缓存挣扎对象
+        struggle = self._get_struggle_move()
 
         for _ in range(simulations):
-            cur_u_hp = u_start_hp
-            cur_w_hp = w_start_hp
+            cur_u_hp = u_hp_start
+            cur_w_hp = w_hp_start
+
+            # 使用列表切片快速复制 PP 状态
+            cur_u_pps = u_pp_start[:]
+            cur_w_pps = w_pp_start[:]
+
             turn = 0
-
-            # 创建技能PP的副本，用于模拟
-            user_moves_pp = [move.current_pp for move in user_ctx.moves]  # 保存初始PP
-            wild_moves_pp = [move.current_pp for move in wild_ctx.moves]  # 保存初始PP
-
-            # 创建技能副本（复制PP值）
-            user_moves_backup = [self._create_move_backup(move, user_moves_pp[i]) for i, move in enumerate(user_ctx.moves)]
-            wild_moves_backup = [self._create_move_backup(move, wild_moves_pp[i]) for i, move in enumerate(wild_ctx.moves)]
-
-            # 创建临时战斗上下文用于模拟
-            temp_user_ctx = BattleContext(
-                pokemon=user_ctx.pokemon,
-                moves=user_moves_backup,
-                types=user_ctx.types,
-                current_hp=cur_u_hp,
-                is_user=True
-            )
-            temp_wild_ctx = BattleContext(
-                pokemon=wild_ctx.pokemon,
-                moves=wild_moves_backup,
-                types=wild_ctx.types,
-                current_hp=cur_w_hp,
-                is_user=False
-            )
-
-            while cur_u_hp > 0 and cur_w_hp > 0 and turn < 20:  # 减少模拟回合上限
+            while cur_u_hp > 0 and cur_w_hp > 0 and turn < 15:  # 降低模拟回合上限以提升性能
                 turn += 1
 
-                # 获取当前PP下的最佳招式
-                u_move = self.get_best_move_from_context(temp_user_ctx, temp_wild_ctx)
-                w_move = self.get_best_move_from_context(temp_wild_ctx, temp_user_ctx)
+                # 获取招式 (传递 PP 列表)
+                u_move = self.get_best_move_from_context(user_ctx, wild_ctx, cur_u_pps)
+                w_move = self.get_best_move_from_context(wild_ctx, user_ctx, cur_w_pps)
 
-                user_first = self._is_user_first_simple(u_speed, w_speed, u_move.priority, w_move.priority)
+                # 简单判定先手
+                user_first = True
+                if u_move.priority < w_move.priority:
+                    user_first = False
+                elif u_move.priority == w_move.priority:
+                    if u_speed < w_speed:
+                        user_first = False
+                    elif u_speed == w_speed and random.random() < 0.5:
+                        user_first = False
 
+                # 模拟回合逻辑
+                first_move, first_attacker, first_defender, first_pps = (u_move, user_ctx, wild_ctx,
+                                                                         cur_u_pps) if user_first else (w_move,
+                                                                                                        wild_ctx,
+                                                                                                        user_ctx,
+                                                                                                        cur_w_pps)
+                second_move, second_attacker, second_defender, second_pps = (w_move, wild_ctx, user_ctx,
+                                                                             cur_w_pps) if user_first else (u_move,
+                                                                                                            user_ctx,
+                                                                                                            wild_ctx,
+                                                                                                            cur_u_pps)
+
+                # Action 1
+                idx = -1
+                if first_move.move_id != self.STRUGGLE_MOVE_ID:
+                    # 找到对应的 index 扣 PP (这里假设 moves 顺序不变)
+                    try:
+                        idx = first_attacker.moves.index(first_move)
+                        if first_pps[idx] > 0: first_pps[idx] -= 1
+                    except ValueError:
+                        pass
+
+                dmg, _ = self._calculate_damage_core(first_attacker, first_defender, first_move)
                 if user_first:
-                    # User attacks Wild
-                    if u_move and u_move.current_pp > 0:
-                        u_move.current_pp -= 1  # 减少PP
-                    dmg = self.resolve_damage(temp_user_ctx, temp_wild_ctx, u_move)
                     cur_w_hp -= dmg
-                    temp_wild_ctx.current_hp = cur_w_hp  # 同步HP
-                    if cur_w_hp <= 0: break
-                    # Wild attacks User
-                    if w_move and w_move.current_pp > 0:
-                        w_move.current_pp -= 1  # 减少PP
-                    dmg = self.resolve_damage(temp_wild_ctx, temp_user_ctx, w_move)
-                    cur_u_hp -= dmg
-                    temp_user_ctx.current_hp = cur_u_hp  # 同步HP
                 else:
-                    # Wild attacks User
-                    if w_move and w_move.current_pp > 0:
-                        w_move.current_pp -= 1  # 减少PP
-                    dmg = self.resolve_damage(temp_wild_ctx, temp_user_ctx, w_move)
                     cur_u_hp -= dmg
-                    temp_user_ctx.current_hp = cur_u_hp  # 同步HP
-                    if cur_u_hp <= 0: break
-                    # User attacks Wild
-                    if u_move and u_move.current_pp > 0:
-                        u_move.current_pp -= 1  # 减少PP
-                    dmg = self.resolve_damage(temp_user_ctx, temp_wild_ctx, u_move)
+
+                if cur_u_hp <= 0 or cur_w_hp <= 0: break
+
+                # Action 2
+                if second_move.move_id != self.STRUGGLE_MOVE_ID:
+                    try:
+                        idx = second_attacker.moves.index(second_move)
+                        if second_pps[idx] > 0: second_pps[idx] -= 1
+                    except ValueError:
+                        pass
+
+                dmg, _ = self._calculate_damage_core(second_attacker, second_defender, second_move)
+                if user_first:
+                    cur_u_hp -= dmg
+                else:
                     cur_w_hp -= dmg
-                    temp_wild_ctx.current_hp = cur_w_hp  # 同步HP
 
             if cur_u_hp > 0:
                 user_wins += 1
@@ -1002,27 +670,23 @@ class AdventureService:
         """计算属性克制系数"""
         effectiveness = 1.0
         for atk_type in attacker_types:
-            atk = atk_type.lower()
-            if atk in self.TYPE_CHART:
-                for def_type in defender_types:
-                    effectiveness *= self.TYPE_CHART[atk].get(def_type.lower(), 1.0)
+            atk_dict = self.TYPE_CHART.get(atk_type.lower())
+            if not atk_dict: continue
+
+            for def_type in defender_types:
+                effectiveness *= atk_dict.get(def_type.lower(), 1.0)
         return effectiveness
 
     def _is_user_first(self, user_ctx: BattleContext, wild_ctx: BattleContext, u_move: BattleMoveInfo,
                        w_move: BattleMoveInfo) -> bool:
-        return self._is_user_first_simple(
-            user_ctx.pokemon.stats.speed,
-            wild_ctx.pokemon.stats.speed,
-            u_move.priority,
-            w_move.priority
-        )
+        u_prio, w_prio = u_move.priority, w_move.priority
+        if u_prio != w_prio:
+            return u_prio > w_prio
 
-    def _is_user_first_simple(self, u_speed, w_speed, u_prio, w_prio) -> bool:
-        """简化版先手判定，仅依赖数值"""
-        if u_prio > w_prio: return True
-        if w_prio > u_prio: return False
-        if u_speed > w_speed: return True
-        if w_speed > u_speed: return False
+        u_spd, w_spd = user_ctx.pokemon.stats.speed, wild_ctx.pokemon.stats.speed
+        if u_spd != w_spd:
+            return u_spd > w_spd
+
         return random.random() < 0.5
 
     def calculate_catch_success_rate(self, user_id: str, wild_pokemon: WildPokemonInfo, item_id: str) -> Dict[str, Any]:
@@ -1030,7 +694,6 @@ class AdventureService:
         user_items: UserItems = self.user_item_repo.get_user_items(user_id)
         pokeball_item = None
 
-        # 查找精灵球
         target_item_id = item_id if item_id else None
         for item in user_items.items:
             is_ball = int(item.category_id) == 34
@@ -1043,18 +706,15 @@ class AdventureService:
             msg = f"❌ 找不到ID为 {item_id} 的精灵球" if item_id else AnswerEnum.USER_POKEBALLS_EMPTY.value
             return {"success": False, "message": msg}
 
-        # 倍率设置
         ball_map = {'超级球': 1.5, '高级球': 2.0, '大师球': 255.0}
         ball_multiplier = ball_map.get(pokeball_item.name_zh, 1.0)
 
         max_hp = wild_pokemon.stats.hp
-        # 注意：这里逻辑保留原样（随机HP），如果是战斗后捕捉，应传入 remaining_hp
+        # 简单模拟当前血量 (若有战斗上下文应传入实际血量)
         temp_current_hp = int(random.gauss(max_hp * 0.75, max_hp * 0.25))
-        current_hp = max(1, min(max_hp, temp_current_hp))  # 最小1血
+        current_hp = max(1, min(max_hp, temp_current_hp))
 
         base_capture_rate = int(self.pokemon_repo.get_pokemon_capture_rate(wild_pokemon.species_id))
-
-        # 计算公式
         catch_value = int(((3 * max_hp - 2 * current_hp) * base_capture_rate * ball_multiplier) // (3 * max_hp))
         catch_value = min(catch_value, 255)
         success_rate = catch_value / 256.0
@@ -1069,25 +729,22 @@ class AdventureService:
             }
         }
 
-    def _handle_battle_experience(self, user_id: str, result_str: str, wild_pokemon: WildPokemonInfo, battle_log: List[Dict] = None):
-        """处理战斗后的经验分配
-        出场的宝可梦获得100%经验值，未出场的宝可梦获得50%经验值，已死亡的宝可梦不获得经验值
-        """
+    def _handle_battle_experience(self, user_id: str, result_str: str, wild_pokemon: WildPokemonInfo,
+                                  battle_log: List[Dict] = None):
+        """处理战斗后的经验分配"""
         if not self.exp_service or result_str != "success":
             return {
                 "pokemon_exp": {"success": True, "exp_gained": 0, "message": AnswerEnum.BATTLE_FAILURE_NO_EXP.value},
-                "ev_gained": {"hp_ev": 0, "attack_ev": 0, "defense_ev": 0, "sp_attack_ev": 0, "sp_defense_ev": 0, "speed_ev": 0},
+                "ev_gained": {"hp_ev": 0, "attack_ev": 0, "defense_ev": 0, "sp_attack_ev": 0, "sp_defense_ev": 0,
+                              "speed_ev": 0},
                 "team_pokemon_results": []
             }
 
-        # 计算基础经验值
         base_exp_gained = self.exp_service.calculate_pokemon_exp_gain(
-            wild_pokemon_id=wild_pokemon.species_id,  # 使用species_id而不是id
+            wild_pokemon_id=wild_pokemon.species_id,
             wild_pokemon_level=wild_pokemon.level,
             battle_result=result_str
         )
-
-        # 计算EV奖励
         ev_gained = self.exp_service.calculate_pokemon_ev_gain(
             wild_pokemon_species_id=wild_pokemon.species_id,
             battle_result=result_str
@@ -1095,62 +752,35 @@ class AdventureService:
 
         user_team = self.team_repo.get_user_team(user_id)
         team_results = []
+        primary_result = {}
+
         if user_team and user_team.team_pokemon_ids:
-            # 根据战斗日志确定每只宝可梦的状态：出场、未出场或死亡
-            team_pokemon_ids = user_team.team_pokemon_ids
-            battle_participants = set()  # 出场的宝可梦ID
-            battle_deaths = set()  # 死亡的宝可梦ID
+            battle_participants = set()
+            battle_deaths = set()
 
             if battle_log:
-                for battle_info in battle_log:
-                    pokemon_id = battle_info.get("pokemon_id")
-                    battle_participants.add(pokemon_id)
+                for b_info in battle_log:
+                    pid = b_info.get("pokemon_id")
+                    battle_participants.add(pid)
+                    if b_info.get("result") == "fail":
+                        battle_deaths.add(pid)
 
-                    # 检查这只宝可梦是否在战斗中死亡
-                    # 在当前的逻辑中，只有失败的宝可梦才会继续让下一只上场
-                    if battle_info.get("result") == "fail":
-                        battle_deaths.add(pokemon_id)
+            for pokemon_id in user_team.team_pokemon_ids:
+                pid = int(pokemon_id)
+                if pid in battle_deaths:
+                    continue  # 死亡无经验
 
-            # 计算每只宝可梦的经验值
-            for pokemon_id in team_pokemon_ids:
-                pokemon_id = int(pokemon_id)  # 确保是整数
-                current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+                is_participant = pid in battle_participants
+                p_exp = base_exp_gained if is_participant else (base_exp_gained // 2)
+                msg = "获得全部经验" if is_participant else "获得一半经验"
 
-                if not current_pokemon:
-                    continue
+                res = self.exp_service.update_pokemon_after_battle(user_id, pid, p_exp, ev_gained)
+                res.update({"message": msg, "original_base_exp": base_exp_gained, "applied_exp": p_exp})
+                team_results.append(res)
 
-                # 确定该宝可梦的状态和对应的经验值
-                if pokemon_id in battle_deaths:
-                    # 死亡的宝可梦不获得经验
-                    pokemon_exp = 0
-                    exp_message = "宝可梦在战斗中死亡，未获得经验"
-                elif pokemon_id in battle_participants:
-                    # 出场的宝可梦获得100%经验
-                    pokemon_exp = base_exp_gained
-                    exp_message = "宝可梦参与战斗，获得全部经验"
-                else:
-                    # 未出场的宝可梦获得50%经验
-                    pokemon_exp = base_exp_gained // 2
-                    exp_message = "宝可梦未参与战斗，获得一半经验"
-
-                # 更新单个宝可梦的经验
-                pokemon_result = self.exp_service.update_pokemon_after_battle(
-                    user_id, pokemon_id, pokemon_exp, ev_gained
-                )
-                pokemon_result["message"] = exp_message
-                pokemon_result["original_base_exp"] = base_exp_gained
-                pokemon_result["applied_exp"] = pokemon_exp  # 添加实际应用的经验值
-
-                team_results.append(pokemon_result)
-
-        # 返回第一个参与战斗的宝可梦的结果作为主结果
-        primary_result = {}
-        if battle_log and team_results:
-            first_battle_pokemon_id = battle_log[0].get("pokemon_id") if battle_log else None
-            for result in team_results:
-                if result.get("pokemon_id") == first_battle_pokemon_id:
-                    primary_result = result
-                    break
+                # 记录首发宠物的经验结果
+                if not primary_result and is_participant:
+                    primary_result = res
 
         if not primary_result and team_results:
             primary_result = team_results[0]
@@ -1186,194 +816,133 @@ class AdventureService:
         return self.battle_repo.get_battle_log_by_id(log_id)
 
     def adventure_with_trainer(self, user_id: str, location_id: int) -> BaseResult:
-        """在指定区域尝试遇到训练家"""
         if not self.trainer_service:
             return BaseResult(success=False, message="训练家服务未初始化")
 
-        # 检查用户是否有队伍
         user_team_data = self.team_repo.get_user_team(user_id)
         if not user_team_data or not user_team_data.team_pokemon_ids:
             return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
 
-        # 尝试在指定位置遇到一个训练家
         trainer = self.trainer_service.get_random_trainer_at_location(location_id, user_id)
         if not trainer:
-            # 没有可遇到的训练家，返回None表示只遇到野生宝可梦
             return BaseResult(success=True, message="没有遇到训练家", data=None)
 
-        # 获取训练家的宝可梦信息用于战斗
         battle_trainer = self.trainer_service.get_trainer_with_pokemon(trainer.id)
         if not battle_trainer:
             return BaseResult(success=False, message="获取训练家宝可梦失败")
 
-        # 记录当前训练家遭遇
         self.user_pokemon_repo.set_user_current_trainer_encounter(user_id, trainer.id)
-
-        # 返回训练家信息，让玩家可以选择战斗或逃跑
         return BaseResult(success=True, message="遇到了训练家！", data=battle_trainer)
 
-    def start_trainer_battle(self, user_id: str, battle_trainer: BattleTrainer, user_team_list: List[int]) -> BaseResult[BattleResult]:
+    def start_trainer_battle(self, user_id: str, battle_trainer: BattleTrainer, user_team_list: List[int]) -> \
+    BaseResult[BattleResult]:
         """开始与训练家的战斗"""
         if not user_team_list:
             return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
-
-        # 使用训练家第一只宝可梦作为初始对手上下文
         if not battle_trainer.pokemon_list:
             return BaseResult(success=False, message="训练家没有宝可梦")
 
-        # 获取训练家王牌宝可梦（通常是最高等级的那只）
-        last_pokemon = battle_trainer.pokemon_list[-1]
+        # 预加载数据
+        trainer_pokes = battle_trainer.pokemon_list
+        trainer_contexts = [self._create_battle_context(p, False) for p in trainer_pokes]
 
-        # 记录训练家遭遇
+        user_contexts = []
+        for pid in user_team_list:
+            u_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
+            if u_info:
+                user_contexts.append(self._create_battle_context(u_info, True))
+
+        u_idx = 0
+        t_idx = 0
+        battle_log = []
+        all_u_wins, all_t_wins = [], []
+        battle_result_str = "fail"
+
+        # 记录遭遇
         self.trainer_service.record_trainer_encounter(user_id, battle_trainer.trainer.id)
 
-        # 保存当前所有训练家宝可梦的上下文
-        trainer_pokemon_contexts = [self._create_battle_context(pokemon, is_user=False) for pokemon in battle_trainer.pokemon_list]
+        while u_idx < len(user_contexts) and t_idx < len(trainer_contexts):
+            u_ctx = user_contexts[u_idx]
+            t_ctx = trainer_contexts[t_idx]
 
-        # 保存用户所有宝可梦的上下文，用于状态继承
-        user_pokemon_contexts = []
-        for pokemon_id in user_team_list:
-            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
-            if user_pokemon_info:
-                user_ctx = self._create_battle_context(user_pokemon_info, is_user=True)
-                user_pokemon_contexts.append(user_ctx)
+            # 模拟胜率 (不改变当前 HP)
+            sim_u_hp, sim_t_hp = u_ctx.current_hp, t_ctx.current_hp
+            u_win, t_win = self.calculate_battle_win_rate(u_ctx, t_ctx)
+            u_ctx.current_hp, t_ctx.current_hp = sim_u_hp, sim_t_hp
 
-        current_pokemon_index = 0
-        current_trainer_pokemon_index = 0
-        battle_result_str = "fail"
-        final_user_pokemon_info = None
-        all_user_win_rates = []
-        all_trainer_win_rates = []
-        battle_log = []
-        log_id = 0
+            all_u_wins.append(u_win)
+            all_t_wins.append(t_win)
 
-        # 初始化训练家宝可梦上下文
-        if len(trainer_pokemon_contexts) > 0:
-            current_trainer_ctx = trainer_pokemon_contexts[current_trainer_pokemon_index]
-        else:
-            # 如果训练家没有宝可梦，返回错误
-            return BaseResult(success=False, message="训练家没有宝可梦")
+            # 实战
+            outcome, details, rem_t_hp = self.execute_real_battle(u_ctx, t_ctx)
 
-        while current_pokemon_index < len(user_team_list) and current_trainer_pokemon_index < len(trainer_pokemon_contexts):
-            user_pokemon_id = user_team_list[current_pokemon_index]
-            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, user_pokemon_id)
-
-            if not user_pokemon_info:
-                current_pokemon_index += 1
-                continue
-
-            # 使用已保存的上下文，以继承状态（血量、PP等）
-            user_ctx = user_pokemon_contexts[current_pokemon_index]
-            final_user_pokemon_info = user_pokemon_info
-
-            # 1. 计算胜率
-            if current_trainer_ctx:  # 确保上下文存在
-                # 不重置HP，保持之前战斗后的剩余血量
-                user_win_rate, trainer_win_rate = self.calculate_battle_win_rate(user_ctx, current_trainer_ctx)
-            else:
-                # 如果没有训练家宝可梦，继续下一只用户宝可梦
-                current_pokemon_index += 1
-                continue
-
-            all_user_win_rates.append(user_win_rate)
-            all_trainer_win_rates.append(trainer_win_rate)
-
-            # 2. 执行实际战斗
-            if current_trainer_ctx:  # 确保上下文存在
-                # 不重置HP，保持之前战斗后的剩余血量
-                battle_outcome, battle_log_data, remaining_trainer_hp = self.execute_real_battle(user_ctx, current_trainer_ctx)
-            else:
-                # 如果没有训练家宝可梦，战斗结果为失败（用户宝可梦胜利）
-                battle_outcome = "win"
-                battle_log_data = []
-                remaining_trainer_hp = 0
-
-            # 更新训练家宝可梦的血量
-            if current_trainer_ctx:
-                current_trainer_ctx.current_hp = max(0, remaining_trainer_hp)
-                trainer_pokemon_contexts[current_trainer_pokemon_index].current_hp = max(0, remaining_trainer_hp)
-
-            # 更新用户宝可梦的战斗状态（血量、PP），使其能够继承到下一场战斗
-            # 无论战斗输赢，都需要更新当前宝可梦的战斗状态（血量、PP）到上下文
-            user_pokemon_contexts[current_pokemon_index].current_hp = user_ctx.current_hp
-            # 更新所有技能的PP状态，确保PP消耗被正确继承
-            user_pokemon_contexts[current_pokemon_index].moves = [self._create_move_backup(move, move.current_pp) for move in user_ctx.moves]
+            # 记录训练家剩余血量
+            t_ctx.current_hp = max(0, rem_t_hp)
 
             battle_log.append({
-                "pokemon_id": user_pokemon_info.id,
-                "pokemon_name": user_pokemon_info.name,
-                "species_name": user_pokemon_info.species_id,
-                "level": user_pokemon_info.level,
-                "trainer_pokemon_name": current_trainer_ctx.pokemon.name if current_trainer_ctx else "无",
-                "trainer_pokemon_level": current_trainer_ctx.pokemon.level if current_trainer_ctx else 0,
-                "win_rate": user_win_rate,
-                "result": battle_outcome,
-                "details": battle_log_data
+                "pokemon_id": u_ctx.pokemon.id,
+                "pokemon_name": u_ctx.pokemon.name,
+                "species_name": u_ctx.pokemon.species_id,
+                "level": u_ctx.pokemon.level,
+                "trainer_pokemon_name": t_ctx.pokemon.name,
+                "trainer_pokemon_level": t_ctx.pokemon.level,
+                "win_rate": u_win,
+                "result": outcome,
+                "details": details
             })
 
-            if battle_outcome == "win":
-                # 训练家的宝可梦被击败，继续下一只
-                current_trainer_pokemon_index += 1
-                if current_trainer_pokemon_index < len(trainer_pokemon_contexts):
-                    current_trainer_ctx = trainer_pokemon_contexts[current_trainer_pokemon_index]
-                    # 当新的训练家宝可梦上场时，应该恢复其初始HP
-                    current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
-                else:
-                    # 所有训练家宝可梦都被击败，战斗胜利
-                    battle_result_str = "success"
-                    break
+            if outcome == "win":
+                t_idx += 1  # 击败对方一只，对方下一只上场
             else:
-                # 用户的宝可梦被击败，继续下一只
-                current_pokemon_index += 1
+                u_idx += 1  # 我方战败，下一只上场
 
-        # 计算最终显示的胜率
-        final_u_rate, final_t_rate = 0.0, 100.0
-        if battle_result_str == "success":
-            final_u_rate, final_t_rate = all_user_win_rates[-1], all_trainer_win_rates[-1]
-        elif all_user_win_rates:
-            final_u_rate = round(sum(all_user_win_rates) / len(all_user_win_rates), 2)
-            final_t_rate = round(sum(all_trainer_win_rates) / len(all_trainer_win_rates), 2)
+        if t_idx >= len(trainer_contexts):
+            battle_result_str = "success"
+
+        # 统计平均胜率
+        f_u_rate = round(sum(all_u_wins) / len(all_u_wins), 2) if all_u_wins else 0
+        f_t_rate = round(sum(all_t_wins) / len(all_t_wins), 2) if all_t_wins else 0
 
         # 保存日志
+        log_id = 0
         if self.battle_repo:
-            log_id = self.battle_repo.save_battle_log(
-                user_id=user_id,
-                target_name=f"训练家 {battle_trainer.trainer.name if battle_trainer.trainer and battle_trainer.trainer.name else '未知训练家'}",
-                log_data=battle_log,
-                result=battle_result_str
-            )
+            t_name = battle_trainer.trainer.name or '未知训练家'
+            log_id = self.battle_repo.save_battle_log(user_id, f"训练家 {t_name}", battle_log, battle_result_str)
 
-        # 处理经验值和奖励
-        exp_details = self._handle_trainer_battle_experience(user_id, battle_result_str, battle_trainer, battle_log, last_pokemon.level)
+        # 奖励计算
+        last_poke_level = trainer_pokes[-1].level
+        exp_details = self._handle_trainer_battle_experience(user_id, battle_result_str, battle_trainer, battle_log,
+                                                             last_poke_level)
 
-        # 记录战斗结果
         money_reward = 0
-        user_trainer_battle_exp_result = None
+        user_exp_result = None
+
         if battle_result_str == "success":
-            # 战斗胜利，给予金钱奖励并更新记录
-            rewards = self.trainer_service.calculate_trainer_battle_rewards(battle_trainer.trainer, last_pokemon.level)
+            rewards = self.trainer_service.calculate_trainer_battle_rewards(battle_trainer.trainer, last_poke_level)
             money_reward = rewards["money_reward"]
             self.trainer_service.handle_trainer_battle_win(user_id, battle_trainer.trainer.id, money_reward)
+            user_exp_result = self.exp_service.add_exp_for_defeating_npc_trainer(user_id,
+                                                                                 battle_trainer.trainer.base_payout)
 
-            # 给予击败NPC训练家的额外用户经验奖励
-            user_trainer_battle_exp_result = self.exp_service.add_exp_for_defeating_npc_trainer(user_id, battle_trainer.trainer.base_payout)
+        final_u_info = user_contexts[min(u_idx, len(user_contexts) - 1)].pokemon if user_contexts else None
 
         return BaseResult(
             success=True,
             message=AnswerEnum.BATTLE_SUCCESS.value if battle_result_str == "success" else "训练家对战失败",
             data=BattleResult(
-                user_pokemon=self._format_pokemon_summary(final_user_pokemon_info),
-                wild_pokemon=self._format_pokemon_summary(last_pokemon, is_wild=True),  # 使用训练家最后一只宝可梦
-                win_rates={"user_win_rate": final_u_rate, "wild_win_rate": final_t_rate},
+                user_pokemon=self._format_pokemon_summary(final_u_info),
+                wild_pokemon=self._format_pokemon_summary(trainer_pokes[-1], is_wild=True),
+                win_rates={"user_win_rate": f_u_rate, "wild_win_rate": f_t_rate},
                 result=battle_result_str,
                 exp_details=exp_details,
                 battle_log=battle_log,
                 log_id=log_id,
-                is_trainer_battle=True,  # 标记为训练家战斗
-                money_reward=money_reward,  # 金钱奖励
-                user_battle_exp_result=user_trainer_battle_exp_result  # 用户训练家战斗经验结果
+                is_trainer_battle=True,
+                money_reward=money_reward,
+                user_battle_exp_result=user_exp_result
             )
         )
+
 
     def _handle_trainer_battle_experience(self, user_id: str, result_str: str, battle_trainer: BattleTrainer, battle_log: List[Dict], last_pokemon_level: int):
         """处理训练家战斗后的经验分配（训练家对战经验是野生宝可梦的1.5倍）"""
