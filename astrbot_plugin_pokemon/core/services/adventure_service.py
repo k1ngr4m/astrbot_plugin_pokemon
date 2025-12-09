@@ -696,7 +696,7 @@ class AdventureService:
 
         target_item_id = item_id if item_id else None
         for item in user_items.items:
-            is_ball = int(item.category_id) == 34
+            is_ball = int(item.category_id) == 34 or int(item.category_id) == 33
             if is_ball and item.quantity > 0:
                 if target_item_id is None or item.item_id == target_item_id:
                     pokeball_item = item
