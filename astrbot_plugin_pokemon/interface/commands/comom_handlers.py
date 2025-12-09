@@ -1,9 +1,17 @@
+import asyncio
 import os
 from typing import TYPE_CHECKING
+
+import asyncio
+from hypercorn.config import Config
+from hypercorn.asyncio import serve
+
 from astrbot.api.event import AstrMessageEvent
+from astrbot.core import logger
+from data.plugins.astrbot_plugin_pokemon.manager.app import create_app
 from .draw.help import draw_help_image
 from ...interface.response.answer_enum import AnswerEnum
-from ...utils.utils import userid_to_base32
+from ...utils.utils import userid_to_base32, _is_port_available
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
@@ -23,3 +31,41 @@ class CommonHandlers:
         output_path = os.path.join(self.tmp_dir, "pokemon_help.png")
         image.save(output_path)
         yield event.image_result(output_path)
+
+
+    async def start_admin(self, event: AstrMessageEvent):
+        if self.plugin.web_admin_task and not self.plugin.web_admin_task.done():
+            yield event.plain_result("❌ 宝可梦后台管理已经在运行中")
+            return
+        yield event.plain_result("🔄 正在启动宝可梦插件Web管理后台...")
+
+        if not await _is_port_available(self.plugin.port):
+            yield event.plain_result(f"❌ 端口 {self.plugin.port} 已被占用，请更换端口后重试")
+            return
+
+        try:
+            services_to_inject = {
+                "user_service": self.plugin.user_service,
+                "shop_service": self.plugin.shop_service,
+            }
+            app = create_app(secret_key=self.plugin.secret_key, services=services_to_inject)
+            config = Config()
+            config.bind = [f"0.0.0.0:{self.plugin.port}"]
+            self.plugin.web_admin_task = asyncio.create_task(serve(app, config))
+
+            # 等待服务启动
+            for i in range(10):
+                if await self.plugin._check_port_active():
+                    break
+                await asyncio.sleep(1)
+            else:
+                raise TimeoutError("⌛ 启动超时，请检查防火墙设置")
+
+            await asyncio.sleep(1)  # 等待服务启动
+
+            yield event.plain_result(
+                f"✅ 钓鱼后台已启动！\n🔗请访问 http://localhost:{self.plugin.port}/admin\n🔑 密钥请到配置文件中查看\n\n⚠️ 重要提示：\n• 如需公网访问，请自行配置端口转发和防火墙规则\n• 确保端口 {self.plugin.port} 已开放并映射到公网IP\n• 建议使用反向代理（如Nginx）增强安全性"
+            )
+        except Exception as e:
+            logger.error(f"启动后台失败: {e}", exc_info=True)
+            yield event.plain_result(f"❌ 启动后台失败: {e}")

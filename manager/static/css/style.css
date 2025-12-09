@@ -1,0 +1,135 @@
+/* static/css/style.css */
+:root {
+    --poke-red: #EE1515;       /* 精灵球红 */
+    --poke-red-hover: #CC0000;
+    --poke-dark: #222224;      /* 用于文字/导航 */
+    --poke-bg: #F0F2F5;        /* 柔和背景灰 */
+    --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    --card-hover: 0 8px 25px rgba(238, 21, 21, 0.15);
+}
+
+body {
+    background-color: var(--poke-bg);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    color: #4a5568;
+}
+
+/* --- 导航栏美化 --- */
+.navbar {
+    background: linear-gradient(135deg, var(--poke-red) 0%, #ff4b4b 100%) !important;
+    box-shadow: 0 4px 12px rgba(238, 21, 21, 0.2);
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    font-size: 1.4rem;
+}
+
+/* --- 卡片美化 --- */
+.card {
+    border: none;
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    transition: all 0.3s ease;
+    background: #fff;
+    overflow: hidden;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--card-hover);
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid #f0f0f0;
+    padding: 1.5rem;
+    font-weight: 600;
+}
+
+.card-header h3 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--poke-dark);
+    font-weight: 700;
+}
+
+/* --- 统计数字卡片 --- */
+.stat-card {
+    position: relative;
+    overflow: hidden;
+}
+.stat-card .card-body {
+    padding: 2rem 1.5rem;
+}
+.stat-card .display-4 {
+    font-weight: 700;
+    font-size: 2.5rem;
+    margin-bottom: 0;
+    color: var(--poke-red);
+}
+.stat-card h5 {
+    color: #a0aec0;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 0.5rem;
+}
+/* 装饰性背景图标 */
+.stat-icon-bg {
+    position: absolute;
+    right: -10px;
+    bottom: -10px;
+    font-size: 5rem;
+    opacity: 0.05;
+    color: var(--poke-dark);
+    transform: rotate(-15deg);
+}
+
+/* --- 表格美化 --- */
+.table {
+    vertical-align: middle;
+}
+.table thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #e9ecef;
+    color: #718096;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(248, 249, 250, 0.5);
+}
+
+/* --- 按钮美化 --- */
+.btn {
+    border-radius: 10px;
+    padding: 0.5rem 1.2rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+.btn-primary {
+    background-color: var(--poke-red);
+    border-color: var(--poke-red);
+}
+.btn-primary:hover {
+    background-color: var(--poke-red-hover);
+    border-color: var(--poke-red-hover);
+    box-shadow: 0 4px 12px rgba(238, 21, 21, 0.3);
+}
+
+/* --- 徽章美化 --- */
+.badge {
+    padding: 0.5em 0.8em;
+    border-radius: 6px;
+    font-weight: 500;
+}
+/* 属性颜色示例 */
+.bg-grass { background-color: #48cfb2 !important; color: white;}
+.bg-fire { background-color: #fa6c6c !important; color: white;}
+.bg-water { background-color: #6890f0 !important; color: white;}
+.bg-electric { background-color: #fcec5d !important; color: #555;}

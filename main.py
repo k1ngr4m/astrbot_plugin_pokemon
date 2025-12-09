@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 from astrbot.api.event import filter, AstrMessageEvent
@@ -40,8 +41,9 @@ class PokemonPlugin(Star):
             "adventure": {"cooldown": adventure_config.get("cooldown_seconds", 10)}
         }
 
+        self.web_admin_task = None
         webui_config = config.get("webui", {})
-        self.secret_key = webui_config.get("secret_key")
+        self.secret_key = webui_config.get("secret_key", "default-secret-key")
         self.port = webui_config.get("port", 7777)
 
         # 3. 初始化容器
@@ -129,7 +131,6 @@ class PokemonPlugin(Star):
         except Exception as e:
             logger.error(f"[{self.plugin_id}] 初始数据设置失败: {e}")
 
-        logger.info(f"[{self.plugin_id}] 插件初始化完毕，准备就绪！")
 
     # ====================== 指令注册区 ======================
 
@@ -264,6 +265,25 @@ class PokemonPlugin(Star):
         """查看宝可梦游戏的帮助信息和所有可用命令"""
         async for r in self.common_handlers.pokemon_help(event):
             yield r
+
+    # @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("开启宝可梦后台管理")
+    async def start_admin(self, event: AstrMessageEvent):
+        """[管理员] 启动Web后台管理服务器"""
+        async for r in self.common_handlers.start_admin(event):
+            yield r
+
+    async def _check_port_active(self):
+        """验证端口是否实际已激活"""
+        try:
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection("127.0.0.1", self.port),
+                timeout=1
+            )
+            writer.close()
+            return True
+        except:
+            return False
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法"""

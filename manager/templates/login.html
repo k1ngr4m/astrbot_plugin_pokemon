@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>后台登录 - 宝可梦中心</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <style>
+        body {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* 模仿精灵球配色的极淡背景 */
+            background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+        }
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
+        }
+        .card {
+            border: none;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        /* 顶部红色条装饰，像精灵球的上半部分 */
+        .card-top-deco {
+            height: 8px;
+            background: #EE1515;
+            width: 100%;
+        }
+        .login-btn {
+            background-color: #EE1515;
+            border: none;
+            padding: 12px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .login-btn:hover {
+            background-color: #cc0000;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(238, 21, 21, 0.3);
+        }
+        .form-control:focus {
+            border-color: #EE1515;
+            box-shadow: 0 0 0 0.25rem rgba(238, 21, 21, 0.25);
+        }
+        .icon-circle {
+            width: 80px;
+            height: 80px;
+            background: #fff;
+            border: 4px solid #EE1515;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<main class="login-card">
+    <div class="card">
+        <div class="card-top-deco"></div>
+        <div class="card-body p-4 p-md-5">
+            <form method="post">
+                <div class="text-center">
+                    <div class="icon-circle">
+                        <i class="fas fa-dot-circle fa-2x" style="color: #EE1515;"></i>
+                    </div>
+                    <h1 class="h4 mb-4 fw-bold text-dark">训练家认证</h1>
+                </div>
+
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-danger py-2 rounded-3 fs-6" role="alert">
+                                <i class="fas fa-exclamation-circle me-2"></i>{{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <div class="form-floating mb-4">
+                    <input type="password" name="secret_key" class="form-control" id="secret_key" placeholder="安全密钥" required>
+                    <label for="secret_key">请输入 Admin Key</label>
+                </div>
+
+                <button class="w-100 btn btn-primary btn-lg login-btn" type="submit">
+                    进入系统
+                </button>
+                <p class="mt-4 mb-0 text-center text-muted small">&copy; AstrBot Pokémon Plugin</p>
+            </form>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>
