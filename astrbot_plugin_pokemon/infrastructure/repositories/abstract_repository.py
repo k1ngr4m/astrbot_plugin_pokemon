@@ -273,6 +273,14 @@ class AbstractUserPokemonRepository(ABC):
     @abstractmethod
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]: pass
 
+    # 分页获取用户宝可梦
+    @abstractmethod
+    def get_user_pokemon_paged(self, user_id: str, limit: int, offset: int) -> List[UserPokemonInfo]: pass
+
+    # 获取用户宝可梦总数
+    @abstractmethod
+    def get_user_pokemon_count(self, user_id: str) -> int: pass
+
     # 根据宝可梦ID获取用户宝可梦记录
     @abstractmethod
     def get_user_pokemon_by_id(self, user_id: str, pokemon_id: int) -> Optional[UserPokemonInfo]: pass

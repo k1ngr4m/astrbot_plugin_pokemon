@@ -129,5 +129,6 @@ class GameContainer:
         )
         self.evolution_service = EvolutionService(
             user_pokemon_repo=self.user_pokemon_repo,
-            pokemon_repo=self.pokemon_repo
+            pokemon_repo=self.pokemon_repo,
+            nature_service=self.nature_service
         )

@@ -196,10 +196,33 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
               FROM user_pokemon up
                        JOIN pokemon_species ps ON up.species_id = ps.id
               WHERE up.user_id = ?
-              ORDER BY up.id \
+              ORDER BY up.caught_time DESC, up.id \
               """
         cursor = self._get_connection().execute(sql, (user_id,))
         return [self._row_to_user_pokemon(row) for row in cursor.fetchall()]
+
+    def get_user_pokemon_paged(self, user_id: str, limit: int, offset: int) -> List[UserPokemonInfo]:
+        """分页获取用户宝可梦"""
+        sql = """
+              SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
+              FROM user_pokemon up
+                       JOIN pokemon_species ps ON up.species_id = ps.id
+              WHERE up.user_id = ?
+              ORDER BY up.caught_time DESC, up.id
+              LIMIT ? OFFSET ? \
+              """
+        cursor = self._get_connection().execute(sql, (user_id, limit, offset))
+        return [self._row_to_user_pokemon(row) for row in cursor.fetchall()]
+
+    def get_user_pokemon_count(self, user_id: str) -> int:
+        """获取用户宝可梦总数"""
+        sql = """
+              SELECT COUNT(*)
+              FROM user_pokemon
+              WHERE user_id = ? \
+              """
+        cursor = self._get_connection().execute(sql, (user_id,))
+        return cursor.fetchone()[0]
 
     def get_user_pokemon_by_id(self, user_id: str, pokemon_id: int) -> Optional[UserPokemonInfo]:
         sql = """

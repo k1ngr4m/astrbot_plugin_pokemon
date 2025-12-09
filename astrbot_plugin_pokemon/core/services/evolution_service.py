@@ -3,8 +3,9 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import (
     UserPokemonInfo, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves, PokemonEvolution
 )
+from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.services.nature_service import NatureService
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
-    AbstractUserPokemonRepository, AbstractPokemonRepository
+    AbstractUserPokemonRepository, AbstractPokemonRepository, AbstractNatureRepository
 )
 
 
@@ -14,10 +15,12 @@ class EvolutionService:
     def __init__(
             self,
             user_pokemon_repo: AbstractUserPokemonRepository,
-            pokemon_repo: AbstractPokemonRepository
+            pokemon_repo: AbstractPokemonRepository,
+            nature_service: NatureService,
     ):
         self.user_pokemon_repo = user_pokemon_repo
         self.pokemon_repo = pokemon_repo
+        self.nature_service = nature_service
 
     def evolve_pokemon(self, user_id: str, pokemon_id: int) -> Dict[str, Any]:
         """
@@ -59,12 +62,12 @@ class EvolutionService:
             self.user_pokemon_repo._update_user_pokemon_fields(
                 user_id, pokemon_id,
                 species_id=evolved_species.id,
-                name=evolved_species.name_zh,
+                nickname=evolved_species.name_zh,
                 hp=new_stats.hp,
                 attack=new_stats.attack,
                 defense=new_stats.defense,
-                special_attack=new_stats.sp_attack,
-                special_defense=new_stats.sp_defense,
+                sp_attack=new_stats.sp_attack,
+                sp_defense=new_stats.sp_defense,
                 speed=new_stats.speed,
             )
 
@@ -158,18 +161,8 @@ class EvolutionService:
         )
 
         # 如果需要应用性格修正，创建并使用NatureService
-        # 这里我们直接导入NatureService来应用性格修正
-        from .nature_service import NatureService
-        from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository
-        import os
-
-        # 创建临时nature_service来应用修正
-        # 注意：在实际应用中，应该通过依赖注入传入nature_service
-        # 这里是为了解决循环依赖而做的简化
-        temp_nature_repo = SqliteNatureRepository(self.user_pokemon_repo.db_path)  # 假设user_pokemon_repo有db_path
-        temp_nature_service = NatureService(temp_nature_repo)
 
         # 应用性格修正
-        final_stats = temp_nature_service.apply_nature_modifiers(base_stats_obj, nature_id)
+        final_stats = self.nature_service.apply_nature_modifiers(base_stats_obj, nature_id)
 
         return final_stats

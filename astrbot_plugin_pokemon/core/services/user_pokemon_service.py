@@ -131,6 +131,55 @@ class UserPokemonService:
             data=formatted_pokemon
         )
 
+    def get_user_pokemon_paged(self, user_id: str, page: int = 1, page_size: int = 20) -> BaseResult[dict]:
+        """
+        分页获取用户宝可梦信息
+        Args:
+            user_id: 用户ID
+            page: 页码 (从1开始)
+            page_size: 每页数量
+        Returns:
+            包含分页数据和元信息的字典
+        """
+        offset = (page - 1) * page_size
+        user_pokemon_list = self.user_pokemon_repo.get_user_pokemon_paged(user_id, page_size, offset)
+
+        # 获取总数用于计算页数
+        total_count = self.user_pokemon_repo.get_user_pokemon_count(user_id)
+
+        # 格式化返回数据
+        formatted_pokemon = []
+        for pokemon in user_pokemon_list:
+            formatted_pokemon.append(UserPokemonInfo(
+                id = pokemon.id,
+                species_id = pokemon.species_id,
+                name = pokemon.name,
+                level = pokemon.level,
+                exp = pokemon.exp,
+                gender = pokemon.gender,
+                stats=pokemon.stats,
+                ivs = pokemon.ivs,
+                evs = pokemon.evs,
+                moves = pokemon.moves,
+                nature_id=pokemon.nature_id,
+                caught_time=pokemon.caught_time
+            ))
+
+        # 计算总页数
+        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_POKEMON_ALL_POKEMON_SUCCESS.value if formatted_pokemon else AnswerEnum.USER_POKEMONS_NOT_FOUND.value,
+            data={
+                "pokemon_list": formatted_pokemon,
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": total_pages
+            }
+        )
+
     def update_user_pokemon_moves(self, user_id: str, pokemon_id: int, moves) -> BaseResult:
         """
         更新用户宝可梦的技能

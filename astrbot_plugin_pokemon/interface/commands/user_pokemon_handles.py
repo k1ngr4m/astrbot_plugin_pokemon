@@ -79,112 +79,172 @@ class UserPokemonHandlers:
 
         args = event.message_str.split()
         if len(args) >= 2:
-            if not args[1].isdigit():
+            # 检查是否是分页指令 (P[页数])
+            if args[1].lower().startswith('p') and len(args[1]) > 1 and args[1][1:].isdigit():
+                page = int(args[1][1:])  # 获取页数，例如 P2 -> 2
+                if page < 1:
+                    yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
+                    return
+
+                # 获取分页数据
+                page_result = self.user_pokemon_service.get_user_pokemon_paged(user_id, page=page, page_size=20)
+                if not page_result.success:
+                    yield event.plain_result(page_result.message)
+                    return
+
+                page_data = page_result.data
+                pokemon_list = page_data.get("pokemon_list", [])
+                current_page = page_data.get("page", 1)
+                total_pages = page_data.get("total_pages", 1)
+                total_count = page_data.get("total_count", 0)
+
+                if not pokemon_list:
+                    yield event.plain_result(AnswerEnum.USER_POKEMONS_NOT_FOUND.value)
+                    return
+
+                # 组织显示信息
+                message = f"🌟 您拥有 {total_count} 只宝可梦 (第 {current_page}/{total_pages} 页)：\n\n"
+                start_index = (current_page - 1) * 20 + 1
+                for i, pokemon in enumerate(pokemon_list, start_index):
+                    gender_str = {
+                        "M": "♂️",
+                        "F": "♀️",
+                        "N": "⚲"
+                    }.get(pokemon.gender, "")
+
+                    # 获取宝可梦的类型信息
+                    pokemon_types = self.pokemon_service.get_pokemon_types(pokemon.species_id)
+                    pokemon_nature_name = self.nature_service.get_nature_name_by_id(pokemon.nature_id)
+
+                    # 只显示不重复的类型
+                    unique_types = list(dict.fromkeys(pokemon_types))  # 去重但保持顺序
+                    types_str = '/'.join(unique_types) if unique_types else "未知"
+
+                    message += f"{i}. {pokemon.name} {gender_str}\n"
+                    message += f"   属性: {types_str} | 性格: {pokemon_nature_name} | ID: {pokemon.id} | 等级: {pokemon.level} | HP: {pokemon.stats['hp']}\n"
+
+                message += f"\n使用 /我的宝可梦 P[页数] 查看其他页，如 /我的宝可梦 P2"
+                message += f"\n或使用 /我的宝可梦 <宝可梦ID> 查看特定宝可梦的详细信息。"
+                yield event.plain_result(message)
+            elif args[1].isdigit():
+                result = self.user_pokemon_service.get_user_pokemon_by_id(user_id, int(args[1]))
+                if not result.success:
+                    yield event.plain_result(result.message)
+                    return
+                pokemon_data: UserPokemonInfo = result.data
+                # 显示详细信息
+                gender_str = {
+                    "M": "♂️",
+                    "F": "♀️",
+                    "N": "⚲"
+                }.get(pokemon_data["gender"], "")
+
+                # 获取宝可梦的类型信息
+                pokemon_types = self.pokemon_service.get_pokemon_types(pokemon_data.species_id)
+                pokemon_nature_name = self.nature_service.get_nature_name_by_id(pokemon_data.nature_id)
+
+                # 只显示不重复的类型
+                unique_types = list(dict.fromkeys(pokemon_types))  # 去重但保持顺序
+                types_str = '/'.join(unique_types) if unique_types else "未知"
+
+                message = f"🔍 宝可梦详细信息：\n\n"
+                message += f"{pokemon_data.name} {gender_str}\n\n"
+                message += f"属性: {types_str}\n"  # 将"类型"改为"属性"
+                message += f"性格: {pokemon_nature_name}\n"  # 显示性格名称
+                message += f"等级: {pokemon_data.level}\n"
+                message += f"经验: {pokemon_data.exp}\n\n"
+
+                # 实际属性值
+                message += "💪 属性值:\n\n"
+                message += f"  HP: {pokemon_data['stats']['hp']}\t\n"
+                message += f"  攻击: {pokemon_data['stats']['attack']}\t\n"
+                message += f"  防御: {pokemon_data['stats']['defense']}\n\n"
+                message += f"  特攻: {pokemon_data['stats']['sp_attack']}\t\n"
+                message += f"  特防: {pokemon_data['stats']['sp_defense']}\t\n"
+                message += f"  速度: {pokemon_data['stats']['speed']}\n\n"
+
+                # 个体值 (IV)
+                message += "📊 个体值 (IV):\n\n"
+                message += f"  HP: {pokemon_data['ivs']['hp_iv']}/31\t\n"
+                message += f"  攻击: {pokemon_data['ivs']['attack_iv']}/31\t\n"
+                message += f"  防御: {pokemon_data['ivs']['defense_iv']}/31\n\n"
+                message += f"  特攻: {pokemon_data['ivs']['sp_attack_iv']}/31\t\n"
+                message += f"  特防: {pokemon_data['ivs']['sp_defense_iv']}/31\t\n"
+                message += f"  速度: {pokemon_data['ivs']['speed_iv']}/31\n\n"
+
+                # 努力值 (EV)
+                message += "📈 努力值 (EV):\n\n"
+                message += f"  HP: {pokemon_data['evs']['hp_ev']}\t\n"
+                message += f"  攻击: {pokemon_data['evs']['attack_ev']}\t\n"
+                message += f"  防御: {pokemon_data['evs']['defense_ev']}\n\n"
+                message += f"  特攻: {pokemon_data['evs']['sp_attack_ev']}\t\n"
+                message += f"  特防: {pokemon_data['evs']['sp_defense_ev']}\t\n"
+                message += f"  速度: {pokemon_data['evs']['speed_ev']}\n\n"
+
+                # 招式信息
+                message += "⚔️ 招式:\n\n"
+                moves = pokemon_data['moves']
+                move_names = []
+
+                # 获取招式1名称
+                if moves['move1_id']:
+                    move_info = self.plugin.move_repo.get_move_by_id(moves['move1_id'])
+                    move_name = move_info['name_zh'] if move_info else f"技能{moves['move1_id']}"
+                    move_names.append(f"  1. {move_name}")
+                else:
+                    move_names.append("  1. (空)")
+
+                # 获取招式2名称
+                if moves['move2_id']:
+                    move_info = self.plugin.move_repo.get_move_by_id(moves['move2_id'])
+                    move_name = move_info['name_zh'] if move_info else f"技能{moves['move2_id']}"
+                    move_names.append(f"  2. {move_name}")
+                else:
+                    move_names.append("  2. (空)")
+
+                # 获取招式3名称
+                if moves['move3_id']:
+                    move_info = self.plugin.move_repo.get_move_by_id(moves['move3_id'])
+                    move_name = move_info['name_zh'] if move_info else f"技能{moves['move3_id']}"
+                    move_names.append(f"  3. {move_name}")
+                else:
+                    move_names.append("  3. (空)")
+
+                # 获取招式4名称
+                if moves['move4_id']:
+                    move_info = self.plugin.move_repo.get_move_by_id(moves['move4_id'])
+                    move_name = move_info['name_zh'] if move_info else f"技能{moves['move4_id']}"
+                    move_names.append(f"  4. {move_name}")
+                else:
+                    move_names.append("  4. (空)")
+
+                message += "\n".join(move_names) + "\n\n"
+
+                message += f"捕获时间: {pokemon_data['caught_time']}"
+                yield event.plain_result(message)
+            else:
                 yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
-            result = self.user_pokemon_service.get_user_pokemon_by_id(user_id, int(args[1]))
-            if not result.success:
-                yield event.plain_result(result.message)
-                return
-            pokemon_data: UserPokemonInfo = result.data
-            # 显示详细信息
-            gender_str = {
-                "M": "♂️",
-                "F": "♀️",
-                "N": "⚲"
-            }.get(pokemon_data["gender"], "")
-
-            # 获取宝可梦的类型信息
-            pokemon_types = self.pokemon_service.get_pokemon_types(pokemon_data.species_id)
-            pokemon_nature_name = self.nature_service.get_nature_name_by_id(pokemon_data.nature_id)
-
-            # 只显示不重复的类型
-            unique_types = list(dict.fromkeys(pokemon_types))  # 去重但保持顺序
-            types_str = '/'.join(unique_types) if unique_types else "未知"
-
-            message = f"🔍 宝可梦详细信息：\n\n"
-            message += f"{pokemon_data.name} {gender_str}\n\n"
-            message += f"属性: {types_str}\n"  # 将"类型"改为"属性"
-            message += f"性格: {pokemon_nature_name}\n"  # 显示性格名称
-            message += f"等级: {pokemon_data.level}\n"
-            message += f"经验: {pokemon_data.exp}\n\n"
-
-            # 实际属性值
-            message += "💪 属性值:\n\n"
-            message += f"  HP: {pokemon_data['stats']['hp']}\t\n"
-            message += f"  攻击: {pokemon_data['stats']['attack']}\t\n"
-            message += f"  防御: {pokemon_data['stats']['defense']}\n\n"
-            message += f"  特攻: {pokemon_data['stats']['sp_attack']}\t\n"
-            message += f"  特防: {pokemon_data['stats']['sp_defense']}\t\n"
-            message += f"  速度: {pokemon_data['stats']['speed']}\n\n"
-
-            # 个体值 (IV)
-            message += "📊 个体值 (IV):\n\n"
-            message += f"  HP: {pokemon_data['ivs']['hp_iv']}/31\t\n"
-            message += f"  攻击: {pokemon_data['ivs']['attack_iv']}/31\t\n"
-            message += f"  防御: {pokemon_data['ivs']['defense_iv']}/31\n\n"
-            message += f"  特攻: {pokemon_data['ivs']['sp_attack_iv']}/31\t\n"
-            message += f"  特防: {pokemon_data['ivs']['sp_defense_iv']}/31\t\n"
-            message += f"  速度: {pokemon_data['ivs']['speed_iv']}/31\n\n"
-
-            # 努力值 (EV)
-            message += "📈 努力值 (EV):\n\n"
-            message += f"  HP: {pokemon_data['evs']['hp_ev']}\t\n"
-            message += f"  攻击: {pokemon_data['evs']['attack_ev']}\t\n"
-            message += f"  防御: {pokemon_data['evs']['defense_ev']}\n\n"
-            message += f"  特攻: {pokemon_data['evs']['sp_attack_ev']}\t\n"
-            message += f"  特防: {pokemon_data['evs']['sp_defense_ev']}\t\n"
-            message += f"  速度: {pokemon_data['evs']['speed_ev']}\n\n"
-
-            # 招式信息
-            message += "⚔️ 招式:\n\n"
-            moves = pokemon_data['moves']
-            move_names = []
-
-            # 获取招式1名称
-            if moves['move1_id']:
-                move_info = self.plugin.move_repo.get_move_by_id(moves['move1_id'])
-                move_name = move_info['name_zh'] if move_info else f"技能{moves['move1_id']}"
-                move_names.append(f"  1. {move_name}")
-            else:
-                move_names.append("  1. (空)")
-
-            # 获取招式2名称
-            if moves['move2_id']:
-                move_info = self.plugin.move_repo.get_move_by_id(moves['move2_id'])
-                move_name = move_info['name_zh'] if move_info else f"技能{moves['move2_id']}"
-                move_names.append(f"  2. {move_name}")
-            else:
-                move_names.append("  2. (空)")
-
-            # 获取招式3名称
-            if moves['move3_id']:
-                move_info = self.plugin.move_repo.get_move_by_id(moves['move3_id'])
-                move_name = move_info['name_zh'] if move_info else f"技能{moves['move3_id']}"
-                move_names.append(f"  3. {move_name}")
-            else:
-                move_names.append("  3. (空)")
-
-            # 获取招式4名称
-            if moves['move4_id']:
-                move_info = self.plugin.move_repo.get_move_by_id(moves['move4_id'])
-                move_name = move_info['name_zh'] if move_info else f"技能{moves['move4_id']}"
-                move_names.append(f"  4. {move_name}")
-            else:
-                move_names.append("  4. (空)")
-
-            message += "\n".join(move_names) + "\n\n"
-
-            message += f"捕获时间: {pokemon_data['caught_time']}"
-            yield event.plain_result(message)
         else:
-            result = self.user_pokemon_service.get_user_all_pokemon(user_id)
-            if not result.success:
-                yield event.plain_result(result.message)
+            # 默认显示第一页
+            page_result = self.user_pokemon_service.get_user_pokemon_paged(user_id, page=1, page_size=20)
+            if not page_result.success:
+                yield event.plain_result(page_result.message)
                 return
-            user_pokemon_list:List[UserPokemonInfo] = result.data
+
+            page_data = page_result.data
+            pokemon_list = page_data.get("pokemon_list", [])
+            current_page = page_data.get("page", 1)
+            total_pages = page_data.get("total_pages", 1)
+            total_count = page_data.get("total_count", 0)
+
+            if not pokemon_list:
+                yield event.plain_result(AnswerEnum.USER_POKEMONS_NOT_FOUND.value)
+                return
+
             # 组织显示信息
-            message = f"🌟 您拥有 {len(user_pokemon_list)} 只宝可梦：\n\n"
-            for i, pokemon in enumerate(user_pokemon_list, 1):
+            message = f"🌟 您拥有 {total_count} 只宝可梦 (第 {current_page}/{total_pages} 页)：\n\n"
+            start_index = (current_page - 1) * 20 + 1
+            for i, pokemon in enumerate(pokemon_list, start_index):
                 gender_str = {
                     "M": "♂️",
                     "F": "♀️",
@@ -202,5 +262,6 @@ class UserPokemonHandlers:
                 message += f"{i}. {pokemon.name} {gender_str}\n"
                 message += f"   属性: {types_str} | 性格: {pokemon_nature_name} | ID: {pokemon.id} | 等级: {pokemon.level} | HP: {pokemon.stats['hp']}\n"
 
-            message += f"\n您可以使用 /我的宝可梦 <宝可梦ID> 来查看特定宝可梦的详细信息。"
+            message += f"\n使用 /我的宝可梦 P[页数] 查看其他页，如 /我的宝可梦 P2"
+            message += f"\n或使用 /我的宝可梦 <宝可梦ID> 查看特定宝可梦的详细信息。"
             yield event.plain_result(message)
