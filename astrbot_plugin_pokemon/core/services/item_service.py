@@ -73,6 +73,7 @@ class ItemService:
         items_by_type = items_result["items_by_type"]
         type_names = {
             34: "精灵球",
+            33: "特殊精灵球"
         }
 
         for item_type, items in items_by_type.items():

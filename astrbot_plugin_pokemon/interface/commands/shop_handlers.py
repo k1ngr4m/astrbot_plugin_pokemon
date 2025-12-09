@@ -63,7 +63,8 @@ class ShopHandlers:
             items_by_type[item_type].append(item)
 
         type_names = {
-            34: "精灵球",
+             34: "精灵球",
+             33: "特殊精灵球"
         }
 
         for item_type, items in items_by_type.items():
