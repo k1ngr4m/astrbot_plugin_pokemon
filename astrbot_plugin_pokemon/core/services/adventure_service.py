@@ -281,6 +281,14 @@ class AdventureService:
         # 预加载野生宝可梦的 Context (包含招式数据，避免循环内查询数据库)
         wild_ctx = self._create_battle_context(wild_pokemon_info, is_user=False)
 
+        # 保存用户所有宝可梦的上下文，用于状态继承
+        user_pokemon_contexts = []
+        for pokemon_id in user_team_list:
+            user_pokemon_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pokemon_id)
+            if user_pokemon_info:
+                user_ctx = self._create_battle_context(user_pokemon_info, is_user=True)
+                user_pokemon_contexts.append(user_ctx)
+
         current_pokemon_index = 0
         battle_result_str = "fail"
         final_user_pokemon_info = None
@@ -297,8 +305,8 @@ class AdventureService:
                 current_pokemon_index += 1
                 continue
 
-            # 预加载玩家宝可梦的 Context
-            user_ctx = self._create_battle_context(user_pokemon_info, is_user=True)
+            # 使用已保存的上下文，以继承状态（血量、PP等）
+            user_ctx = user_pokemon_contexts[current_pokemon_index]
             final_user_pokemon_info = user_pokemon_info
 
             # 1. 计算胜率 (使用预加载数据的Context，大幅提升性能)
@@ -320,6 +328,12 @@ class AdventureService:
             # 更新野生宝可梦数据对象，以便下一轮（如果输了）继承血量
             wild_pokemon_info.stats.hp = max(0, remaining_wild_hp)
             wild_ctx.current_hp = wild_pokemon_info.stats.hp  # 更新 Context
+
+            # 更新用户宝可梦的战斗状态（血量、PP），使其能够继承到下一场战斗
+            # 无论战斗输赢，都需要更新当前宝可梦的战斗状态（血量、PP）到上下文
+            user_pokemon_contexts[current_pokemon_index].current_hp = user_ctx.current_hp
+            # 更新所有技能的PP状态，确保PP消耗被正确继承
+            user_pokemon_contexts[current_pokemon_index].moves = [self._create_move_backup(move, move.current_pp) for move in user_ctx.moves]
 
             battle_log.append({
                 "pokemon_id": user_pokemon_info.id,
@@ -1254,7 +1268,7 @@ class AdventureService:
 
             # 1. 计算胜率
             if current_trainer_ctx:  # 确保上下文存在
-                current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
+                # 不重置HP，保持之前战斗后的剩余血量
                 user_win_rate, trainer_win_rate = self.calculate_battle_win_rate(user_ctx, current_trainer_ctx)
             else:
                 # 如果没有训练家宝可梦，继续下一只用户宝可梦
@@ -1266,8 +1280,7 @@ class AdventureService:
 
             # 2. 执行实际战斗
             if current_trainer_ctx:  # 确保上下文存在
-                current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
-
+                # 不重置HP，保持之前战斗后的剩余血量
                 battle_outcome, battle_log_data, remaining_trainer_hp = self.execute_real_battle(user_ctx, current_trainer_ctx)
             else:
                 # 如果没有训练家宝可梦，战斗结果为失败（用户宝可梦胜利）
@@ -1303,6 +1316,8 @@ class AdventureService:
                 current_trainer_pokemon_index += 1
                 if current_trainer_pokemon_index < len(trainer_pokemon_contexts):
                     current_trainer_ctx = trainer_pokemon_contexts[current_trainer_pokemon_index]
+                    # 当新的训练家宝可梦上场时，应该恢复其初始HP
+                    current_trainer_ctx.current_hp = current_trainer_ctx.pokemon.stats.hp
                 else:
                     # 所有训练家宝可梦都被击败，战斗胜利
                     battle_result_str = "success"

@@ -108,7 +108,7 @@ class AdventureHandlers:
             return
 
         # 3. 执行冒险 - 按7:3比例遭遇野生宝可梦和训练家
-        result = self.adventure_service.adventure_in_location(user_id, location_id, encounter_npc_only=False)
+        result = self.adventure_service.adventure_in_location(user_id, location_id, encounter_npc_only=True)
         if not result.success:
             yield event.plain_result(result.message)
             return
