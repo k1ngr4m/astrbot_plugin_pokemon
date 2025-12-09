@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ user.basic_info.nickname }} - 用户详情 - 宝可梦后台</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ url_for('admin_bp.dashboard') }}">
+                <i class="fas fa-gamepad me-2"></i>宝可梦管理
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="{{ url_for('admin_bp.dashboard') }}">仪表盘</a>
+                <a class="nav-link active" href="{{ url_for('admin_bp.users') }}">用户管理</a>
+                <a class="nav-link" href="{{ url_for('admin_bp.logout') }}"><i class="fas fa-sign-out-alt"></i></a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid mt-4 p-4">
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-white py-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h3 class="mb-0"><i class="fas fa-user-circle me-2 text-primary"></i>{{ user.basic_info.nickname }} ({{ user_id }})</h3>
+                            <a href="{{ url_for('admin_bp.users') }}" class="btn btn-outline-secondary"><i class="fas fa-arrow-left me-1"></i> 返回用户列表</a>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- 用户基本信息卡片 -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <h5 class="card-title"><i class="fas fa-info-circle me-2 text-info"></i>基本信息</h5>
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <strong>等级:</strong> Lv.{{ user.basic_info.level }}
+                                            </div>
+                                            <div class="col-md-3">
+                                                <strong>经验:</strong> {{ user.basic_info.exp }}
+                                            </div>
+                                            <div class="col-md-3">
+                                                <strong>金币:</strong> {{ user.basic_info.coins }}
+                                            </div>
+                                            <div class="col-md-3">
+                                                <strong>注册时间:</strong> {{ user.basic_info.created_at }}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 标签页导航 -->
+                        <ul class="nav nav-tabs" id="userTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" id="pokemon-tab" data-bs-toggle="tab" data-bs-target="#pokemon" type="button" role="tab">
+                                    <i class="fas fa-dragon me-1"></i>用户宝可梦 ({{ user.pokemon|length }})
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="items-tab" data-bs-toggle="tab" data-bs-target="#items" type="button" role="tab">
+                                    <i class="fas fa-shopping-bag me-1"></i>用户道具 ({{ user.user_items|length }})
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="team-tab" data-bs-toggle="tab" data-bs-target="#team" type="button" role="tab">
+                                    <i class="fas fa-users me-1"></i>用户队伍
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="battle-tab" data-bs-toggle="tab" data-bs-target="#battle" type="button" role="tab">
+                                    <i class="fas fa-fist-raised me-1"></i>战斗记录 ({{ user.battle_logs|length }})
+                                </button>
+                            </li>
+                        </ul>
+
+                        <!-- 标签页内容 -->
+                        <div class="tab-content mt-3" id="userTabsContent">
+                            <!-- 宝可梦标签页 -->
+                            <div class="tab-pane fade show active" id="pokemon" role="tabpanel">
+                                {% if user.pokemon %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th width="50">#</th>
+                                                <th>宝可梦</th>
+                                                <th>等级</th>
+                                                <th>性别</th>
+                                                <th>经验</th>
+                                                <th>属性</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for pokemon in user.pokemon %}
+                                            <tr>
+                                                <td class="text-muted">{{ pokemon.id }}</td>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <div class="bg-light rounded-circle p-2 me-2 text-primary">
+                                                            <i class="fas fa-dragon"></i>
+                                                        </div>
+                                                        <div>
+                                                            <div class="fw-bold">{{ pokemon.name }}</div>
+                                                            <small class="text-muted">ID: {{ pokemon.species_id }}</small>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td><span class="badge bg-light text-dark border">Lv. {{ pokemon.level }}</span></td>
+                                                <td>
+                                                    {% if pokemon.gender == 'M' %}
+                                                        <i class="fas fa-mars text-primary"></i> 雄性
+                                                    {% elif pokemon.gender == 'F' %}
+                                                        <i class="fas fa-venus text-danger"></i> 雌性
+                                                    {% else %}
+                                                        <i class="fas fa-infinity"></i> 无性别
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ pokemon.exp }}</td>
+                                                <td>
+                                                    HP:{{ pokemon.stats.hp }} | ATK:{{ pokemon.stats.attack }} | DEF:{{ pokemon.stats.defense }}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-dragon fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">该用户还没有宝可梦</p>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- 道具标签页 -->
+                            <div class="tab-pane fade" id="items" role="tabpanel">
+                                {% if user.items %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th width="50">#</th>
+                                                <th>道具名称</th>
+                                                <th>类型</th>
+                                                <th>数量</th>
+                                                <th>描述</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in user.user_items %}
+                                            <tr>
+                                                <td class="text-muted">{{ item.item_id }}</td>
+                                                <td>
+                                                    <div class="fw-bold">{{ item.name_zh }}</div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge bg-secondary">{{ item.category_id }}</span>
+                                                </td>
+                                                <td><span class="badge bg-success">{{ item.quantity }}</span></td>
+                                                <td>
+                                                    {% if item.description %}
+                                                        <small class="text-muted">{{ item.description }}</small>
+                                                    {% else %}
+                                                        <small class="text-muted">-</small>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-shopping-bag fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">该用户没有任何道具</p>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- 队伍标签页 -->
+                            <div class="tab-pane fade" id="team" role="tabpanel">
+                                {% if user.team %}
+                                <div class="row">
+                                    {% for pokemon_id in user.team %}
+                                    <div class="col-md-4 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-body text-center">
+                                                <i class="fas fa-dragon fa-2x text-primary mb-2"></i>
+                                                <h6 class="card-title">队伍位置 #{{ loop.index }}</h6>
+                                                <p class="card-text">宝可梦ID: {{ pokemon_id }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-users fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">该用户还没有配置队伍</p>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- 战斗记录标签页 -->
+                            <div class="tab-pane fade" id="battle" role="tabpanel">
+                                {% if user.battle_logs %}
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle">
+                                        <thead>
+                                            <tr>
+                                                <th width="50">#</th>
+                                                <th>对手</th>
+                                                <th>结果</th>
+                                                <th>时间</th>
+                                                <th>详细信息</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for log in user.battle_logs %}
+                                            <tr>
+                                                <td class="text-muted">{{ log.id }}</td>
+                                                <td>
+                                                    <div class="fw-bold">{{ log.target_name }}</div>
+                                                </td>
+                                                <td>
+                                                    <span class="badge
+                                                        {% if log.result == 'win' or '成功' in log.result or 'WIN' in log.result.upper() %}bg-success
+                                                        {% elif log.result == 'lose' or '失败' in log.result or 'LOSE' in log.result.upper() %}bg-danger
+                                                        {% else %}bg-warning{% endif %}">
+                                                        {{ log.result }}
+                                                    </span>
+                                                </td>
+                                                <td><small class="text-muted">{{ log.created_at }}</small></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#battleLogModal"
+                                                            data-log="{{ log.log_data|tojson|urlencode }}">
+                                                        查看详情
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                {% else %}
+                                <div class="text-center py-4">
+                                    <i class="fas fa-fist-raised fa-3x text-muted mb-3"></i>
+                                    <p class="text-muted">该用户还没有战斗记录</p>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 战斗记录详情模态框 -->
+    <div class="modal fade" id="battleLogModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">战斗详情</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="battleLogContent"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 战斗记录模态框事件处理
+        var battleLogModal = document.getElementById('battleLogModal');
+        battleLogModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var logData = button.getAttribute('data-log');
+
+            // 解码并解析JSON
+            logData = decodeURIComponent(logData);
+            logData = JSON.parse(logData);
+
+            var content = document.getElementById('battleLogContent');
+            content.innerHTML = '';
+
+            // 显示战斗记录的每一行
+            logData.forEach(function(line, index) {
+                var p = document.createElement('p');
+                p.className = 'mb-2';
+                p.textContent = (index + 1) + '. ' + line;
+                content.appendChild(p);
+            });
+        });
+    </script>
+</body>
+</html>
