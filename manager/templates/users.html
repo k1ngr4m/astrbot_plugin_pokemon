@@ -16,7 +16,7 @@
             </a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="{{ url_for('admin_bp.dashboard') }}">仪表盘</a>
-                <a class="nav-link active" href="#">用户管理</a>
+                <a class="nav-link active" href="{{ url_for('admin_bp.users') }}">用户管理</a>
             </div>
         </div>
     </nav>
@@ -27,22 +27,22 @@
                 <div class="card shadow-sm">
                     <div class="card-header bg-white d-flex justify-content-between align-items-center py-3">
                         <h3 class="mb-0"><i class="fas fa-users-cog me-2 text-primary"></i>训练家列表</h3>
-                        <button class="btn btn-primary"><i class="fas fa-plus me-1"></i> 新增训练家</button>
+                        <span class="badge bg-primary">{{ users|length }} 个用户</span>
                     </div>
                     <div class="card-body">
                         <div class="row mb-4 g-3">
                             <div class="col-md-5">
                                 <div class="input-group">
                                     <span class="input-group-text bg-light border-end-0"><i class="fas fa-search text-muted"></i></span>
-                                    <input type="text" class="form-control border-start-0 bg-light" placeholder="搜索用户名或ID...">
-                                    <button class="btn btn-primary" type="button">搜索</button>
+                                    <input type="text" class="form-control border-start-0 bg-light" placeholder="搜索用户名或ID..." id="searchInput">
+                                    <button class="btn btn-primary" type="button" onclick="searchUsers()">搜索</button>
                                 </div>
                             </div>
                             <div class="col-md-7 text-end">
                                 <div class="btn-group shadow-sm" role="group">
-                                    <button class="btn btn-light active fw-bold">全部</button>
-                                    <button class="btn btn-light text-success">活跃</button>
-                                    <button class="btn btn-light text-secondary">沉睡</button>
+                                    <button class="btn btn-light active fw-bold" onclick="filterUsers('all')">全部</button>
+                                    <button class="btn btn-light" onclick="filterUsers('active')">活跃</button>
+                                    <button class="btn btn-light" onclick="filterUsers('inactive')">沉睡</button>
                                 </div>
                             </div>
                         </div>
@@ -54,36 +54,45 @@
                                         <th width="50">#</th>
                                         <th>训练家</th>
                                         <th>等级</th>
-                                        <th>资产</th>
+                                        <th>金币</th>
                                         <th>注册时间</th>
                                         <th>状态</th>
-                                        <th class="text-end">管理</th>
+                                        <th class="text-end">操作</th>
                                     </tr>
                                 </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="text-muted">001</td>
+                                <tbody id="usersTableBody">
+                                    {% for user in users %}
+                                    <tr data-user-id="{{ user.user_id }}" data-level="{{ user.level }}" data-nickname="{{ user.nickname }}">
+                                        <td class="text-muted">{{ loop.index }}</td>
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="bg-light rounded-circle p-2 me-2 text-primary">
                                                     <i class="fas fa-user"></i>
                                                 </div>
                                                 <div>
-                                                    <div class="fw-bold">训练家小明</div>
-                                                    <small class="text-muted">宝可梦: 8只</small>
+                                                    <div class="fw-bold">{{ user.nickname }}</div>
+                                                    <small class="text-muted">ID: {{ user.user_id }}</small>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td><span class="badge bg-light text-dark border">Lv. 15</span></td>
-                                        <td><span class="text-warning fw-bold"><i class="fas fa-coins me-1"></i>2,850</span></td>
-                                        <td class="text-muted small">2025-01-01</td>
+                                        <td><span class="badge bg-light text-dark border">Lv. {{ user.level }}</span></td>
+                                        <td><span class="text-warning fw-bold"><i class="fas fa-coins me-1"></i>{{ user.coins }}</span></td>
+                                        <td class="text-muted small">{{ user.created_at }}</td>
                                         <td><span class="badge bg-success bg-opacity-10 text-success px-3 py-2 rounded-pill">活跃中</span></td>
                                         <td class="text-end">
-                                            <button class="btn btn-sm btn-light text-primary" data-bs-toggle="modal" data-bs-target="#userDetailModal"><i class="fas fa-eye"></i></button>
-                                            <button class="btn btn-sm btn-light text-danger"><i class="fas fa-trash"></i></button>
+                                            <a href="{{ url_for('admin_bp.user_detail', user_id=user.user_id) }}" class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> 查看</a>
                                         </td>
                                     </tr>
-                                    </tbody>
+                                    {% endfor %}
+                                    {% if not users %}
+                                    <tr>
+                                        <td colspan="7" class="text-center text-muted py-4">
+                                            <i class="fas fa-users fa-3x mb-3"></i>
+                                            <p>还没有任何用户</p>
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
                             </table>
                         </div>
                     </div>
@@ -92,73 +101,50 @@
         </div>
     </div>
 
-    <div class="modal fade" id="userDetailModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-centered">
-            <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold">训练家档案</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4">
-                    <div class="row">
-                        <div class="col-md-5 border-end">
-                            <div class="text-center mb-4">
-                                <div class="avatar-circle bg-light rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
-                                    <i class="fas fa-user fa-2x text-secondary"></i>
-                                </div>
-                                <h4 class="fw-bold">训练家小明</h4>
-                                <span class="badge bg-primary rounded-pill">Lv. 15</span>
-                            </div>
-                            <div class="p-3 bg-light rounded-3">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <span class="text-muted">金币</span>
-                                    <span class="fw-bold text-dark">2,850</span>
-                                </div>
-                                <div class="d-flex justify-content-between">
-                                    <span class="text-muted">最后登录</span>
-                                    <span class="fw-bold text-dark">今日 10:30</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-7 ps-md-4">
-                            <h6 class="text-muted text-uppercase small fw-bold mb-3">持有宝可梦</h6>
-                            <div class="list-group list-group-flush">
-                                <div class="list-group-item border-0 px-0 d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center">
-                                        <span class="badge bg-secondary me-2">#004</span>
-                                        <strong>小火龙</strong>
-                                        <small class="text-muted ms-2">Lv. 18</small>
-                                    </div>
-                                    <span class="badge bg-fire">火系</span>
-                                </div>
-                                <div class="list-group-item border-0 px-0 d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center">
-                                        <span class="badge bg-secondary me-2">#007</span>
-                                        <strong>杰尼龟</strong>
-                                        <small class="text-muted ms-2">Lv. 15</small>
-                                    </div>
-                                    <span class="badge bg-water">水系</span>
-                                </div>
-                                <div class="list-group-item border-0 px-0 d-flex justify-content-between align-items-center">
-                                    <div class="d-flex align-items-center">
-                                        <span class="badge bg-secondary me-2">#025</span>
-                                        <strong>皮卡丘</strong>
-                                        <small class="text-muted ms-2">Lv. 20</small>
-                                    </div>
-                                    <span class="badge bg-electric">电系</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer border-0">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">关闭</button>
-                    <button type="button" class="btn btn-primary">保存数据</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function filterUsers(status) {
+            const rows = document.querySelectorAll('#usersTableBody tr:not(:first-child)'); // 排除空行
+
+            rows.forEach(row => {
+                const level = parseInt(row.getAttribute('data-level'));
+                let show = true;
+
+                if (status === 'active' && level >= 5) {
+                    show = true; // 假设等级5以上为活跃
+                } else if (status === 'inactive' && level < 5) {
+                    show = true; // 假设等级5以下为不活跃
+                } else if (status === 'all') {
+                    show = true;
+                } else {
+                    show = false;
+                }
+
+                if (show) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        function searchUsers() {
+            const input = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.querySelectorAll('#usersTableBody tr:not(:first-child)'); // 排除空行
+
+            rows.forEach(row => {
+                const nickname = row.getAttribute('data-nickname').toLowerCase();
+                const userId = row.getAttribute('data-user-id').toLowerCase();
+
+                const matches = nickname.includes(input) || userId.includes(input);
+
+                if (matches) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+    </script>
 </body>
 </html>

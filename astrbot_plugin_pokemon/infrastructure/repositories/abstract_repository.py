@@ -44,6 +44,9 @@ class AbstractUserRepository(ABC):
     @abstractmethod
     def update_user_last_adventure_time(self, user_id, last_adventure_time): pass
 
+    @abstractmethod
+    def get_all_users(self) -> List[User]: pass
+
 class AbstractPokemonRepository(ABC):
     """宝可梦数据仓储接口"""
     # ==========增==========
@@ -230,6 +233,9 @@ class AbstractBattleRepository(ABC):
 
     @abstractmethod
     def get_battle_log_by_id(self, battle_log_id: int) -> Optional[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def get_user_battle_logs(self, user_id: str, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]: pass
 
 class AbstractTeamRepository(ABC):
     """队伍数据仓储接口"""

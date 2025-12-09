@@ -116,3 +116,39 @@ async def logout():
 @login_required
 async def dashboard():
     return await render_template("dashboard.html")
+
+
+@admin_bp.route("/users")
+@login_required
+async def users():
+    """显示所有用户列表"""
+    # 从服务实例获取用户数据
+    user_service = current_app.config.get("USER_SERVICE")
+    if not user_service:
+        return "服务未配置", 500
+
+    users_result = user_service.get_all_users()
+    if not users_result.success:
+        users_list = []
+    else:
+        users_list = users_result.data
+
+    return await render_template("users.html", users=users_list)
+
+
+@admin_bp.route("/users/<user_id>")
+@login_required
+async def user_detail(user_id):
+    """显示用户详细信息"""
+    # 从服务实例获取用户数据
+    user_service = current_app.config.get("USER_SERVICE")
+    if not user_service:
+        return "服务未配置", 500
+
+    user_detail_result = user_service.get_user_detailed_info(user_id)
+    if not user_detail_result.success:
+        return "用户不存在", 404
+
+    user_data = user_detail_result.data
+
+    return await render_template("user_detail.html", user=user_data, user_id=user_id)

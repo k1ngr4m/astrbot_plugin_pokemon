@@ -75,6 +75,8 @@ class GameContainer:
             item_repo=self.item_repo,
             user_pokemon_repo=self.user_pokemon_repo,
             user_item_repo=self.user_item_repo,
+            team_repo=self.team_repo,
+            battle_repo=self.battle_repo,
             exp_service=self.exp_service,
             config=self.config
         )

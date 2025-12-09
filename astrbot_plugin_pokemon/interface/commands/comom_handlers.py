@@ -64,7 +64,13 @@ class CommonHandlers:
             await asyncio.sleep(1)  # 等待服务启动
 
             yield event.plain_result(
-                f"✅ 钓鱼后台已启动！\n🔗请访问 http://localhost:{self.plugin.port}/admin\n🔑 密钥请到配置文件中查看\n\n⚠️ 重要提示：\n• 如需公网访问，请自行配置端口转发和防火墙规则\n• 确保端口 {self.plugin.port} 已开放并映射到公网IP\n• 建议使用反向代理（如Nginx）增强安全性"
+                f"✅ 宝可梦后台已启动！\n\n"
+                f"🔗请访问 http://localhost:{self.plugin.port}/admin\n\n"
+                f"🔑 密钥请到配置文件中查看\n\n"
+                f"⚠️ 重要提示：\n\n"
+                f"• 如需公网访问，请自行配置端口转发和防火墙规则\n\n"
+                f"• 确保端口 {self.plugin.port} 已开放并映射到公网IP\n\n"
+                f"• 建议使用反向代理（如Nginx）增强安全性"
             )
         except Exception as e:
             logger.error(f"启动后台失败: {e}", exc_info=True)

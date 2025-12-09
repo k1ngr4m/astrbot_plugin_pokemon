@@ -48,3 +48,32 @@ class SqliteBattleRepository(AbstractBattleRepository):
         except Exception as e:
             logger.error(f"获取战斗日志失败: {e}")
             return None
+
+    def get_user_battle_logs(self, user_id: str, limit: int = 10, offset: int = 0) -> List[Dict[str, Any]]:
+        """获取用户的战斗日志"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, user_id, target_name, log_data, result, created_at
+                    FROM battle_logs
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC
+                    LIMIT ? OFFSET ?
+                """, (user_id, limit, offset))
+                rows = cursor.fetchall()
+
+                battle_logs = []
+                for row in rows:
+                    battle_logs.append({
+                        "id": row[0],
+                        "user_id": row[1],
+                        "target_name": row[2],
+                        "log_data": json.loads(row[3]),
+                        "result": row[4],
+                        "created_at": row[5]
+                    })
+                return battle_logs
+        except Exception as e:
+            logger.error(f"获取用户战斗日志失败: {e}")
+            return []

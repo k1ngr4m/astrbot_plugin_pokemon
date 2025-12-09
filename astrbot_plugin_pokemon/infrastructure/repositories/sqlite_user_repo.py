@@ -248,3 +248,20 @@ class SqliteUserRepository(AbstractUserRepository):
                 WHERE user_id = ?
             """, (last_adventure_time, user_id))
             conn.commit()
+
+    def get_all_users(self) -> List[User]:
+        """
+        获取所有用户信息
+        Returns:
+            List[User]: 所有用户信息列表
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM users ORDER BY created_at DESC")
+            rows = cursor.fetchall()
+            users = []
+            for row in rows:
+                user = self._row_to_user(row)
+                if user:
+                    users.append(user)
+            return users

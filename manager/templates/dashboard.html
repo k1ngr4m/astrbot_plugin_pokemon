@@ -16,8 +16,8 @@
             </a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link active" href="{{ url_for('admin_bp.dashboard') }}">仪表盘</a>
-                <a class="nav-link" href="#">用户管理</a>
-                <a class="nav-link" href="#"><i class="fas fa-sign-out-alt"></i></a>
+                <a class="nav-link" href="{{ url_for('admin_bp.users') }}">用户管理</a>
+                <a class="nav-link" href="{{ url_for('admin_bp.logout') }}"><i class="fas fa-sign-out-alt"></i></a>
             </div>
         </div>
     </nav>
@@ -68,7 +68,7 @@
                     <div class="card-body d-flex justify-content-between align-items-center">
                         <h4 class="mb-0 fs-5"><i class="fas fa-bolt me-2 text-warning"></i>快速操作</h4>
                         <div>
-                            <a href="#" class="btn btn-primary me-2"><i class="fas fa-user-cog me-1"></i> 用户管理</a>
+                            <a href="{{ url_for('admin_bp.users') }}" class="btn btn-primary me-2"><i class="fas fa-user-cog me-1"></i> 用户管理</a>
                             <a href="#" class="btn btn-outline-dark me-2"><i class="fas fa-search me-1"></i> 查询图鉴</a>
                             <a href="#" class="btn btn-success"><i class="fas fa-store me-1"></i> 商店配置</a>
                         </div>
