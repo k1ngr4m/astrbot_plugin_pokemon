@@ -245,8 +245,7 @@ class AdventureService:
             wild_ctx.current_hp = wild_pokemon_info.stats.hp
 
             user_ctx.pokemon.stats.hp = max(0, rem_user_hp)
-            # 上下文已经在 execute_real_battle 中被修改了 (HP, PP)，这里不需要显式回写
-            # 只需要将数据记录到日志
+            user_ctx.current_hp = user_ctx.pokemon.stats.hp  # 也要更新上下文中的current_hp以确保一致性
             battle_log.append({
                 "pokemon_id": user_ctx.pokemon.id,
                 "pokemon_name": user_ctx.pokemon.name,
@@ -386,11 +385,7 @@ class AdventureService:
         
         logger.info("=====================实战结束=====================")
 
-        # Sync back state to context (HP and PP)
-        user_ctx.current_hp = user_state.current_hp
-        wild_ctx.current_hp = wild_state.current_hp
-        
-        # Sync PP back to moves in context
+        # Sync PP back to moves in context (HP is handled by the caller)
         for i, move in enumerate(user_ctx.moves):
             move.current_pp = user_state.current_pps[i]
         for i, move in enumerate(wild_ctx.moves):
@@ -616,8 +611,11 @@ class AdventureService:
             outcome, details, rem_t_hp, rem_u_hp = self.execute_real_battle(u_ctx, t_ctx)
 
             # 更新用户和训练家的 HP
-            u_ctx.current_hp = max(0, rem_u_hp)
-            t_ctx.current_hp = max(0, rem_t_hp)
+            u_ctx.pokemon.stats.hp = max(0, rem_u_hp)
+            u_ctx.current_hp = u_ctx.pokemon.stats.hp  # 也要更新上下文中的current_hp以确保一致性
+
+            t_ctx.pokemon.stats.hp = max(0, rem_t_hp)
+            t_ctx.current_hp = t_ctx.pokemon.stats.hp  # 也要更新上下文中的current_hp以确保一致性
 
             battle_log.append({
                 "pokemon_id": u_ctx.pokemon.id,
