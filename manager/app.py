@@ -152,3 +152,65 @@ async def user_detail(user_id):
     user_data = user_detail_result.data
 
     return await render_template("user_detail.html", user=user_data, user_id=user_id)
+
+
+@admin_bp.route("/users/<user_id>/edit", methods=["GET", "POST"])
+@login_required
+async def edit_user(user_id):
+    """编辑用户信息"""
+    user_service = current_app.config.get("USER_SERVICE")
+    if not user_service:
+        return "服务未配置", 500
+
+    if request.method == "POST":
+        # 获取POST数据
+        form = await request.form
+        try:
+            # 更新用户基本信息
+            nickname = form.get('nickname', '').strip()
+            level = int(form.get('level', 1))
+            exp = int(form.get('exp', 0))
+            coins = int(form.get('coins', 0))
+
+            # 获取当前用户数据用于更新
+            current_user_data = user_service.get_user_by_id(user_id)
+            if not current_user_data.success:
+                await flash("用户不存在", "danger")
+                return redirect(url_for("admin_bp.users"))
+
+            # 更新用户信息
+            user_repo = current_app.config.get("USER_REPO")
+            if not user_repo:
+                return "服务未配置", 500
+
+            # 更新用户数据
+            user_repo.update_user_exp(level, exp, user_id)
+            user_repo.update_user_coins(user_id, coins)
+
+            # 更新昵称，如果提供了新昵称
+            if nickname and nickname != current_user_data.data.nickname:
+                # 直接更新昵称
+                with user_repo._get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        UPDATE users
+                        SET nickname = ?
+                        WHERE user_id = ?
+                    """, (nickname, user_id))
+                    conn.commit()
+
+            await flash("用户信息更新成功", "success")
+            return redirect(url_for("admin_bp.user_detail", user_id=user_id))
+        except ValueError:
+            await flash("数据格式错误，请检查输入", "danger")
+        except Exception as e:
+            logger.error(f"更新用户信息时出错: {e}")
+            await flash("更新用户信息失败", "danger")
+
+    # GET 请求 - 显示编辑表单
+    user_detail_result = user_service.get_user_detailed_info(user_id)
+    if not user_detail_result.success:
+        return "用户不存在", 404
+
+    user_data = user_detail_result.data
+    return await render_template("edit_user.html", user=user_data, user_id=user_id)

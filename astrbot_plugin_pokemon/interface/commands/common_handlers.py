@@ -47,6 +47,7 @@ class CommonHandlers:
             services_to_inject = {
                 "user_service": self.plugin.user_service,
                 "shop_service": self.plugin.shop_service,
+                "user_repo": self.plugin.user_repo,  # 添加user_repo服务以支持编辑功能
             }
             app = create_app(secret_key=self.plugin.secret_key, services=services_to_inject)
             config = Config()

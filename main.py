@@ -9,7 +9,7 @@ from .astrbot_plugin_pokemon.core.container import GameContainer
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
 from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
 
-from .astrbot_plugin_pokemon.interface.commands.comom_handlers import CommonHandlers
+from .astrbot_plugin_pokemon.interface.commands.common_handlers import CommonHandlers
 from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers
 from .astrbot_plugin_pokemon.interface.commands.team_handlers import TeamHandlers
 from .astrbot_plugin_pokemon.interface.commands.adventure_handlers import AdventureHandlers
