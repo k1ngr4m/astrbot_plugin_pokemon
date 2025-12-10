@@ -12,16 +12,23 @@ class BattleLogger(Protocol):
 
 
 class ListBattleLogger:
-    def __init__(self):
+    def __init__(self, log_details: bool = False):
         self.logs = []
+        self._log_details = log_details
 
     def log(self, message: str):
         self.logs.append(message)
+
+    def should_log_details(self) -> bool:
+        return self._log_details
 
 
 class NoOpBattleLogger:
     def log(self, message: str):
         pass
+
+    def should_log_details(self) -> bool:
+        return False
 
 
 @dataclass
@@ -42,6 +49,14 @@ class BattleState:
             current_hp=context.current_hp,
             current_pps=[m.current_pp for m in context.moves]
         )
+
+
+class BattleLoggerWithDetailOption(Protocol):
+    def log(self, message: str):
+        ...
+    def should_log_details(self) -> bool:
+        """返回是否应该记录详细信息（如评分计算详情）"""
+        ...
 
 
 class BattleLogic:
@@ -115,8 +130,8 @@ class BattleLogic:
         atk_def_ratio = self._get_atk_def_ratio(attacker_ctx, defender_ctx, move)
         score = move.power * (move.accuracy / 100.0) * eff * stab * atk_def_ratio
 
-        if logger_obj:
-             logger.info(
+        if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
+            logger.info(
                 f"评分计算详情 - {move.move_name}: "
                 f"基础伤害({move.power}) * 命中率({move.accuracy/100.0:.2f}) * "
                 f"克制({eff}) * STAB({stab}) * 攻防比({atk_def_ratio:.2f}) = {score:.2f}"
@@ -138,7 +153,8 @@ class BattleLogic:
                 available_moves.append(move)
 
         if not available_moves:
-            if logger_obj: logger.info("没有可用招式，使用挣扎")
+            if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
+                logger.info("没有可用招式，使用挣扎")
             return self.get_struggle_move()
 
         attack_moves = [m for m in available_moves if m.power > 0]
@@ -147,10 +163,12 @@ class BattleLogic:
         if not attack_moves:
             if status_moves:
                 selected = random.choice(status_moves)
-                if logger_obj: logger.info(f"没有攻击招式，随机选择变化招式: {selected.move_name}")
+                if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
+                    logger.info(f"没有攻击招式，随机选择变化招式: {selected.move_name}")
                 return selected
             else:
-                if logger_obj: logger.info("既没有攻击招式也没有变化招式，使用挣扎")
+                if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
+                    logger.info("既没有攻击招式也没有变化招式，使用挣扎")
                 return self.get_struggle_move()
 
         # Select best attack move
@@ -163,7 +181,8 @@ class BattleLogic:
                 best_score = score
                 best_move = move
         
-        if logger_obj: logger.info(f"最终选择: {best_move.move_name} (评分: {best_score:.2f})")
+        if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
+            logger.info(f"最终选择: {best_move.move_name} (评分: {best_score:.2f})")
         return best_move
 
     def _calculate_damage_core(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> Tuple[int, Dict[str, Any]]:
