@@ -131,7 +131,6 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             moves = [pokemon.moves.move1_id, pokemon.moves.move2_id,
                      pokemon.moves.move3_id, pokemon.moves.move4_id]
 
-            from .sqlite_pokemon_repo import SqlitePokemonRepository
             temp_repo = SqliteMoveRepository(self.db_path)
             current_pps = []
             for move_id in moves:
@@ -271,7 +270,6 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             moves = [pokemon_info.moves.move1_id, pokemon_info.moves.move2_id,
                      pokemon_info.moves.move3_id, pokemon_info.moves.move4_id]
 
-            from .sqlite_pokemon_repo import SqlitePokemonRepository
             # 使用一个临时实例来获取技能PP
             temp_repo = SqliteMoveRepository(self.db_path)
             current_pps = []

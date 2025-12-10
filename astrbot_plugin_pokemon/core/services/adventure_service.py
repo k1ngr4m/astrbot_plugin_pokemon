@@ -206,7 +206,13 @@ class AdventureService:
         for pid in user_team_list:
             u_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
             if u_info:
-                user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True))
+                # 检查宝可梦的当前HP，如果为0则跳过
+                if u_info.current_hp > 0:
+                    user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True))
+
+        # 检查是否有可用的宝可梦参与战斗
+        if not user_pokemon_contexts:
+            return BaseResult(success=False, message="您的所有宝可梦都处于濒死状态，无法进行战斗！")
 
         current_idx = 0
         battle_result_str = "fail"
@@ -272,6 +278,21 @@ class AdventureService:
             final_u_rate = round(sum(u_rates) / len(u_rates), 2)
             final_w_rate = round(sum(w_rates) / len(w_rates), 2)
 
+        # 保存战斗后用户的宝可梦状态（HP和PP）
+        # 只保存参与战斗的宝可梦（即在战斗循环中被访问过的）
+        for i in range(current_idx + 1):  # 保存从索引0到当前索引的所有宝可梦
+            ctx = user_pokemon_contexts[i]
+            # 更新用户宝可梦的当前HP和当前PP
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id=user_id,
+                pokemon_id=ctx.pokemon.id,
+                current_hp=ctx.pokemon.stats.hp,
+                current_pp1=ctx.moves[0].current_pp if len(ctx.moves) > 0 else 0,
+                current_pp2=ctx.moves[1].current_pp if len(ctx.moves) > 1 else 0,
+                current_pp3=ctx.moves[2].current_pp if len(ctx.moves) > 2 else 0,
+                current_pp4=ctx.moves[3].current_pp if len(ctx.moves) > 3 else 0
+            )
+
         if self.battle_repo:
             log_id = self.battle_repo.save_battle_log(
                 user_id=user_id,
@@ -307,11 +328,16 @@ class AdventureService:
                                is_user: bool) -> BattleContext:
         types = self.pokemon_repo.get_pokemon_types(pokemon_info.species_id) or ['normal']
         moves_list = self._preload_moves(pokemon_info)
+        # 如果是用户的宝可梦，使用current_hp；如果是野生宝可梦，使用stats.hp
+        if isinstance(pokemon_info, UserPokemonInfo):
+            current_hp = pokemon_info.current_hp
+        else:
+            current_hp = pokemon_info.stats.hp
         return BattleContext(
             pokemon=pokemon_info,
             moves=moves_list,
             types=types,
-            current_hp=pokemon_info.stats.hp,
+            current_hp=current_hp,
             is_user=is_user
         )
 
@@ -667,7 +693,13 @@ class AdventureService:
         for pid in user_team_list:
             u_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
             if u_info:
-                user_contexts.append(self._create_battle_context(u_info, True))
+                # 检查宝可梦的当前HP，如果为0则跳过
+                if u_info.current_hp > 0:
+                    user_contexts.append(self._create_battle_context(u_info, True))
+
+        # 检查是否有可用的宝可梦参与战斗
+        if not user_contexts:
+            return BaseResult(success=False, message="您的所有宝可梦都处于濒死状态，无法进行战斗！")
 
         u_idx = 0
         t_idx = 0
@@ -746,6 +778,21 @@ class AdventureService:
                                                                                  battle_trainer.trainer.base_payout)
 
         final_u_info = user_contexts[min(u_idx, len(user_contexts) - 1)].pokemon if user_contexts else None
+
+        # 保存战斗后用户的宝可梦状态（HP和PP）
+        # 只保存参与战斗的宝可梦（即在战斗循环中被访问过的）
+        for i in range(u_idx + 1):  # 保存从索引0到当前索引的所有宝可梦
+            ctx = user_contexts[i]
+            # 更新用户宝可梦的当前HP和当前PP
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id=user_id,
+                pokemon_id=ctx.pokemon.id,
+                current_hp=ctx.pokemon.stats.hp,
+                current_pp1=ctx.moves[0].current_pp if len(ctx.moves) > 0 else 0,
+                current_pp2=ctx.moves[1].current_pp if len(ctx.moves) > 1 else 0,
+                current_pp3=ctx.moves[2].current_pp if len(ctx.moves) > 2 else 0,
+                current_pp4=ctx.moves[3].current_pp if len(ctx.moves) > 3 else 0
+            )
 
         return BaseResult(
             success=True,

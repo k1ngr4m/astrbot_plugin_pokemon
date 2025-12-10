@@ -210,6 +210,12 @@ class PokemonPlugin(Star):
         async for r in self.team_handlers.view_team(event):
             yield r
 
+    @filter.command("宝可梦恢复", alias={"恢复队伍", "恢复宝可梦", "治疗所有宝可梦", "heal"})
+    async def heal_team(self, event: AstrMessageEvent):
+        """恢复队伍中所有宝可梦的生命值和状态，花费1000金币"""
+        async for r in self.team_handlers.heal_team(event):
+            yield r
+
     @filter.command("查看区域")
     async def view_locations(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
