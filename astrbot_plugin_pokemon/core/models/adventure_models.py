@@ -4,9 +4,34 @@ from typing import Optional, TypedDict, Dict, List
 
 from dataclasses import dataclass
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import WildPokemonInfo
-from typing import Optional
 from .trainer_models import BattleTrainer
+from ..models.pokemon_models import WildPokemonInfo, UserPokemonInfo
+from typing import Union
+
+
+@dataclass
+class BattleMoveInfo:
+    power: int
+    accuracy: float
+    type_name: str
+    damage_class_id: int  # 2 for physical, 3 for special
+    priority: int
+    type_effectiveness: float
+    stab_bonus: float
+    max_pp: int = 0  # 技能最大使用次数
+    current_pp: int = 0  # 当前剩余使用次数
+    move_id: int = 0
+    move_name: str = ""
+
+
+@dataclass
+class BattleContext:
+    pokemon: Union[UserPokemonInfo, WildPokemonInfo]
+    moves: List[BattleMoveInfo]
+    types: List[str]
+    current_hp: int
+    is_user: bool
+
 
 
 @dataclass
@@ -55,16 +80,3 @@ class BattleResult:
     money_reward: int = 0  # 金钱奖励
     user_battle_exp_result: Dict[str, any] = None  # 用户战斗经验奖励结果
 
-@dataclass
-class BattleMoveInfo:
-    power: int
-    accuracy: float
-    type_name: str
-    damage_class_id: int  # 2 for physical, 3 for special
-    priority: int
-    type_effectiveness: float
-    stab_bonus: float
-    max_pp: int = 0  # 技能最大使用次数
-    current_pp: int = 0  # 当前剩余使用次数
-    move_id: int = 0
-    move_name: str = ""
