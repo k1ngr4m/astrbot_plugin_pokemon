@@ -273,6 +273,13 @@ class PokemonPlugin(Star):
         async for r in self.common_handlers.start_admin(event):
             yield r
 
+    # @filter.permission_type(PermissionType.ADMIN)
+    @filter.command("关闭宝可梦后台管理")
+    async def stop_admin(self, event: AstrMessageEvent):
+        """[管理员] 关闭Web后台管理服务器"""
+        async for r in self.common_handlers.stop_admin(event):
+            yield r
+
     async def _check_port_active(self):
         """验证端口是否实际已激活"""
         try:
