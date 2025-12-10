@@ -315,7 +315,6 @@ class AdventureService:
                 log_data=battle_log,
                 result=battle_result_str
             )
-        logger.info(f"战斗日志ID: {log_id}")
         exp_details = self._handle_battle_experience(user_id, battle_result_str, wild_pokemon_info, battle_log)
         self._update_encounter_log(user_id, wild_pokemon_info.id, battle_result_str)
 
@@ -391,7 +390,11 @@ class AdventureService:
         current_pps: 可选，仅用于模拟时传入临时的PP列表，避免修改对象。如果不传则使用 attacker_ctx.moves 里的值。
         """
         moves = attacker_ctx.moves
-        logger.info(f"技能选择开始: 攻击方 {attacker_ctx.pokemon.name}(Lv.{attacker_ctx.pokemon.level}) 选择最佳招式")
+
+        # 仅在非模拟模式（实战）下记录日志
+        is_simulation = current_pps is not None
+        if not is_simulation:
+            logger.info(f"技能选择开始: 攻击方 {attacker_ctx.pokemon.name}(Lv.{attacker_ctx.pokemon.level}) 选择最佳招式")
 
         # 确定可用招式
         available_moves = []
@@ -400,49 +403,56 @@ class AdventureService:
             for i, move in enumerate(moves):
                 if current_pps[i] > 0:
                     available_moves.append(move)
-            logger.info(f"模拟模式: PP状态 {current_pps}")
         else:
             # 实战模式
             available_moves = [m for m in moves if m.current_pp > 0]
-            logger.info(f"实战模式: 招式PP状态 {[m.current_pp for m in moves]}")
+            if not is_simulation:
+                logger.info(f"实战模式: 招式PP状态 {[m.current_pp for m in moves]}")
 
         if not available_moves:
-            logger.info("没有可用招式，使用挣扎")
+            if not is_simulation:
+                logger.info("没有可用招式，使用挣扎")
             return self._get_struggle_move()
 
-        logger.info(f"可用招式: {[m.move_name for m in available_moves]}")
+        if not is_simulation:
+            logger.info(f"可用招式: {[m.move_name for m in available_moves]}")
 
         # 分离攻击和变化招式
         attack_moves = [m for m in available_moves if m.power > 0]
         status_moves = [m for m in available_moves if m.power == 0]
 
-        logger.info(f"攻击招式: {[m.move_name for m in attack_moves]}")
-        logger.info(f"变化招式: {[m.move_name for m in status_moves]}")
+        if not is_simulation:
+            logger.info(f"攻击招式: {[m.move_name for m in attack_moves]}")
+            logger.info(f"变化招式: {[m.move_name for m in status_moves]}")
 
         if not attack_moves:
             if status_moves:
                 selected_move = random.choice(status_moves)
-                logger.info(f"没有攻击招式，随机选择变化招式: {selected_move.move_name}")
+                if not is_simulation:
+                    logger.info(f"没有攻击招式，随机选择变化招式: {selected_move.move_name}")
                 return selected_move
             else:
-                logger.info("既没有攻击招式也没有变化招式，使用挣扎")
+                if not is_simulation:
+                    logger.info("既没有攻击招式也没有变化招式，使用挣扎")
                 return self._get_struggle_move()
 
-        # 计算每个攻击招式的评分并记录详情
+        # 计算每个攻击招式的评分并记录详情（仅在实战模式下记录）
         move_scores = []
         for move in attack_moves:
-            score = self._calculate_move_score(attacker_ctx, defender_ctx, move)
+            score = self._calculate_move_score(attacker_ctx, defender_ctx, move, is_simulation)
             move_scores.append((move, score))
-            logger.info(
-                f"招式 {move.move_name}: 伤害{move.power} 精确度{move.accuracy}% "
-                f"克制系数{move.type_effectiveness} STAB{move.stab_bonus} "
-                f"攻击/防御比率{self._get_atk_def_ratio(attacker_ctx, defender_ctx, move)} "
-                f"→ 评分: {score:.2f}"
-            )
+            if not is_simulation:
+                logger.info(
+                    f"招式 {move.move_name}: 伤害{move.power} 精确度{move.accuracy}% "
+                    f"克制系数{move.type_effectiveness} STAB{move.stab_bonus} "
+                    f"攻击/防御比率{self._get_atk_def_ratio(attacker_ctx, defender_ctx, move)} "
+                    f"→ 评分: {score:.2f}"
+                )
 
         # 选择评分最高的攻击招式
-        best_move = max(attack_moves, key=lambda m: self._calculate_move_score(attacker_ctx, defender_ctx, m))
-        logger.info(f"最终选择: {best_move.move_name} (评分: {max([score for _, score in move_scores]):.2f})")
+        best_move = max(attack_moves, key=lambda m: self._calculate_move_score(attacker_ctx, defender_ctx, m, is_simulation))
+        if not is_simulation:
+            logger.info(f"最终选择: {best_move.move_name} (评分: {max([score for _, score in move_scores]):.2f})")
         return best_move
 
     def _get_atk_def_ratio(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> float:
@@ -452,7 +462,7 @@ class AdventureService:
         return atk_stat / max(1, def_stat)
 
     def _calculate_move_score(self, attacker_ctx: BattleContext, defender_ctx: BattleContext,
-                              move: BattleMoveInfo) -> float:
+                              move: BattleMoveInfo, is_simulation: bool = False) -> float:
         eff = self.calculate_type_effectiveness([move.type_name], defender_ctx.types)
         stab = 1.5 if move.type_name in attacker_ctx.types else 1.0
 
@@ -466,11 +476,12 @@ class AdventureService:
         atk_def_ratio = atk_stat / max(1, def_stat)
         score = move.power * (move.accuracy / 100.0) * eff * stab * atk_def_ratio
 
-        logger.info(
-            f"评分计算详情 - {move.move_name}: "
-            f"基础伤害({move.power}) * 命中率({move.accuracy/100.0:.2f}) * "
-            f"克制({eff}) * STAB({stab}) * 攻防比({atk_def_ratio:.2f}) = {score:.2f}"
-        )
+        if not is_simulation:
+            logger.info(
+                f"评分计算详情 - {move.move_name}: "
+                f"基础伤害({move.power}) * 命中率({move.accuracy/100.0:.2f}) * "
+                f"克制({eff}) * STAB({stab}) * 攻防比({atk_def_ratio:.2f}) = {score:.2f}"
+            )
 
         return score
 
@@ -524,7 +535,6 @@ class AdventureService:
         turn = 0
         max_turns = 50
         winner = None
-        logger.info("=====================执行实战，生成详细日志=====================")
         while user_ctx.current_hp > 0 and wild_ctx.current_hp > 0 and turn < max_turns:
             turn += 1
             log_lines.append(f"--- 第 {turn} 回合 ---\n\n")
@@ -562,7 +572,6 @@ class AdventureService:
             log_lines.append("战斗超时，强制结束。\n\n")
         else:
             result = "win" if winner == "user" else "fail"
-        logger.info("=====================实战结束=====================")
         return result, log_lines, wild_ctx.current_hp
 
     def _process_turn_action(self, attacker: BattleContext, defender: BattleContext, move: BattleMoveInfo,
