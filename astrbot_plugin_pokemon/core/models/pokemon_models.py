@@ -148,6 +148,12 @@ class UserPokemonInfo:
     moves: PokemonMoves
     caught_time: Optional[str] = None
     nature_id: int = 1  # 默认性格ID为1，即勤奋
+    happiness: int = 70  # 友好度
+    current_hp: int = 0  # 当前HP
+    current_pp1: int = 0  # 当前技能1 PP
+    current_pp2: int = 0  # 当前技能2 PP
+    current_pp3: int = 0  # 当前技能3 PP
+    current_pp4: int = 0  # 当前技能4 PP
 
     def __getitem__(self, item):
         return getattr(self, item)

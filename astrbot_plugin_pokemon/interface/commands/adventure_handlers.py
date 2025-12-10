@@ -314,6 +314,16 @@ class AdventureHandlers:
 
             # 构造并保存宝可梦
             new_pokemon = self.user_pokemon_service._create_and_save_caught_pokemon(user_id, wild_pokemon)
+
+            # 获取球的ID来处理特殊逻辑
+            ball_id = int(pokeball.item_id)
+
+            # 处理特殊精灵球效果
+            if ball_id == 11:  # 治愈球 - 初始友好度+200
+                self.user_pokemon_service.update_pokemon_happiness(user_id, new_pokemon.id, 270)  # 默认70 + 200
+            elif ball_id == 14:  # 治愈球 - 完全治愈
+                self.user_pokemon_service.heal_pokemon_fully(user_id, new_pokemon.id)
+
             self.user_service._update_encounter_log(user_id, wild_pokemon.id, captured=True, deleted=True)
 
             # 如果是首次捕捉该物种，给予额外经验值奖励
@@ -322,10 +332,16 @@ class AdventureHandlers:
                 first_catch_exp_result = self.exp_service.add_exp_for_first_time_capture(user_id, wild_pokemon.level)
 
             message_parts = [
-                f"🎉 捕捉成功！\n",
-                f"已添加 {wild_pokemon.name} 到收藏 (ID: {new_pokemon.id})。\n",
-                f"消耗: [{pokeball.item_id}] {pokeball.name_zh} (剩余: {pokeball.quantity - 1})"
+                f"🎉 捕捉成功！\n\n",
+                f"已添加 {wild_pokemon.name} 到收藏 (ID: {new_pokemon.id})。\n\n",
+                f"消耗: [{pokeball.item_id}] {pokeball.name_zh} (剩余: {pokeball.quantity - 1})\n\n"
             ]
+
+            # 添加特殊球的提示信息
+            if ball_id == 11:
+                message_parts.append(f"\n🌟 使用豪华球捕捉，宝可梦初始友好度更高！\n\n")
+            elif ball_id == 14:
+                message_parts.append(f"\n✨ 使用治愈球捕捉，宝可梦已完全治愈！\n\n")
 
             # 如果是首次捕捉，添加经验奖励信息
             if is_first_catch and first_catch_exp_result and first_catch_exp_result.get("success"):
