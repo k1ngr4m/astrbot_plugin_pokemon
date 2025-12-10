@@ -39,6 +39,11 @@
 - **进化条件**：根据不同宝可梦设置不同的进化条件
 - **进化预览**：查看宝可梦的进化状态和进化树
 
+### 📈 升级速率系统
+- **多种成长曲线**：支持6种不同的宝可梦成长速率类型
+- **数学公式驱动**：每种成长速率都有对应的数学公式计算所需经验值
+- **个性化成长**：不同宝可梦根据其特性拥有不同的升级速率
+
 ### 🖼️ 图形界面
 - **精美图鉴**：通过绘制生成精美的宝可梦图鉴
 - **详情展示**：显示宝可梦的详细信息
@@ -136,6 +141,21 @@
 
 
 ## 🛠️ 开发贡献
+
+### 升级速率公式说明
+
+宝可梦升级的速率使用 `pokemon_species` 表中的 `growth_rate_id` 字段定义，具体对应关系如下：
+
+| ID | 成长类型 | 经验值计算公式 |
+|----|----------|----------------|
+| 1 | slow | \\(\\frac{5x^3}{4}\\) |
+| 2 | medium | \\(x^3\\) |
+| 3 | fast | \\(\\frac{4x^3}{5}\\) |
+| 4 | medium-slow | \\(\\frac{6x^3}{5} - 15x^2 + 100x - 140\\) |
+| 5 | slow-then-very-fast | \\(\\begin{cases} \\frac{ x^3 \\left( 100 - x \\right) }{50}, & \\text{if } x \\leq 50 \\\\ \\frac{ x^3 \\left( 150 - x \\right) }{100}, & \\text{if } 50 < x \\leq 68 \\\\ \\frac{ x^3 \\left( 1274 + (x \\bmod 3)^2 - 9 (x \\bmod 3) - 20 \\left\\lfloor \\frac{x}{3} \\right\\rfloor \\right) }{1000}, & \\text{if } 68 < x \\leq 98 \\\\ \\frac{ x^3 \\left( 160 - x \\right) }{100}, & \\text{if } x > 98 \\\\ \\end{cases}\\) |
+| 6 | fast-then-very-slow | \\(\\begin{cases} \\frac{ x^3 \\left( 24 + \\left\\lfloor \\frac{x+1}{3} \\right\\rfloor \\right) }{50}, & \\text{if } x \\leq 15 \\\\ \\frac{ x^3 \\left( 14 + x \\right) }{50}, & \\text{if } 15 < x \\leq 35 \\\\ \\frac{ x^3 \\left( 32 + \\left\\lfloor \\frac{x}{2} \\right\\rfloor \\right ) }{50}, & \\text{if } x > 35 \\\\ \\end{cases}\\) |
+
+其中，x 表示目标等级，公式计算出的结果为达到该等级所需的总经验值。
 
 ### 项目结构
 ```

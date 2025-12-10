@@ -391,6 +391,7 @@ class AdventureService:
         current_pps: 可选，仅用于模拟时传入临时的PP列表，避免修改对象。如果不传则使用 attacker_ctx.moves 里的值。
         """
         moves = attacker_ctx.moves
+        logger.debug(f"技能选择开始: 攻击方 {attacker_ctx.pokemon.name}(Lv.{attacker_ctx.pokemon.level}) 选择最佳招式")
 
         # 确定可用招式
         available_moves = []
@@ -399,23 +400,56 @@ class AdventureService:
             for i, move in enumerate(moves):
                 if current_pps[i] > 0:
                     available_moves.append(move)
+            logger.debug(f"模拟模式: PP状态 {current_pps}")
         else:
             # 实战模式
             available_moves = [m for m in moves if m.current_pp > 0]
+            logger.debug(f"实战模式: 招式PP状态 {[m.current_pp for m in moves]}")
 
         if not available_moves:
+            logger.debug("没有可用招式，使用挣扎")
             return self._get_struggle_move()
+
+        logger.debug(f"可用招式: {[m.move_name for m in available_moves]}")
 
         # 分离攻击和变化招式
         attack_moves = [m for m in available_moves if m.power > 0]
         status_moves = [m for m in available_moves if m.power == 0]
 
+        logger.debug(f"攻击招式: {[m.move_name for m in attack_moves]}")
+        logger.debug(f"变化招式: {[m.move_name for m in status_moves]}")
+
         if not attack_moves:
-            return random.choice(status_moves) if status_moves else self._get_struggle_move()
+            if status_moves:
+                selected_move = random.choice(status_moves)
+                logger.debug(f"没有攻击招式，随机选择变化招式: {selected_move.move_name}")
+                return selected_move
+            else:
+                logger.debug("既没有攻击招式也没有变化招式，使用挣扎")
+                return self._get_struggle_move()
+
+        # 计算每个攻击招式的评分并记录详情
+        move_scores = []
+        for move in attack_moves:
+            score = self._calculate_move_score(attacker_ctx, defender_ctx, move)
+            move_scores.append((move, score))
+            logger.debug(
+                f"招式 {move.move_name}: 伤害{move.power} 精确度{move.accuracy}% "
+                f"克制系数{move.type_effectiveness} STAB{move.stab_bonus} "
+                f"攻击/防御比率{self._get_atk_def_ratio(attacker_ctx, defender_ctx, move)} "
+                f"→ 评分: {score:.2f}"
+            )
 
         # 选择评分最高的攻击招式
         best_move = max(attack_moves, key=lambda m: self._calculate_move_score(attacker_ctx, defender_ctx, m))
+        logger.debug(f"最终选择: {best_move.move_name} (评分: {max([score for _, score in move_scores]):.2f})")
         return best_move
+
+    def _get_atk_def_ratio(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> float:
+        """获取攻击/防御比率，用于日志记录"""
+        atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
+        def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
+        return atk_stat / max(1, def_stat)
 
     def _calculate_move_score(self, attacker_ctx: BattleContext, defender_ctx: BattleContext,
                               move: BattleMoveInfo) -> float:
@@ -429,7 +463,16 @@ class AdventureService:
         atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
         def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
 
-        return move.power * (move.accuracy / 100.0) * eff * stab * (atk_stat / max(1, def_stat))
+        atk_def_ratio = atk_stat / max(1, def_stat)
+        score = move.power * (move.accuracy / 100.0) * eff * stab * atk_def_ratio
+
+        logger.debug(
+            f"评分计算详情 - {move.move_name}: "
+            f"基础伤害({move.power}) * 命中率({move.accuracy/100.0:.2f}) * "
+            f"克制({eff}) * STAB({stab}) * 攻防比({atk_def_ratio:.2f}) = {score:.2f}"
+        )
+
+        return score
 
     def _calculate_damage_core(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> \
     Tuple[int, Dict[str, Any]]:

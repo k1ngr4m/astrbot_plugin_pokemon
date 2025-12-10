@@ -30,26 +30,56 @@ class ExpService:
         self.config = config
         self.nature_service = nature_service
 
-    # 计算达到指定等级所需的总经验值（基于 level^1.2 公式）
-    def get_required_exp_for_level(self, level: int) -> int:
+    # 计算达到指定等级所需的总经验值（基于 growth_rate_id 对应公式）
+    def get_required_exp_for_level(self, level: int, growth_rate_id: int = 2) -> int:
         """
-        计算达到指定等级所需的总经验值（基于 base × level^1.2 公式）
+        计算达到指定等级所需的总经验值（基于 growth_rate_id 对应公式）
+        Args:
+            level: 目标等级
+            growth_rate_id: 升级速率组ID (1=slow, 2=medium, 3=fast, 4=medium-slow, 5=slow-then-very-fast, 6=fast-then-very-slow)
         """
         if level <= 1:
             return 0
-        # 使用公式: 基础值 × (等级^1.2)
-        # 这里将基础值设为100，可以根据游戏平衡性调整
-        base_value = 100
-        return int(base_value * (level ** 1.2))
+
+        # 根据growth_rate_id选择对应的升级公式
+        if growth_rate_id == 1:  # slow: (5x³)/4
+            exp = int((5 * (level ** 3)) / 4)
+        elif growth_rate_id == 2:  # medium: x³
+            exp = int(level ** 3)
+        elif growth_rate_id == 3:  # fast: (4x³)/5
+            exp = int((4 * (level ** 3)) / 5)
+        elif growth_rate_id == 4:  # medium-slow: (6x³)/5 - 15x² + 100x - 140
+            exp = int((6 * (level ** 3)) / 5 - 15 * (level ** 2) + 100 * level - 140)
+        elif growth_rate_id == 5:  # slow-then-very-fast: 分段函数
+            if level <= 50:
+                exp = int((level ** 3 * (100 - level)) / 50)
+            elif level <= 68:
+                exp = int((level ** 3 * (150 - level)) / 100)
+            elif level <= 98:
+                exp = int((level ** 3 * (1274 + (level % 3) ** 2 - 9 * (level % 3) - 20 * (level // 3))) / 1000)
+            else:  # level > 98
+                exp = int((level ** 3 * (160 - level)) / 100)
+        elif growth_rate_id == 6:  # fast-then-very-slow: 分段函数
+            if level <= 15:
+                exp = int((level ** 3 * (24 + (level + 1) // 3)) / 50)
+            elif level <= 35:
+                exp = int((level ** 3 * (14 + level)) / 50)
+            else:  # level > 35
+                exp = int((level ** 3 * (32 + level // 2)) / 50)
+        else:  # 默认使用medium公式
+            exp = int(level ** 3)
+
+        # 确保经验值不小于0
+        return max(0, exp)
 
     # 计算从当前等级升到下一级所需的经验值
-    def get_exp_needed_for_next_level(self, current_level: int) -> int:
+    def get_exp_needed_for_next_level(self, current_level: int, growth_rate_id: int = 2) -> int:
         """
         计算从当前等级升到下一级所需的经验值
         """
         if current_level < 1:
             return 1
-        return self.get_required_exp_for_level(current_level + 1) - self.get_required_exp_for_level(current_level)
+        return self.get_required_exp_for_level(current_level + 1, growth_rate_id) - self.get_required_exp_for_level(current_level, growth_rate_id)
 
     # 计算野生宝可梦在战斗后获得的经验值
     def calculate_pokemon_exp_gain(self, wild_pokemon_id: int, wild_pokemon_level: int, battle_result: str) -> int:
@@ -140,21 +170,25 @@ class ExpService:
         return ev_rewards
 
     # 检查宝可梦是否升级
-    def check_pokemon_level_up(self, current_level: int, current_exp: int) -> Dict[str, Any]:
+    def check_pokemon_level_up(self, current_level: int, current_exp: int, species_id: int) -> Dict[str, Any]:
         """
         检查宝可梦是否升级
         返回包含升级信息的字典
         """
+        # 获取宝可梦的生长率
+        species_data = self.pokemon_repo.get_pokemon_by_id(species_id)
+        growth_rate_id = species_data.growth_rate_id if species_data and species_data.growth_rate_id else 2  # 默认为medium
+
         levels_gained = 0
         new_level = current_level
         remaining_exp = current_exp
 
         # 检查是否能升级多级
-        while new_level < 100 and remaining_exp >= self.get_required_exp_for_level(new_level + 1):
+        while new_level < 100 and remaining_exp >= self.get_required_exp_for_level(new_level + 1, growth_rate_id):
             new_level += 1
             levels_gained += 1
             # 扣除升级所需的经验
-            remaining_exp = remaining_exp - self.get_exp_needed_for_next_level(new_level - 1)
+            remaining_exp = remaining_exp - self.get_exp_needed_for_next_level(new_level - 1, growth_rate_id)
 
         new_level = min(100, new_level)
         return {
@@ -162,7 +196,7 @@ class ExpService:
             "levels_gained": levels_gained,
             "new_level": new_level,
             "new_exp": remaining_exp,
-            "required_exp_for_next": self.get_required_exp_for_level(new_level + 1) if new_level < 100 else 0
+            "required_exp_for_next": self.get_required_exp_for_level(new_level + 1, growth_rate_id) if new_level < 100 else 0
         }
 
     # 战斗后更新宝可梦的经验值和等级（考虑EV值）
@@ -192,7 +226,7 @@ class ExpService:
             self._calculate_and_update_pokemon_stats(pokemon_id, pokemon_data.species_id, current_level, user_id)
 
         # 检查是否升级
-        level_up_info = self.check_pokemon_level_up(current_level, new_total_exp)
+        level_up_info = self.check_pokemon_level_up(current_level, new_total_exp, pokemon_data.species_id)
         # 使用宝可梦的数字ID，而不是短码ID
         # 从数据库返回的数据中获取数字ID
         pokemon_id = pokemon_data.id
@@ -855,9 +889,9 @@ class ExpService:
         new_total_exp = user.exp + exp_gained
         current_level = user.level
 
-        # 检查用户可以升到多少级
+        # 检查用户可以升到多少级 (用户使用medium增长曲线)
         new_level = current_level
-        while new_level < 100 and new_total_exp >= self.get_required_exp_for_level(new_level + 1):
+        while new_level < 100 and new_total_exp >= self.get_required_exp_for_level(new_level + 1, 2):  # 用户使用medium增长曲线
             new_level += 1
 
         levels_gained = new_level - current_level
@@ -865,7 +899,7 @@ class ExpService:
         # 计算剩余经验（升级后剩余的经验）
         if new_level > current_level:
             # 如果升级了，计算升级后的剩余经验
-            remaining_exp = new_total_exp - self.get_required_exp_for_level(new_level)
+            remaining_exp = new_total_exp - self.get_required_exp_for_level(new_level, 2)  # 用户使用medium增长曲线
         else:
             # 没有升级，保留原来的逻辑
             remaining_exp = new_total_exp
