@@ -53,12 +53,6 @@ class ShopService:
 
         items_list = self.shop_repo.get_shop_items_by_shop_id(shop_info["id"])
 
-        if not items_list:
-            return {
-                "success": False,
-                "message": f"❌ 商店 {shop_id} 当前没有商品出售！"
-            }
-
         items = []
         for item in items_list:
             items.append({
