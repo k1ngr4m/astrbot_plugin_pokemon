@@ -352,7 +352,6 @@ class UserService:
                             user_items = []
                         else:
                             user_items = convert_items_to_dict(original_items)
-                            logger.info(f"user_items: {user_items}")
                     else:
                         # user_items_result本身可能已经是items列表
                         if isinstance(user_items_result, list):

@@ -9,18 +9,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{{ url_for('admin_bp.dashboard') }}">
-                <i class="fas fa-gamepad me-2"></i>宝可梦管理
-            </a>
-            <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="{{ url_for('admin_bp.dashboard') }}">仪表盘</a>
-                <a class="nav-link" href="{{ url_for('admin_bp.users') }}">用户管理</a>
-                <a class="nav-link" href="{{ url_for('admin_bp.logout') }}"><i class="fas fa-sign-out-alt"></i></a>
-            </div>
-        </div>
-    </nav>
+        {% include 'sidebar.html' %}
 
     <div class="container-fluid mt-4 p-4">
         <div class="row">

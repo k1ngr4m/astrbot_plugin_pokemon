@@ -91,9 +91,9 @@ class SqliteShopRepository(AbstractShopRepository):
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT s.shop_id, s.id as shop_item_id, i.name_en, i.name_zh, i.category_id, i.description, s.price, s.stock, s.is_active
-                FROM shop_items s 
+                FROM shop_items s
                 JOIN items i ON s.item_id = i.id
-                WHERE s.shop_id = ?
+                WHERE s.shop_id = ? AND s.is_active = 1
             """, (shop_id,))
             rows = cursor.fetchall()
             return [dict(row) for row in rows]

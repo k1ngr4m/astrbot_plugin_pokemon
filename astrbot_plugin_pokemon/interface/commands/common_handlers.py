@@ -48,6 +48,8 @@ class CommonHandlers:
                 "user_service": self.plugin.user_service,
                 "shop_service": self.plugin.shop_service,
                 "user_repo": self.plugin.user_repo,  # 添加user_repo服务以支持编辑功能
+                "shop_repo": self.plugin.shop_repo,  # 添加shop_repo服务以支持商店管理
+                "item_repo": self.plugin.item_repo,  # 添加item_repo服务以支持商品管理
             }
             app = create_app(secret_key=self.plugin.secret_key, services=services_to_inject)
             config = Config()
