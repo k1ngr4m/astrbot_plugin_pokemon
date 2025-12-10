@@ -206,7 +206,13 @@ class AdventureService:
         for pid in user_team_list:
             u_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
             if u_info:
-                user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True))
+                # 检查宝可梦的当前HP，如果为0则跳过
+                if u_info.current_hp > 0:
+                    user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True))
+
+        # 检查是否有可用的宝可梦参与战斗
+        if not user_pokemon_contexts:
+            return BaseResult(success=False, message="您的所有宝可梦都处于濒死状态，无法进行战斗！")
 
         current_idx = 0
         battle_result_str = "fail"
@@ -272,6 +278,21 @@ class AdventureService:
             final_u_rate = round(sum(u_rates) / len(u_rates), 2)
             final_w_rate = round(sum(w_rates) / len(w_rates), 2)
 
+        # 保存战斗后用户的宝可梦状态（HP和PP）
+        # 只保存参与战斗的宝可梦（即在战斗循环中被访问过的）
+        for i in range(current_idx + 1):  # 保存从索引0到当前索引的所有宝可梦
+            ctx = user_pokemon_contexts[i]
+            # 更新用户宝可梦的当前HP和当前PP
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id=user_id,
+                pokemon_id=ctx.pokemon.id,
+                current_hp=ctx.pokemon.stats.hp,
+                current_pp1=ctx.moves[0].current_pp if len(ctx.moves) > 0 else 0,
+                current_pp2=ctx.moves[1].current_pp if len(ctx.moves) > 1 else 0,
+                current_pp3=ctx.moves[2].current_pp if len(ctx.moves) > 2 else 0,
+                current_pp4=ctx.moves[3].current_pp if len(ctx.moves) > 3 else 0
+            )
+
         if self.battle_repo:
             log_id = self.battle_repo.save_battle_log(
                 user_id=user_id,
@@ -307,11 +328,16 @@ class AdventureService:
                                is_user: bool) -> BattleContext:
         types = self.pokemon_repo.get_pokemon_types(pokemon_info.species_id) or ['normal']
         moves_list = self._preload_moves(pokemon_info)
+        # 如果是用户的宝可梦，使用current_hp；如果是野生宝可梦，使用stats.hp
+        if isinstance(pokemon_info, UserPokemonInfo):
+            current_hp = pokemon_info.current_hp
+        else:
+            current_hp = pokemon_info.stats.hp
         return BattleContext(
             pokemon=pokemon_info,
             moves=moves_list,
             types=types,
-            current_hp=pokemon_info.stats.hp,
+            current_hp=current_hp,
             is_user=is_user
         )
 
@@ -440,8 +466,86 @@ class AdventureService:
             msg = f"❌ 找不到ID为 {item_id} 的精灵球" if item_id else AnswerEnum.USER_POKEBALLS_EMPTY.value
             return {"success": False, "message": msg}
 
-        ball_map = {'超级球': 1.5, '高级球': 2.0, '大师球': 255.0}
-        ball_multiplier = ball_map.get(pokeball_item.name_zh, 1.0)
+        # 处理特殊精灵球逻辑
+        ball_id = int(pokeball_item.item_id)
+        ball_multiplier = 1.0  # 默认倍数
+
+        # 根据精灵球ID应用特殊逻辑
+        # 1: 大师球 - 100% 捕捉成功率
+        if ball_id == 1:
+            ball_multiplier = 255.0  # 大师球确保捕捉成功
+        # 2: 高级球 - 2x 捕捉成功率
+        elif ball_id == 2:
+            ball_multiplier = 2.0
+        # 3: 超级球 - 1.5x 捕捉成功率
+        elif ball_id == 3:
+            ball_multiplier = 1.5
+        # 4: 普通精灵球 - 1x 捕捉成功率
+        elif ball_id == 4:
+            ball_multiplier = 1.0
+        # 5: 狩猎球 - 按描述这球只能在特定区域使用，这里先按1.5x处理
+        elif ball_id == 5:
+            ball_multiplier = 1.5
+        # 6: 捕网球球 - 3x针对水/虫系宝可梦，1x其他
+        elif ball_id == 6:
+            # 检查野生宝可梦是否为水系或虫系
+            pokemon_types = [t.lower() for t in self.pokemon_repo.get_pokemon_types(wild_pokemon.species_id) or ['normal']]
+            if 'water' in pokemon_types or 'bug' in pokemon_types:
+                ball_multiplier = 3.0
+            else:
+                ball_multiplier = 1.0
+        # 7: 潜水球球 - 3.5x针对水上/钓鱼时遇到的宝可梦，1x其他
+        elif ball_id == 7:
+            # 这里先按3.5x处理，实际应用时可能需要判断是否在水上/钓鱼情境中
+            ball_multiplier = 3.5
+        # 8: 巢穴球 - 捕捉率根据宝可梦等级变化 (40-level)/10，最高3.9x (level 1)，最低1x (level 30+)
+        elif ball_id == 8:
+            level = wild_pokemon.level
+            # 根据公式 (40 - level) / 10 计算倍数，最低为1.0
+            calculated_multiplier = max(1.0, (40 - level) / 10)
+            ball_multiplier = min(3.9, calculated_multiplier)  # 最高3.9倍
+        # 9: 重复球 - 3x针对已捕捉过的宝可梦种类，1x其他
+        elif ball_id == 9:
+            # 检查用户是否已捕获过该种类的宝可梦
+            pokedex_result = self.user_pokemon_repo.get_user_pokedex_ids(user_id)
+            if pokedex_result and wild_pokemon.species_id in pokedex_result.get("caught", set()):
+                ball_multiplier = 3.0
+            else:
+                ball_multiplier = 1.0
+        # 10: 计时球 - 捕捉率随回合增加，最高4x
+        elif ball_id == 10:
+            # 这里先按1x处理，实际应用中可能需要根据战斗回合数调整
+            ball_multiplier = 1.0
+        # 11: 豪华球 - 捕捉成功后初始友好度+200
+        elif ball_id == 11:
+            ball_multiplier = 1.0  # 基础捕捉率不变
+        # 12: 纪念球 - 1x 捕捉成功率
+        elif ball_id == 12:
+            ball_multiplier = 1.0
+        # 13: 黑暗球 - 夜晚(18:00-6:00)时3.5x，其他时间1x
+        elif ball_id == 13:
+            # 获取当前北京时间
+            from datetime import datetime
+            import pytz
+            beijing_tz = pytz.timezone('Asia/Shanghai')  # 北京时间
+            current_time = datetime.now(beijing_tz)
+            current_hour = current_time.hour
+
+            # 如果当前时间在18:00-6:00之间（晚上6点到早上6点），使用3.5倍数
+            if 18 <= current_hour <= 23 or 0 <= current_hour < 6:
+                ball_multiplier = 3.5
+            else:
+                ball_multiplier = 1.0
+        # 14: 治愈球 - 捕捉成功后立即治愈
+        elif ball_id == 14:
+            ball_multiplier = 1.0  # 基础捕捉率不变
+        # 15: 先机球 - 首回合4x，其他回合1x
+        elif ball_id == 15:
+            # 这里先按4x处理，实际应用中可能需要判断是否为战斗首回合
+            ball_multiplier = 4.0
+        # 16: 贵重球 - 1x 捕捉成功率
+        elif ball_id == 16:
+            ball_multiplier = 1.0
 
         max_hp = wild_pokemon.stats.hp
         # 简单模拟当前血量 (若有战斗上下文应传入实际血量)
@@ -452,6 +556,11 @@ class AdventureService:
         catch_value = int(((3 * max_hp - 2 * current_hp) * base_capture_rate * ball_multiplier) // (3 * max_hp))
         catch_value = min(catch_value, 255)
         success_rate = catch_value / 256.0
+
+        # 特殊处理大师球：直接返回100%成功率
+        if ball_id == 1:  # 大师球
+            success_rate = 1.0
+            catch_value = 255
 
         return {
             "success": True,
@@ -584,7 +693,13 @@ class AdventureService:
         for pid in user_team_list:
             u_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
             if u_info:
-                user_contexts.append(self._create_battle_context(u_info, True))
+                # 检查宝可梦的当前HP，如果为0则跳过
+                if u_info.current_hp > 0:
+                    user_contexts.append(self._create_battle_context(u_info, True))
+
+        # 检查是否有可用的宝可梦参与战斗
+        if not user_contexts:
+            return BaseResult(success=False, message="您的所有宝可梦都处于濒死状态，无法进行战斗！")
 
         u_idx = 0
         t_idx = 0
@@ -663,6 +778,21 @@ class AdventureService:
                                                                                  battle_trainer.trainer.base_payout)
 
         final_u_info = user_contexts[min(u_idx, len(user_contexts) - 1)].pokemon if user_contexts else None
+
+        # 保存战斗后用户的宝可梦状态（HP和PP）
+        # 只保存参与战斗的宝可梦（即在战斗循环中被访问过的）
+        for i in range(u_idx + 1):  # 保存从索引0到当前索引的所有宝可梦
+            ctx = user_contexts[i]
+            # 更新用户宝可梦的当前HP和当前PP
+            self.user_pokemon_repo._update_user_pokemon_fields(
+                user_id=user_id,
+                pokemon_id=ctx.pokemon.id,
+                current_hp=ctx.pokemon.stats.hp,
+                current_pp1=ctx.moves[0].current_pp if len(ctx.moves) > 0 else 0,
+                current_pp2=ctx.moves[1].current_pp if len(ctx.moves) > 1 else 0,
+                current_pp3=ctx.moves[2].current_pp if len(ctx.moves) > 2 else 0,
+                current_pp4=ctx.moves[3].current_pp if len(ctx.moves) > 3 else 0
+            )
 
         return BaseResult(
             success=True,

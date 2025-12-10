@@ -78,12 +78,12 @@ class ItemService:
 
         for item_type, items in items_by_type.items():
             type_name = type_names.get(item_type, item_type)
-            formatted_text += f"🔸 {type_name}:\n"
+            formatted_text += f"🔸 {type_name}:\n\n"
 
             for item in items:
-                formatted_text += f"  • [{item.item_id}] {item.name_zh} x{item.quantity}\n"
-                if item.description:
-                    formatted_text += f"    {item.description}\n"
+                formatted_text += f"  • [{item.item_id}] {item.name_zh} x{item.quantity}\n\n"
+                # if item.description:
+                #     formatted_text += f"    {item.description}\n"
             formatted_text += "\n"
 
         return formatted_text.strip()

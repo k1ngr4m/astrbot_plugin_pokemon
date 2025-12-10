@@ -274,6 +274,19 @@ class AbstractUserPokemonRepository(ABC):
     # 更新用户宝可梦字段
     def _update_user_pokemon_fields(self, user_id: str, pokemon_id: int, **kwargs) -> None: pass
 
+    @abstractmethod
+    def update_user_pokemon_happiness(self, user_id: str, pokemon_id: int, happiness: int) -> None: pass
+
+    @abstractmethod
+    def update_user_pokemon_current_hp(self, user_id: str, pokemon_id: int, current_hp: int) -> None: pass
+
+    @abstractmethod
+    def update_user_pokemon_current_pp(self, user_id: str, pokemon_id: int, current_pp1: int = None,
+                                       current_pp2: int = None, current_pp3: int = None, current_pp4: int = None) -> None: pass
+
+    @abstractmethod
+    def update_user_pokemon_full_heal(self, user_id: str, pokemon_id: int) -> None: pass
+
     # ==========查==========
     # 获取用户所有宝可梦
     @abstractmethod

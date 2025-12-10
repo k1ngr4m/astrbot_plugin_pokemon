@@ -3,6 +3,7 @@ import threading
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 
+from .sqlite_move_repo import SqliteMoveRepository
 from ...core.models.pokemon_models import PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves, WildPokemonEncounterLog
 from ...core.models.pokemon_models import UserPokemonInfo
 from .abstract_repository import AbstractUserPokemonRepository
@@ -65,6 +66,12 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             moves=self._extract_moves(row_dict),
             caught_time=row_dict['caught_time'],
             nature_id=row_dict['nature_id'],
+            happiness=row_dict.get('happiness', 70),
+            current_hp=row_dict.get('current_hp', 0),
+            current_pp1=row_dict.get('current_pp1', 0),
+            current_pp2=row_dict.get('current_pp2', 0),
+            current_pp3=row_dict.get('current_pp3', 0),
+            current_pp4=row_dict.get('current_pp4', 0),
         )
 
     # =========增=========
@@ -75,19 +82,21 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                                         hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv, \
                                         hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev, \
                                         hp, attack, defense, sp_attack, sp_defense, speed, \
-                                        move1_id, move2_id, move3_id, move4_id, nature_id)
+                                        move1_id, move2_id, move3_id, move4_id, nature_id, \
+                                        happiness, current_hp, current_pp1, current_pp2, current_pp3, current_pp4)
               VALUES (:user_id, :species_id, :nickname, :level, :exp, :gender, \
                       :hp_iv, :attack_iv, :defense_iv, :sp_attack_iv, :sp_defense_iv, :speed_iv, \
                       :hp_ev, :attack_ev, :defense_ev, :sp_attack_ev, :sp_defense_ev, :speed_ev, \
                       :hp, :attack, :defense, :sp_attack, :sp_defense, :speed, \
-                      :move1_id, :move2_id, :move3_id, :move4_id, :nature_id) \
+                      :move1_id, :move2_id, :move3_id, :move4_id, :nature_id, \
+                      :happiness, :current_hp, :current_pp1, :current_pp2, :current_pp3, :current_pp4) \
               """
 
         # 展平参数字典，使用命名占位符防止位置错误
         params = {
             "user_id": user_id, "species_id": pokemon.species_id, "nickname": pokemon.name,
             "level": pokemon.level, "exp": pokemon.exp, "gender": pokemon.gender,
-            "nature_id": pokemon.nature_id,  # 占位符，稍后更新
+            "nature_id": pokemon.nature_id,
             # IVs
             "hp_iv": pokemon.ivs.hp_iv, "attack_iv": pokemon.ivs.attack_iv, "defense_iv": pokemon.ivs.defense_iv,
             "sp_attack_iv": pokemon.ivs.sp_attack_iv, "sp_defense_iv": pokemon.ivs.sp_defense_iv,
@@ -102,13 +111,50 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             # Moves
             "move1_id": pokemon.moves.move1_id, "move2_id": pokemon.moves.move2_id,
             "move3_id": pokemon.moves.move3_id, "move4_id": pokemon.moves.move4_id,
+            # 新增字段
+            "happiness": pokemon.happiness,
+            "current_hp": pokemon.stats.hp,  # 刚捕捉的宝可梦HP满
+            "current_pp1": 0,  # PP会在创建后根据技能自动设置
+            "current_pp2": 0,
+            "current_pp3": 0,
+            "current_pp4": 0,
         }
 
+        # 在插入记录后，更新PP为技能的最大PP值
         conn = self._get_connection()
         with conn:  # 开启事务
             cursor = conn.cursor()
             cursor.execute(sql, params)
             new_id = cursor.lastrowid
+
+            # 获取技能的最大PP值并更新current_pp字段
+            moves = [pokemon.moves.move1_id, pokemon.moves.move2_id,
+                     pokemon.moves.move3_id, pokemon.moves.move4_id]
+
+            temp_repo = SqliteMoveRepository(self.db_path)
+            current_pps = []
+            for move_id in moves:
+                if move_id:
+                    move_info = temp_repo.get_move_by_id(move_id)
+                    max_pp = move_info['pp'] if move_info else 0
+                    current_pps.append(max_pp)
+                else:
+                    current_pps.append(0)
+
+            # 更新PP值
+            update_pp_sql = """
+                UPDATE user_pokemon
+                SET current_pp1 = ?, current_pp2 = ?, current_pp3 = ?, current_pp4 = ?,
+                    updated_at = datetime('now', '+8 hours')
+                WHERE id = ?
+            """
+            cursor.execute(update_pp_sql, (
+                current_pps[0] if len(current_pps) > 0 else 0,
+                current_pps[1] if len(current_pps) > 1 else 0,
+                current_pps[2] if len(current_pps) > 2 else 0,
+                current_pps[3] if len(current_pps) > 3 else 0,
+                new_id
+            ))
 
         return new_id
 
@@ -188,6 +234,58 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
         conn = self._get_connection()
         with conn:
             conn.execute(sql, params)
+
+    def update_user_pokemon_happiness(self, user_id: str, pokemon_id: int, happiness: int) -> None:
+        """更新用户宝可梦的友好度"""
+        self._update_user_pokemon_fields(user_id, pokemon_id, happiness=happiness)
+
+    def update_user_pokemon_current_hp(self, user_id: str, pokemon_id: int, current_hp: int) -> None:
+        """更新用户宝可梦的当前HP"""
+        self._update_user_pokemon_fields(user_id, pokemon_id, current_hp=current_hp)
+
+    def update_user_pokemon_current_pp(self, user_id: str, pokemon_id: int, current_pp1: int = None,
+                                       current_pp2: int = None, current_pp3: int = None, current_pp4: int = None) -> None:
+        """更新用户宝可梦的当前PP"""
+        updates = {}
+        if current_pp1 is not None:
+            updates['current_pp1'] = current_pp1
+        if current_pp2 is not None:
+            updates['current_pp2'] = current_pp2
+        if current_pp3 is not None:
+            updates['current_pp3'] = current_pp3
+        if current_pp4 is not None:
+            updates['current_pp4'] = current_pp4
+        if updates:
+            self._update_user_pokemon_fields(user_id, pokemon_id, **updates)
+
+    def update_user_pokemon_full_heal(self, user_id: str, pokemon_id: int) -> None:
+        """完全治愈宝可梦（恢复HP和PP）"""
+        # 获取宝可梦信息以知道最大HP
+        pokemon_info = self.get_user_pokemon_by_id(user_id, pokemon_id)
+        if pokemon_info:
+            # 恢复HP到最大值
+            self.update_user_pokemon_current_hp(user_id, pokemon_id, pokemon_info.stats.hp)
+
+            # 恢复PP到最大值（需要获取技能的PP）
+            moves = [pokemon_info.moves.move1_id, pokemon_info.moves.move2_id,
+                     pokemon_info.moves.move3_id, pokemon_info.moves.move4_id]
+
+            # 使用一个临时实例来获取技能PP
+            temp_repo = SqliteMoveRepository(self.db_path)
+            current_pps = []
+            for move_id in moves:
+                if move_id:
+                    move_info = temp_repo.get_move_by_id(move_id)
+                    max_pp = move_info['pp'] if move_info else 0
+                    current_pps.append(max_pp)
+                else:
+                    current_pps.append(0)
+
+            self.update_user_pokemon_current_pp(user_id, pokemon_id,
+                                              current_pp1=current_pps[0] if len(current_pps) > 0 else 0,
+                                              current_pp2=current_pps[1] if len(current_pps) > 1 else 0,
+                                              current_pp3=current_pps[2] if len(current_pps) > 2 else 0,
+                                              current_pp4=current_pps[3] if len(current_pps) > 3 else 0)
 
     # =========查=========
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:

@@ -76,3 +76,27 @@ class CommonHandlers:
         except Exception as e:
             logger.error(f"启动后台失败: {e}", exc_info=True)
             yield event.plain_result(f"❌ 启动后台失败: {e}")
+
+    async def stop_admin(self, event: AstrMessageEvent):
+        """关闭钓鱼后台管理"""
+        if (
+                not hasattr(self.plugin, "web_admin_task")
+                or not self.plugin.web_admin_task
+                or self.plugin.web_admin_task.done()
+        ):
+            yield event.plain_result("❌ 宝可梦后台管理没有在运行中")
+            return
+
+        try:
+            # 1. 请求取消任务
+            self.plugin.web_admin_task.cancel()
+            # 2. 等待任务实际被取消
+            await self.plugin.web_admin_task
+        except asyncio.CancelledError:
+            # 3. 捕获CancelledError，这是成功关闭的标志
+            logger.info("宝可梦插件Web管理后台已成功关闭")
+            yield event.plain_result("✅ 宝可梦后台已关闭")
+        except Exception as e:
+            # 4. 捕获其他可能的意外错误
+            logger.error(f"关闭宝可梦后台管理时发生意外错误: {e}", exc_info=True)
+            yield event.plain_result(f"❌ 关闭宝可梦后台管理失败: {e}")

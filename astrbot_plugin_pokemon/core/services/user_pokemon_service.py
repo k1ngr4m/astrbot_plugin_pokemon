@@ -304,3 +304,67 @@ class UserPokemonService:
             user_id (str): 用户ID
         """
         self.user_pokemon_repo.clear_user_current_trainer_encounter(user_id)
+
+    def update_pokemon_happiness(self, user_id: str, pokemon_id: int, happiness: int) -> BaseResult:
+        """
+        更新宝可梦友好度
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+            happiness: 友好度值
+        Returns:
+            BaseResult
+        """
+        try:
+            self.user_pokemon_repo.update_user_pokemon_happiness(user_id, pokemon_id, happiness)
+            return BaseResult(
+                success=True,
+                message="宝可梦友好度更新成功"
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"更新宝可梦友好度失败: {str(e)}"
+            )
+
+    def heal_pokemon_fully(self, user_id: str, pokemon_id: int) -> BaseResult:
+        """
+        完全治愈宝可梦
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+        Returns:
+            BaseResult
+        """
+        try:
+            self.user_pokemon_repo.update_user_pokemon_full_heal(user_id, pokemon_id)
+            return BaseResult(
+                success=True,
+                message="宝可梦已完全治愈"
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"治愈宝可梦失败: {str(e)}"
+            )
+
+    def update_user_pokemon_full_heal(self, user_id: str, pokemon_id: int) -> BaseResult:
+        """
+        完全治愈用户宝可梦
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+        Returns:
+            BaseResult
+        """
+        try:
+            self.user_pokemon_repo.update_user_pokemon_full_heal(user_id, pokemon_id)
+            return BaseResult(
+                success=True,
+                message="宝可梦已完全治愈"
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"治愈宝可梦失败: {str(e)}"
+            )

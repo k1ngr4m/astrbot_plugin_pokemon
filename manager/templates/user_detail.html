@@ -304,12 +304,47 @@
             content.innerHTML = '';
 
             // 显示战斗记录的每一行
-            logData.forEach(function(line, index) {
-                var p = document.createElement('p');
-                p.className = 'mb-2';
-                p.textContent = (index + 1) + '. ' + line;
-                content.appendChild(p);
+            logData.forEach(function(battleEntry, index) {
+                // 每个战斗记录项是一个对象，包含 details 字段
+                var details = battleEntry.details || [];
+
+                // 创建战斗记录标题
+                var title = document.createElement('h6');
+                title.className = 'mt-3 mb-2';
+                title.textContent = `战斗记录 #${index + 1}: ${battleEntry.pokemon_name || '宝可梦'} vs ${battleEntry.trainer_pokemon_name || battleEntry.target_name || '对手'}`;
+                content.appendChild(title);
+
+                // 显示结果
+                var result = document.createElement('p');
+                result.className = 'text-muted mb-2';
+                result.textContent = `结果: ${battleEntry.result} | 胜率: ${battleEntry.win_rate || 'N/A'}`;
+                content.appendChild(result);
+
+                // 显示具体的战斗日志
+                details.forEach(function(logLine, logIndex) {
+                    var p = document.createElement('p');
+                    p.className = 'mb-1';
+                    p.style.fontFamily = 'monospace';
+                    p.style.fontSize = '0.9em';
+                    p.textContent = (logIndex + 1) + '. ' + logLine;
+                    content.appendChild(p);
+                });
+
+                // 添加分隔线
+                if (index < logData.length - 1) {
+                    var hr = document.createElement('hr');
+                    hr.className = 'my-3';
+                    content.appendChild(hr);
+                }
             });
+
+            // 如果没有战斗记录
+            if (logData.length === 0) {
+                var p = document.createElement('p');
+                p.className = 'text-muted';
+                p.textContent = '没有战斗记录';
+                content.appendChild(p);
+            }
         });
     </script>
 </body>
