@@ -56,7 +56,7 @@ class AdventureService:
         self.move_repo = move_repo
         self.battle_repo = battle_repo
         self.trainer_service = None
-        self.battle_logic = BattleLogic()
+        self.battle_logic = BattleLogic(move_repo=self.move_repo)
 
     def set_trainer_service(self, trainer_service):
         """设置训练家服务"""
@@ -281,6 +281,8 @@ class AdventureService:
         # 保存战斗后用户的宝可梦状态（HP和PP）
         # 只保存参与战斗的宝可梦（即在战斗循环中被访问过的）
         for i in range(current_idx + 1):  # 保存从索引0到当前索引的所有宝可梦
+            if i >= len(user_pokemon_contexts):  # 防御性检查
+                break
             ctx = user_pokemon_contexts[i]
             # 更新用户宝可梦的当前HP和当前PP
             self.user_pokemon_repo._update_user_pokemon_fields(
