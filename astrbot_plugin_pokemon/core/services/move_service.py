@@ -55,3 +55,13 @@ class MoveService:
             return "未知技能"
         move_info = self.get_move_by_id(move_id)
         return move_info['name_zh'] if move_info else f"技能{move_id}"
+
+    def get_move_stat_changes_by_move_id(self, move_id: int) -> List[Dict[str, Any]]:
+        """
+        获取技能能力变化数据
+        Args:
+            move_id: 技能ID
+        Returns:
+            技能能力变化数据列表
+        """
+        return self.move_repo.get_move_stat_changes_by_move_id(move_id)

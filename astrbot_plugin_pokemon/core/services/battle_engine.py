@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from astrbot.api import logger
 from ..models.adventure_models import BattleContext, BattleMoveInfo
+from .stat_modifier_service import StatModifierService, StatID
 
 
 class BattleLogger(Protocol):
@@ -41,13 +42,15 @@ class BattleState:
     context: BattleContext
     current_hp: int
     current_pps: List[int]
+    stat_levels: Optional[Dict[int, int]] = None  # 状态等级字典，key为stat_id，value为等级变化
 
     @classmethod
     def from_context(cls, context: BattleContext) -> 'BattleState':
         return cls(
             context=context,
             current_hp=context.current_hp,
-            current_pps=[m.current_pp for m in context.moves]
+            current_pps=[m.current_pp for m in context.moves],
+            stat_levels={}  # 初始化为空字典，表示所有状态等级为0
         )
 
 
@@ -92,7 +95,9 @@ class BattleLogic:
         'fairy': {'fighting': 2.0, 'poison': 0.5, 'bug': 0.5, 'dragon': 2.0, 'dark': 2.0, 'steel': 0.5}
     }
 
-    def __init__(self):
+    def __init__(self, move_service=None):
+        self.stat_modifier_service = StatModifierService()
+        self.move_service = move_service  # 可选的move_service，用于获取技能状态变化
         self._struggle_move = self._create_struggle_move()
 
     def _create_struggle_move(self) -> BattleMoveInfo:
@@ -105,6 +110,20 @@ class BattleLogic:
     def get_struggle_move(self) -> BattleMoveInfo:
         return self._struggle_move
 
+    def _get_modified_stats(self, battle_state: BattleState):
+        """获取修改后的宝可梦状态"""
+        # 如果没有状态等级，则直接返回原始状态
+        if not battle_state.stat_levels:
+            return battle_state.context.pokemon.stats
+
+        # 使用stat modifier service来计算修改后的状态
+        modified_stats, _ = self.stat_modifier_service.apply_stat_changes(
+            battle_state.context.pokemon.stats,
+            [],  # 空的变化列表，因为我们只是应用现有的等级
+            battle_state.stat_levels
+        )
+        return modified_stats
+
     def calculate_type_effectiveness(self, attacker_types: List[str], defender_types: List[str]) -> float:
         effectiveness = 1.0
         for atk_type in attacker_types:
@@ -114,20 +133,27 @@ class BattleLogic:
                 effectiveness *= atk_dict.get(def_type.lower(), 1.0)
         return effectiveness
 
-    def _get_atk_def_ratio(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> float:
-        atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
-        def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
+    def _get_atk_def_ratio(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo) -> float:
+        # 使用修改后的状态值
+        attacker_stats = self._get_modified_stats(attacker_state)
+        defender_stats = self._get_modified_stats(defender_state)
+
+        atk_stat = attacker_stats.attack if move.damage_class_id == 2 else attacker_stats.sp_attack
+        def_stat = defender_stats.defense if move.damage_class_id == 2 else defender_stats.sp_defense
         return atk_stat / max(1, def_stat)
 
-    def _calculate_move_score(self, attacker_ctx: BattleContext, defender_ctx: BattleContext,
+    def _calculate_move_score(self, attacker_state: BattleState, defender_state: BattleState,
                               move: BattleMoveInfo, logger_obj: Optional[BattleLogger] = None) -> float:
+        attacker_ctx = attacker_state.context
+        defender_ctx = defender_state.context
+
         eff = self.calculate_type_effectiveness([move.type_name], defender_ctx.types)
         stab = 1.5 if move.type_name in attacker_ctx.types else 1.0
 
         # Note: We don't cache eff/stab on the move object here to avoid side effects during simulation if possible,
         # but the original code did. For now, let's calculate it fresh.
 
-        atk_def_ratio = self._get_atk_def_ratio(attacker_ctx, defender_ctx, move)
+        atk_def_ratio = self._get_atk_def_ratio(attacker_state, defender_state, move)
         score = move.power * (move.accuracy / 100.0) * eff * stab * atk_def_ratio
 
         if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
@@ -176,22 +202,25 @@ class BattleLogic:
         best_score = -1.0
 
         for move in attack_moves:
-            score = self._calculate_move_score(attacker_ctx, defender_ctx, move, logger_obj)
+            score = self._calculate_move_score(attacker_state, defender_state, move, logger_obj)
             if score > best_score:
                 best_score = score
                 best_move = move
-        
+
         if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
             logger.info(f"最终选择: {best_move.move_name} (评分: {best_score:.2f})")
         return best_move
 
-    def _calculate_damage_core(self, attacker_ctx: BattleContext, defender_ctx: BattleContext, move: BattleMoveInfo) -> Tuple[int, Dict[str, Any]]:
+    def _calculate_damage_core(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo) -> Tuple[int, Dict[str, Any]]:
         if random.random() * 100 > move.accuracy:
             return 0, {"missed": True, "type_effectiveness": 1.0, "is_crit": False}
 
-        atk_stat = attacker_ctx.pokemon.stats.attack if move.damage_class_id == 2 else attacker_ctx.pokemon.stats.sp_attack
-        def_stat = defender_ctx.pokemon.stats.defense if move.damage_class_id == 2 else defender_ctx.pokemon.stats.sp_defense
-        level = attacker_ctx.pokemon.level
+        attacker_stats = self._get_modified_stats(attacker_state)
+        defender_stats = self._get_modified_stats(defender_state)
+
+        atk_stat = attacker_stats.attack if move.damage_class_id == 2 else attacker_stats.sp_attack
+        def_stat = defender_stats.defense if move.damage_class_id == 2 else defender_stats.sp_defense
+        level = attacker_state.context.pokemon.level
 
         base_damage = ((2 * level / 5 + 2) * move.power * atk_stat / max(1, def_stat)) / 50 + 2
 
@@ -199,8 +228,8 @@ class BattleLogic:
         crit_multiplier = 1.5 if is_crit else 1.0
         random_multiplier = random.uniform(0.85, 1.0)
 
-        eff = self.calculate_type_effectiveness([move.type_name], defender_ctx.types)
-        stab = 1.5 if move.type_name in attacker_ctx.types else 1.0
+        eff = self.calculate_type_effectiveness([move.type_name], defender_state.context.types)
+        stab = 1.5 if move.type_name in attacker_state.context.types else 1.0
 
         final_damage = base_damage * eff * stab * crit_multiplier * random_multiplier
 
@@ -216,12 +245,12 @@ class BattleLogic:
         u_prio, w_prio = u_move.priority, w_move.priority
         if u_prio != w_prio:
             return u_prio > w_prio
-        
-        u_spd = user_state.context.pokemon.stats.speed
-        w_spd = wild_state.context.pokemon.stats.speed
+
+        u_spd = self._get_modified_stats(user_state).speed
+        w_spd = self._get_modified_stats(wild_state).speed
         if u_spd != w_spd:
             return u_spd > w_spd
-        
+
         return random.random() < 0.5
 
     def process_turn(self, user_state: BattleState, wild_state: BattleState,
@@ -266,19 +295,106 @@ class BattleLogic:
             except ValueError:
                 pass # Should not happen if logic is correct
 
-        # Status move
-        if move.damage_class_id == 1:
+        # Process stat changes from move meta data if move_service is available
+        if self.move_service and move.move_id > 0:
+            # Get move stat changes
+            stat_changes = self.move_service.get_move_stat_changes_by_move_id(move.move_id)
+            if stat_changes:
+                # Apply stat changes to the target(s) based on target_id
+                # First, get the move data to know the target_id
+                move_data = self.move_service.get_move_by_id(move.move_id)
+                if move_data:
+                    target_id = move_data.get('target_id', 0)
+
+                    # For now, we'll apply stat changes to the defender by default for offensive moves
+                    # and to the attacker for stat-raising moves
+                    # We'll need to determine the targets based on target_id
+                    # For simplicity, we'll apply to defender if it's an attacking move with negative stat changes
+                    # and to attacker if it's a stat-raising move
+
+                    # Apply stat changes to defender
+                    if target_id in [2, 8, 10, 11, 14]:  # Opponent-related targets
+                        # Apply to defender
+                        defender.stat_levels = defender.stat_levels or {}
+                        _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                            defender.context.pokemon.stats, stat_changes, defender.stat_levels)
+                        defender.stat_levels = new_levels
+
+                        # Log stat changes
+                        for change in stat_changes:
+                            stat_id = change['stat_id']
+                            stat_change = change['change']
+                            if stat_change != 0:
+                                stat_name = self._get_stat_name_by_id(stat_id)
+                                if stat_change > 0:
+                                    logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}提升了！\n\n")
+                                else:
+                                    logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}降低了！\n\n")
+
+                    # Apply stat changes to attacker
+                    elif target_id in [3, 4, 5, 7, 13, 15]:  # Self-related targets
+                        # Apply to attacker
+                        attacker.stat_levels = attacker.stat_levels or {}
+                        _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                            attacker.context.pokemon.stats, stat_changes, attacker.stat_levels)
+                        attacker.stat_levels = new_levels
+
+                        # Log stat changes
+                        for change in stat_changes:
+                            stat_id = change['stat_id']
+                            stat_change = change['change']
+                            if stat_change != 0:
+                                stat_name = self._get_stat_name_by_id(stat_id)
+                                if stat_change > 0:
+                                    logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}提升了！\n\n")
+                                else:
+                                    logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}降低了！\n\n")
+                    else:
+                        # Default behavior: if any stat changes are positive, apply to attacker (self)
+                        # if any are negative, apply to defender (opponent)
+                        positive_changes = any(change['change'] > 0 for change in stat_changes)
+                        negative_changes = any(change['change'] < 0 for change in stat_changes)
+
+                        if positive_changes:
+                            attacker.stat_levels = attacker.stat_levels or {}
+                            _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                                attacker.context.pokemon.stats, stat_changes, attacker.stat_levels)
+                            attacker.stat_levels = new_levels
+
+                            # Log positive stat changes
+                            for change in stat_changes:
+                                if change['change'] > 0:
+                                    stat_id = change['stat_id']
+                                    stat_name = self._get_stat_name_by_id(stat_id)
+                                    logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}提升了！\n\n")
+
+                        if negative_changes:
+                            defender.stat_levels = defender.stat_levels or {}
+                            _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                                defender.context.pokemon.stats, stat_changes, defender.stat_levels)
+                            defender.stat_levels = new_levels
+
+                            # Log negative stat changes
+                            for change in stat_changes:
+                                if change['change'] < 0:
+                                    stat_id = change['stat_id']
+                                    stat_name = self._get_stat_name_by_id(stat_id)
+                                    logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}降低了！\n\n")
+
+        # Check if it's a status move (power = 0) first
+        if move.power == 0:
             logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}！")
+            # Status move with potential stat changes was handled above
             return False
 
-        # Attack move
-        dmg, effects = self._calculate_damage_core(attacker.context, defender.context, move)
+        # Attack move - calculate and apply damage
+        dmg, effects = self._calculate_damage_core(attacker, defender, move)
         defender.current_hp -= dmg
-        
+
         desc = f"{attacker.context.pokemon.name} 使用了 {move.move_name}！"
         if is_struggle:
             desc = f"{attacker.context.pokemon.name} 使用了挣扎！（PP耗尽）\n\n"
-        
+
         # PP display for logging (optional, maybe just show current/max)
         # For simulation we don't care about logging PP details usually
         logger_obj.log(f"{desc} 造成 {dmg} 点伤害。\n\n")
@@ -306,3 +422,17 @@ class BattleLogic:
             return True
 
         return False
+
+    def _get_stat_name_by_id(self, stat_id: int) -> str:
+        """根据stat_id获取状态名称"""
+        stat_names = {
+            StatID.HP.value: "HP",
+            StatID.ATTACK.value: "攻击",
+            StatID.DEFENSE.value: "防御",
+            StatID.SP_ATTACK.value: "特攻",
+            StatID.SP_DEFENSE.value: "特防",
+            StatID.SPEED.value: "速度",
+            StatID.ACCURACY.value: "命中",
+            StatID.EVASION.value: "闪避"
+        }
+        return stat_names.get(stat_id, "未知状态")

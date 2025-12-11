@@ -224,6 +224,21 @@ class AbstractMoveRepository(ABC):
     @abstractmethod
     def get_pokemon_moves_by_species_id(self, pokemon_species_id: int) -> List[Dict[str, Any]]: pass
 
+    @abstractmethod
+    def add_move_flag_map_templates_batch(self, data_list: List[Dict[str, Any]]) -> None: pass
+
+    @abstractmethod
+    def add_move_meta_templates_batch(self, data_list: List[Dict[str, Any]]) -> None: pass
+
+    @abstractmethod
+    def add_move_stat_change_templates_batch(self, data_list: List[Dict[str, Any]]) -> None: pass
+
+    @abstractmethod
+    def get_move_meta_by_move_id(self, move_id: int) -> Optional[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def get_move_stat_changes_by_move_id(self, move_id: int) -> List[Dict[str, Any]]: pass
+
 class AbstractBattleRepository(ABC):
     """战斗日志数据仓储接口"""
     # ==========增==========

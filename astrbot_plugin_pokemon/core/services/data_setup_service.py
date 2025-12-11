@@ -455,6 +455,77 @@ class DataSetupService:
 
                 logger.info("训练家数据初始化完成")
 
+            # 14. 填充 Move Flag Map (招式标志映射)
+            if hasattr(self.move_repo, 'add_move_flag_map_templates_batch'): # Check method existence just in case, though we know we added it.
+                 # Optimization: check if table is empty. Since we don't have a direct method to check count, we can try to get one record, 
+                 # or reliance on idempotent insert (INSERT OR IGNORE). 
+                 # However, data_setup_service pattern seems to be check-if-repo-has-data -> load.
+                 # We added `get_move_meta_by_move_id` but not for flags. 
+                 # Let's check `move_meta` as a proxy for all 3 tables or just assume if one is empty others might be too, 
+                 # or just rely on 'INSERT OR IGNORE' logic in repo if we skip check.
+                 # BUT, the pattern here is `if not self.repo.check(): load()`. 
+                 # Let's add specific checks if possible, or just load since it's idempotent.
+                 # The user request said "same logic", so we should check first.
+                 # I will blindly try to load if I can't check cheaply, but let's see if we can check.
+                 # Actually, I added `get_move_meta_by_move_id`. I can use that for `move_meta`.
+                 # For `move_flag_map` and `move_meta_stat_changes`, I didn't add specific check methods.
+                 # I will trust the migration/setup process. Since I can't check efficiently without new repo methods,
+                 # and adding them now might be overkill vs just running the batch insert which uses INSERT OR IGNORE.
+                 # Wait, for consistency, I should probably use `get_move_meta_by_move_id(1)` for move_meta.
+                 
+                # Move Meta
+                if not self.move_repo.get_move_meta_by_move_id(1):
+                    logger.info("正在初始化招式元数据 (Move Meta)...")
+                    
+                    # 14.1 move_flag_map.csv
+                    df_flag = self._read_csv_data("move_flag_map.csv")
+                    if not df_flag.empty:
+                        df_flag = df_flag.where(pd.notnull(df_flag), None)
+                        flag_data = [
+                            {"move_id": int(row['move_id']), "move_flag_id": int(row['move_flag_id'])} 
+                            for row in df_flag.to_dict('records')
+                        ]
+                        self.move_repo.add_move_flag_map_templates_batch(flag_data)
+
+                    # 14.2 move_meta.csv
+                    df_meta = self._read_csv_data("move_meta.csv")
+                    if not df_meta.empty:
+                        df_meta = df_meta.where(pd.notnull(df_meta), None)
+                        meta_data = []
+                        for row in df_meta.to_dict('records'):
+                            meta_data.append({
+                                "move_id": int(row['move_id']),
+                                "meta_category_id": int(row['meta_category_id']),
+                                "meta_ailment_id": int(row['meta_ailment_id']),
+                                "min_hits": int(row['min_hits']) if pd.notna(row['min_hits']) else None,
+                                "max_hits": int(row['max_hits']) if pd.notna(row['max_hits']) else None,
+                                "min_turns": int(row['min_turns']) if pd.notna(row['min_turns']) else None,
+                                "max_turns": int(row['max_turns']) if pd.notna(row['max_turns']) else None,
+                                "drain": int(row['drain']),
+                                "healing": int(row['healing']),
+                                "crit_rate": int(row['crit_rate']),
+                                "ailment_chance": int(row['ailment_chance']),
+                                "flinch_chance": int(row['flinch_chance']),
+                                "stat_chance": int(row['stat_chance'])
+                            })
+                        self.move_repo.add_move_meta_templates_batch(meta_data)
+                    
+                    # 14.3 move_meta_stat_changes.csv
+                    df_stat = self._read_csv_data("move_meta_stat_changes.csv")
+                    if not df_stat.empty:
+                        df_stat = df_stat.where(pd.notnull(df_stat), None)
+                        stat_change_data = [
+                            {
+                                "move_id": int(row['move_id']),
+                                "stat_id": int(row['stat_id']),
+                                "change": int(row['change'])
+                            }
+                            for row in df_stat.to_dict('records')
+                        ]
+                        self.move_repo.add_move_stat_change_templates_batch(stat_change_data)
+                    
+                    logger.info("招式元数据初始化完成")
+
 
         except Exception as e:
             logger.error(f"初始化数据时发生全局错误: {e}")

@@ -176,3 +176,82 @@ class SqliteMoveRepository(AbstractMoveRepository):
         except Exception as e:
             logger.error(f"获取宝可梦物种招式失败: {e}")
             return []
+
+    def add_move_flag_map_templates_batch(self, data_list: List[Dict[str, Any]]) -> None:
+        """批量添加招式Flag映射"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                batch_records = [(d['move_id'], d['move_flag_id']) for d in data_list]
+                cursor.executemany("INSERT OR IGNORE INTO move_flag_map (move_id, move_flag_id) VALUES (?, ?)", batch_records)
+                conn.commit()
+        except Exception as e:
+            logger.error(f"批量添加招式Flag映射失败: {e}")
+
+    def add_move_meta_templates_batch(self, data_list: List[Dict[str, Any]]) -> None:
+        """批量添加招式元数据"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                batch_records = []
+                for d in data_list:
+                    batch_records.append((
+                        d['move_id'], d['meta_category_id'], d['meta_ailment_id'],
+                        d['min_hits'], d['max_hits'], d['min_turns'], d['max_turns'],
+                        d['drain'], d['healing'], d['crit_rate'],
+                        d['ailment_chance'], d['flinch_chance'], d['stat_chance']
+                    ))
+                
+                cursor.executemany("""
+                    INSERT OR IGNORE INTO move_meta (
+                        move_id, meta_category_id, meta_ailment_id, 
+                        min_hits, max_hits, min_turns, max_turns, 
+                        drain, healing, crit_rate, 
+                        ailment_chance, flinch_chance, stat_chance
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, batch_records)
+                conn.commit()
+        except Exception as e:
+            logger.error(f"批量添加招式元数据失败: {e}")
+
+    def add_move_stat_change_templates_batch(self, data_list: List[Dict[str, Any]]) -> None:
+        """批量添加招式能力变化"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                batch_records = [(d['move_id'], d['stat_id'], d['change']) for d in data_list]
+                cursor.executemany("""
+                    INSERT OR IGNORE INTO move_meta_stat_changes (move_id, stat_id, change) 
+                    VALUES (?, ?, ?)
+                """, batch_records)
+                conn.commit()
+        except Exception as e:
+            logger.error(f"批量添加招式能力变化失败: {e}")
+
+    def get_move_meta_by_move_id(self, move_id: int) -> Optional[Dict[str, Any]]:
+        """获取招式元数据"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM move_meta WHERE move_id = ?", (move_id,))
+                row = cursor.fetchone()
+                if row:
+                    return dict(row)
+                return None
+        except Exception as e:
+            logger.error(f"获取招式元数据失败: {e}")
+            return None
+
+    def get_move_stat_changes_by_move_id(self, move_id: int) -> List[Dict[str, Any]]:
+        """获取招式能力变化数据"""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM move_meta_stat_changes WHERE move_id = ?", (move_id,))
+                rows = cursor.fetchall()
+                return [dict(row) for row in rows]
+        except Exception as e:
+            logger.error(f"获取招式能力变化数据失败: {e}")
+            return []
