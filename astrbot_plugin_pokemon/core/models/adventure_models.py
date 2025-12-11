@@ -22,6 +22,9 @@ class BattleMoveInfo:
     current_pp: int = 0  # 当前剩余使用次数
     move_id: int = 0
     move_name: str = ""
+    # 预加载的技能属性变化数据，避免在战斗循环中查库
+    stat_changes: List[Dict] = None  # 技能对属性的影响: [{'stat_id': int, 'change': int}, ...]
+    target_id: int = 0  # 技能目标ID，用于判断影响对象
 
 
 @dataclass

@@ -380,107 +380,87 @@ class BattleLogic:
                 elif eff == 0.0: logger_obj.log("似乎没有效果！\n\n")
                 elif eff < 1.0: logger_obj.log("效果不佳！\n\n")
 
-        # Process stat changes from move meta data if move service/repo is available
+        # Process stat changes from pre-loaded move data (avoiding database queries in combat loop)
         # This should happen after the move usage is logged
-        if move.move_id > 0:
-            # Prefer move_service if available, fall back to move_repo
-            move_service_or_repo = self.move_service or self.move_repo
-            if move_service_or_repo:
-                # Get move stat changes - try move_service first, then move_repo
-                stat_changes = []
-                move_data = None
+        if move.move_id > 0 and move.stat_changes:
+            # Use pre-loaded stat changes and target_id instead of querying database
+            stat_changes = move.stat_changes
+            target_id = move.target_id
 
-                if hasattr(move_service_or_repo, 'get_move_stat_changes_by_move_id'):
-                    # This is a move service
-                    stat_changes = move_service_or_repo.get_move_stat_changes_by_move_id(move.move_id)
-                    move_data = move_service_or_repo.get_move_by_id(move.move_id)
-                elif hasattr(move_service_or_repo, 'get_move_stat_changes_by_move_id'):
-                    # This is a move repo
-                    stat_changes = move_service_or_repo.get_move_stat_changes_by_move_id(move.move_id)
-                    move_data = move_service_or_repo.get_move_by_id(move.move_id)
+            # Apply stat changes to the target(s) based on target_id
+            # For now, we'll apply stat changes to the defender by default for offensive moves
+            # and to the attacker for stat-raising moves
+            # For simplicity, we'll apply to defender if it's an attacking move with negative stat changes
+            # and to attacker if it's a stat-raising move
 
-                if stat_changes:
-                    # Apply stat changes to the target(s) based on target_id
-                    # Make sure we have move_data
-                    if not move_data:
-                        move_data = move_service_or_repo.get_move_by_id(move.move_id) if move_service_or_repo else {}
-                    if move_data:
-                        target_id = move_data.get('target_id', 0)
+            # Apply stat changes to defender
+            if target_id in [2, 8, 10, 11, 14]:  # Opponent-related targets
+                # Apply to defender
+                defender.stat_levels = defender.stat_levels or {}
+                _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                    defender.context.pokemon.stats, stat_changes, defender.stat_levels)
+                defender.stat_levels = new_levels
 
-                        # For now, we'll apply stat changes to the defender by default for offensive moves
-                        # and to the attacker for stat-raising moves
-                        # We'll need to determine the targets based on target_id
-                        # For simplicity, we'll apply to defender if it's an attacking move with negative stat changes
-                        # and to attacker if it's a stat-raising move
-
-                        # Apply stat changes to defender
-                        if target_id in [2, 8, 10, 11, 14]:  # Opponent-related targets
-                            # Apply to defender
-                            defender.stat_levels = defender.stat_levels or {}
-                            _, new_levels = self.stat_modifier_service.apply_stat_changes(
-                                defender.context.pokemon.stats, stat_changes, defender.stat_levels)
-                            defender.stat_levels = new_levels
-
-                            # Log stat changes
-                            for change in stat_changes:
-                                stat_id = change['stat_id']
-                                stat_change = change['change']
-                                if stat_change != 0:
-                                    stat_name = self._get_stat_name_by_id(stat_id)
-                                    if stat_change > 0:
-                                        logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}提升了！\n\n")
-                                    else:
-                                        logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}降低了！\n\n")
-
-                        # Apply stat changes to attacker
-                        elif target_id in [3, 4, 5, 7, 13, 15]:  # Self-related targets
-                            # Apply to attacker
-                            attacker.stat_levels = attacker.stat_levels or {}
-                            _, new_levels = self.stat_modifier_service.apply_stat_changes(
-                                attacker.context.pokemon.stats, stat_changes, attacker.stat_levels)
-                            attacker.stat_levels = new_levels
-
-                            # Log stat changes
-                            for change in stat_changes:
-                                stat_id = change['stat_id']
-                                stat_change = change['change']
-                                if stat_change != 0:
-                                    stat_name = self._get_stat_name_by_id(stat_id)
-                                    if stat_change > 0:
-                                        logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}提升了！\n\n")
-                                    else:
-                                        logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}降低了！\n\n")
+                # Log stat changes
+                for change in stat_changes:
+                    stat_id = change['stat_id']
+                    stat_change = change['change']
+                    if stat_change != 0:
+                        stat_name = self._get_stat_name_by_id(stat_id)
+                        if stat_change > 0:
+                            logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}提升了！\n\n")
                         else:
-                            # Default behavior: if any stat changes are positive, apply to attacker (self)
-                            # if any are negative, apply to defender (opponent)
-                            positive_changes = any(change['change'] > 0 for change in stat_changes)
-                            negative_changes = any(change['change'] < 0 for change in stat_changes)
+                            logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}降低了！\n\n")
 
-                            if positive_changes:
-                                attacker.stat_levels = attacker.stat_levels or {}
-                                _, new_levels = self.stat_modifier_service.apply_stat_changes(
-                                    attacker.context.pokemon.stats, stat_changes, attacker.stat_levels)
-                                attacker.stat_levels = new_levels
+            # Apply stat changes to attacker
+            elif target_id in [3, 4, 5, 7, 13, 15]:  # Self-related targets
+                # Apply to attacker
+                attacker.stat_levels = attacker.stat_levels or {}
+                _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                    attacker.context.pokemon.stats, stat_changes, attacker.stat_levels)
+                attacker.stat_levels = new_levels
 
-                                # Log positive stat changes
-                                for change in stat_changes:
-                                    if change['change'] > 0:
-                                        stat_id = change['stat_id']
-                                        stat_name = self._get_stat_name_by_id(stat_id)
-                                        logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}提升了！\n\n")
+                # Log stat changes
+                for change in stat_changes:
+                    stat_id = change['stat_id']
+                    stat_change = change['change']
+                    if stat_change != 0:
+                        stat_name = self._get_stat_name_by_id(stat_id)
+                        if stat_change > 0:
+                            logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}提升了！\n\n")
+                        else:
+                            logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}降低了！\n\n")
+            else:
+                # Default behavior: if any stat changes are positive, apply to attacker (self)
+                # if any are negative, apply to defender (opponent)
+                positive_changes = any(change['change'] > 0 for change in stat_changes)
+                negative_changes = any(change['change'] < 0 for change in stat_changes)
 
-                            if negative_changes:
-                                defender.stat_levels = defender.stat_levels or {}
-                                _, new_levels = self.stat_modifier_service.apply_stat_changes(
-                                    defender.context.pokemon.stats, stat_changes, defender.stat_levels)
-                                defender.stat_levels = new_levels
+                if positive_changes:
+                    attacker.stat_levels = attacker.stat_levels or {}
+                    _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                        attacker.context.pokemon.stats, stat_changes, attacker.stat_levels)
+                    attacker.stat_levels = new_levels
 
-                                # Log negative stat changes
-                                for change in stat_changes:
-                                    if change['change'] < 0:
-                                        stat_id = change['stat_id']
-                                        stat_name = self._get_stat_name_by_id(stat_id)
-                                        logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}降低了！\n\n")
+                    # Log positive stat changes
+                    for change in stat_changes:
+                        if change['change'] > 0:
+                            stat_id = change['stat_id']
+                            stat_name = self._get_stat_name_by_id(stat_id)
+                            logger_obj.log(f"{attacker.context.pokemon.name}的{stat_name}提升了！\n\n")
+
+                if negative_changes:
+                    defender.stat_levels = defender.stat_levels or {}
+                    _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                        defender.context.pokemon.stats, stat_changes, defender.stat_levels)
+                    defender.stat_levels = new_levels
+
+                    # Log negative stat changes
+                    for change in stat_changes:
+                        if change['change'] < 0:
+                            stat_id = change['stat_id']
+                            stat_name = self._get_stat_name_by_id(stat_id)
+                            logger_obj.log(f"{defender.context.pokemon.name}的{stat_name}降低了！\n\n")
 
         # Recoil for struggle (should happen after stat changes)
         if is_struggle:
@@ -514,11 +494,6 @@ class BattleLogic:
     def _calculate_status_move_score(self, attacker_state: BattleState, defender_state: BattleState,
                                      move: BattleMoveInfo, logger_obj: Optional[BattleLogger] = None) -> float:
         """计算变化技能的评分"""
-        # Prefer move_service if available, fall back to move_repo
-        move_service_or_repo = self.move_service or self.move_repo
-        if not move_service_or_repo:
-            return 0.0
-
         best_dmg_move_score = 0
         for m in attacker_state.context.moves:
             if m.power > 0:
@@ -528,16 +503,14 @@ class BattleLogic:
 
         score = 0.0
 
-        # 1. 获取技能的属性变化数据
-        stat_changes = move_service_or_repo.get_move_stat_changes_by_move_id(move.move_id)
-        move_data = move_service_or_repo.get_move_by_id(move.move_id)
+        # 1. 使用预加载的技能属性变化数据（避免在战斗循环中查询数据库）
+        stat_changes = move.stat_changes
+        target_id = move.target_id
 
-        if not stat_changes or not move_data:
+        if not stat_changes:
             # 如果没有数据或者是纯状态异常技能（如电磁波），给一个基础分，防止完全不用
             # 可以在这里扩展异常状态的逻辑
             return 10.0
-
-        target_id = move_data.get('target_id', 0)
 
         # 2. 检查是否应该使用状态技能 - 如果攻击技能能造成高伤害，则降低状态技能评分
         # 寻找当前宝可梦的所有攻击技能中预期伤害最高的

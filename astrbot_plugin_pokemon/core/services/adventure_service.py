@@ -344,7 +344,7 @@ class AdventureService:
         )
 
     def _preload_moves(self, pokemon: Any) -> List[BattleMoveInfo]:
-        """批量加载宝可梦的所有招式详情"""
+        """批量加载宝可梦的所有招式详情，包括预加载的属性变化数据"""
         move_ids = [pokemon.moves.move1_id, pokemon.moves.move2_id, pokemon.moves.move3_id, pokemon.moves.move4_id]
         valid_ids = [m for m in move_ids if m and m > 0]
         loaded_moves = []
@@ -353,6 +353,11 @@ class AdventureService:
                 m_data = self.move_repo.get_move_by_id(mid)
                 if m_data:
                     max_pp = m_data.get('pp', 5) or 5
+                    # 预加载技能的属性变化数据和目标信息
+                    stat_changes = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
+                    move_data = self.move_repo.get_move_by_id(mid) or {}
+                    target_id = move_data.get('target_id', 0)
+
                     loaded_moves.append(BattleMoveInfo(
                         power=m_data.get('power', 0) or 0,
                         accuracy=m_data.get('accuracy', 100) or 100,
@@ -364,7 +369,10 @@ class AdventureService:
                         move_id=mid,
                         move_name=m_data.get('name_zh', 'Unknown Move'),
                         max_pp=max_pp,
-                        current_pp=max_pp
+                        current_pp=max_pp,
+                        # 预加载的属性变化数据，避免在战斗循环中查询数据库
+                        stat_changes=stat_changes,
+                        target_id=target_id
                     ))
         return loaded_moves
 
