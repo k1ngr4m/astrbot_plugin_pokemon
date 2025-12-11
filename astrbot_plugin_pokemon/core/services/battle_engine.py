@@ -68,6 +68,28 @@ class BattleLogic:
     CRIT_RATE = 0.0625
     STRUGGLE_MOVE_ID = -1
 
+    # 中文类型名到英文类型名的映射
+    TYPE_NAME_MAPPING = {
+        '一般': 'normal', 'normal': 'normal',
+        '火': 'fire', 'fire': 'fire',
+        '水': 'water', 'water': 'water',
+        '电': 'electric', 'electric': 'electric',
+        '草': 'grass', 'grass': 'grass',
+        '冰': 'ice', 'ice': 'ice',
+        '格斗': 'fighting', 'fighting': 'fighting',
+        '毒': 'poison', 'poison': 'poison',
+        '地面': 'ground', 'ground': 'ground',
+        '飞行': 'flying', 'flying': 'flying',
+        '超能力': 'psychic', 'psychic': 'psychic',
+        '虫': 'bug', 'bug': 'bug',
+        '岩石': 'rock', 'rock': 'rock',
+        '幽灵': 'ghost', 'ghost': 'ghost',
+        '龙': 'dragon', 'dragon': 'dragon',
+        '恶': 'dark', 'dark': 'dark',
+        '钢': 'steel', 'steel': 'steel',
+        '妖精': 'fairy', 'fairy': 'fairy'
+    }
+
     TYPE_CHART = {
         'normal': {'rock': 0.5, 'ghost': 0.0, 'steel': 0.5},
         'fire': {'fire': 0.5, 'water': 0.5, 'grass': 2.0, 'ice': 2.0, 'bug': 2.0, 'rock': 0.5, 'dragon': 0.5,
@@ -129,13 +151,22 @@ class BattleLogic:
         )
         return modified_stats
 
+    def _get_english_type_name(self, type_name: str) -> str:
+        """将类型名称转换为英文"""
+        return self.TYPE_NAME_MAPPING.get(type_name, type_name.lower())
+
     def calculate_type_effectiveness(self, attacker_types: List[str], defender_types: List[str]) -> float:
         effectiveness = 1.0
         for atk_type in attacker_types:
-            atk_dict = self.TYPE_CHART.get(atk_type.lower())
+            # 将攻击方类型转换为英文
+            atk_english = self._get_english_type_name(atk_type)
+            atk_dict = self.TYPE_CHART.get(atk_english)
             if not atk_dict: continue
             for def_type in defender_types:
-                effectiveness *= atk_dict.get(def_type.lower(), 1.0)
+                # 将防御方类型转换为英文
+                def_english = self._get_english_type_name(def_type)
+                effectiveness *= atk_dict.get(def_english, 1.0)
+        # logger.info(f"calculate_type_effectiveness: {attacker_types} vs {defender_types} = {effectiveness}")
         return effectiveness
 
     def _get_atk_def_ratio(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo) -> float:
@@ -488,6 +519,13 @@ class BattleLogic:
         if not move_service_or_repo:
             return 0.0
 
+        best_dmg_move_score = 0
+        for m in attacker_state.context.moves:
+            if m.power > 0:
+                dmg, _ = self._calculate_damage_core(attacker_state, defender_state, m)
+                if dmg >= defender_state.current_hp:
+                    return -100.0  # 绝对不选
+
         score = 0.0
 
         # 1. 获取技能的属性变化数据
@@ -501,7 +539,27 @@ class BattleLogic:
 
         target_id = move_data.get('target_id', 0)
 
-        # 2. 遍历所有受影响的属性
+        # 2. 检查是否应该使用状态技能 - 如果攻击技能能造成高伤害，则降低状态技能评分
+        # 寻找当前宝可梦的所有攻击技能中预期伤害最高的
+        max_expected_damage = 0
+        for battle_move in attacker_state.context.moves:
+            if battle_move.power > 0:  # 攻击技能
+                # 估算这个技能对当前对手的预期伤害
+                hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, battle_move)
+                max_expected_damage = max(max_expected_damage, hypothetical_damage)
+
+        # 计算预期伤害占对手总HP的百分比
+        defender_total_hp = defender_state.context.pokemon.stats.hp
+        if defender_total_hp > 0:
+            damage_percentage = max_expected_damage / defender_total_hp
+            # 如果预期伤害能打掉对手30%或以上的HP，则状态技能评分大幅降低
+            if damage_percentage >= 0.3:
+                score *= 0.2  # 降低到原来的20%
+                # 如果伤害能打掉50%或以上，几乎不考虑状态技能
+                if damage_percentage >= 0.5:
+                    score *= 0.1  # 降低到原来的10%
+
+        # 3. 遍历所有受影响的属性
         for change in stat_changes:
             stat_id = change['stat_id']
             delta = change['change']
@@ -512,16 +570,18 @@ class BattleLogic:
             is_opponent_target = target_id in [2, 8, 10, 11, 14] or delta < 0
 
             if is_opponent_target:
+
                 # -- 试图降低对手能力 --
                 current_stage = defender_state.stat_levels.get(stat_id, 0) if defender_state.stat_levels else 0
+                if current_stage <= -2:
+                    continue  # 已经降了两级了，没必要再降，甚至可以给负分
+                # # 如果已经降无可降 (-6)，则该技能无效，0分
+                # if current_stage <= -6:
+                #     continue
 
-                # 如果已经降无可降 (-6)，则该技能无效，0分
-                if current_stage <= -6:
-                    continue
-
-                # 即使只是 -1，也很有用，基础分 20
-                # 如果对手该项属性等级很高（比如对手由于之前使用了剑舞，攻击+2），降低它的收益更高
-                score += 20.0 + (current_stage * 5)
+                # 基础分大幅降低，依赖战况
+                # 比如：如果对手物理攻击很高，降低攻击(Growl)价值高；如果对手是特攻手，Growl价值低
+                score += 5.0 + (current_stage * 3)
 
             else:
                 # -- 试图提升自己能力 --
@@ -535,9 +595,13 @@ class BattleLogic:
                 # 基础分 30，每级价值 15 分
                 score += 20.0 + (delta * 15)
 
-        # 3. 战术修正：如果对手血量很低，不需要变化技能，直接打死更好
+        # 4. 血量危机判定：如果自己快死了 (HP < 30%)，变化技能评分减半，被迫对攻
+        if attacker_state.current_hp / attacker_state.context.pokemon.stats.hp < 0.3:
+            score *= 0.5
+
+        # 4. 战术修正：如果对手血量很低，不需要变化技能，直接打死更好
         # 假设斩杀线是 25%
-        if defender_state.current_hp < defender_state.context.pokemon.stats.hp * 0.05:
+        if defender_state.current_hp < defender_state.context.pokemon.stats.hp * 0.25:
             score *= 0.1
 
         return score
