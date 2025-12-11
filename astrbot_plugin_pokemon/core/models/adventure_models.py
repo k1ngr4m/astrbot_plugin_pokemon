@@ -25,6 +25,13 @@ class BattleMoveInfo:
     # 预加载的技能属性变化数据，避免在战斗循环中查库
     stat_changes: List[Dict] = None  # 技能对属性的影响: [{'stat_id': int, 'change': int}, ...]
     target_id: int = 0  # 技能目标ID，用于判断影响对象
+    meta_category_id: int = 0  # 技能元类别ID，用于区分特殊逻辑类型
+    ailment_chance: float = 0.0  # 异常状态触发概率
+    meta_ailment_id: int = 0  # 异常状态ID，用于触发异常状态效果
+    healing: float = 0.0  # 技能回复量，正数为回复，负数为消耗
+    stat_chance: float = 0.0  # 能力变化触发概率
+    drain: float = 0.0  # 吸收伤害比例（百分比），用于吸血技能
+
 
 
 @dataclass

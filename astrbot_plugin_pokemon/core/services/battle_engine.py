@@ -63,7 +63,7 @@ class BattleLoggerWithDetailOption(Protocol):
 
 
 class BattleLogic:
-    # --- Constants ---
+    # --- 常量 ---
     TRAINER_ENCOUNTER_RATE = 0.3
     CRIT_RATE = 0.0625
     STRUGGLE_MOVE_ID = -1
@@ -196,6 +196,68 @@ class BattleLogic:
         base_damage = ((2 * level / 5 + 2) * move.power * atk_def_ratio) / 50 + 2
         score = base_damage * (move.accuracy / 100.0) * eff * stab
 
+        # [新增] 为有追加效果的攻击技能添加额外评分
+        # 如果是伤害+异常状态类技能 (meta_category_id == 4)，则加上异常状态的价值评分
+        if move.meta_category_id == 4:  # damage+ailment: 攻击并造成异常状态
+            # 评估异常状态的追加价值
+            ailment_value = 0
+
+            # 根据异常状态类型调整评分
+            ailment_id = move.meta_ailment_id
+            # 不同异常状态的价值不同： paralysis(1), sleep(2), freeze(3), burn(4), poison(5)
+            if ailment_id in [1, 4, 5]:  # paralysis, burn, poison - 持续性影响
+                ailment_value = 15.0
+            elif ailment_id in [2, 3]:  # sleep, freeze - 行动限制
+                ailment_value = 12.0
+            else:
+                ailment_value = 8.0  # 其他异常状态
+
+            # 根据异常状态触发几率调整评分
+            ailment_chance = move.ailment_chance / 100.0
+            if ailment_chance == 0:  # 如果几率为0，假设为100%
+                ailment_chance = 1.0
+            ailment_value *= ailment_chance
+
+            # 如果对手HP较高，异常状态技能更有价值
+            hp_ratio = defender_state.current_hp / defender_state.context.pokemon.stats.hp
+            if hp_ratio > 0.7:
+                ailment_value *= 1.3  # 高HP时异常值更高
+
+            score += ailment_value
+
+        # [新增] 为有追加效果的其他攻击技能也添加额外评分
+        elif move.meta_category_id == 6:  # damage+lower: 攻击并降低能力
+            # 评估降低对手能力的价值
+            if hasattr(move, 'stat_changes') and move.stat_changes:
+                for change in move.stat_changes:
+                    if change.get('change', 0) < 0:  # 负数表示降低对手能力
+                        # 根据降低能力的幅度和当前等级调整评分
+                        change_amount = abs(change.get('change', 0))
+                        current_stage = defender_state.stat_levels.get(change.get('stat_id', 0), 0) if defender_state.stat_levels else 0
+                        # 如果对手当前能力等级较高，降低更有价值
+                        value = 5.0 + (max(0, current_stage) * 3) * change_amount
+                        score += value
+        elif move.meta_category_id == 7:  # damage+raise: 攻击并提升能力
+            # 评估提升自己能力的价值
+            if hasattr(move, 'stat_changes') and move.stat_changes:
+                for change in move.stat_changes:
+                    if change.get('change', 0) > 0:  # 正数表示提升自己能力
+                        change_amount = change.get('change', 0)
+                        current_stage = attacker_state.stat_levels.get(change.get('stat_id', 0), 0) if attacker_state.stat_levels else 0
+                        # 如果当前能力等级不是太高，提升更有价值
+                        value = 5.0 + (min(6 - current_stage, change_amount) * 15)
+                        score += value
+        elif move.meta_category_id == 8:  # damage+heal: 攻击并回复
+            # 评估回复效果的价值
+            drain_percent = move.drain if hasattr(move, 'drain') and move.drain is not None else 50
+            drain_ratio = drain_percent / 100.0
+            # 根据回复比例调整
+            heal_value = base_damage * drain_ratio * 0.8  # 按伤害的一定比例计算回复价值
+            current_hp_ratio = attacker_state.current_hp / attacker_state.context.pokemon.stats.hp
+            if current_hp_ratio < 0.5:  # 如果HP较低，回复更有价值
+                heal_value *= 2.0
+            score += heal_value
+
         if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
             logger.info(
                 f"评分计算详情 - {move.move_name}: "
@@ -263,9 +325,11 @@ class BattleLogic:
 
         return best_move
 
-    def _calculate_damage_core(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo) -> Tuple[int, Dict[str, Any]]:
-        if random.random() * 100 > move.accuracy:
-            return 0, {"missed": True, "type_effectiveness": 1.0, "is_crit": False}
+    def _calculate_damage_core(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo, simulate: bool = False) -> Tuple[int, Dict[str, Any]]:
+        # For OHKO moves, skip the regular accuracy check since they have special rules
+        if move.meta_category_id != 9:  # not OHKO
+            if random.random() * 100 > move.accuracy:
+                return 0, {"missed": True, "type_effectiveness": 1.0, "is_crit": False, "meta_effects": []}
 
         attacker_stats = self._get_modified_stats(attacker_state)
         defender_stats = self._get_modified_stats(defender_state)
@@ -285,11 +349,473 @@ class BattleLogic:
 
         final_damage = base_damage * eff * stab * crit_multiplier * random_multiplier
 
+        # 处理特殊meta类别的效果
+        meta_effects = []
+
+        # 根据meta_category_id处理特殊逻辑
+        if move.meta_category_id == 0:  # damage: 纯粹的攻击招式（无附加效果）
+            # 现有逻辑不变
+            pass
+
+        elif move.meta_category_id == 1:  # ailment: 造成异常状态 (如: 电磁波, 鬼火)
+            # 1. 获取招式的状态几率
+            # 注意: 如果是变化类招式(Status Move)，ailment_chance 为 0 通常代表必中(100%)
+            # 但如果是攻击招式(Category 4)，0 就是 0%。这里我们处理 Category 1。
+            chance = move.ailment_chance
+            if chance == 0:
+                chance = 100  # Category 1 默认为必中（命中判定由 accuracy 决定）
+
+            # 2. 判断是否触发状态 (几率判定)
+            # random.randint(1, 100) 生成 1~100 的整数
+            if defender_state.context.pokemon.stats.hp > 0 and random.randint(1, 100) <= chance:
+
+                # 3. 获取具体的状态 ID (关键步骤)
+                ailment_id = move.meta_ailment_id
+
+                # 4. 检查类型免疫 (关键增强)
+                # 获取防御方的类型
+                defender_types = [t.lower() for t in defender_state.context.types]
+
+                # 检查是否免疫此异常状态
+                is_immune = False
+                if ailment_id == 1:  # paralysis (麻痹)
+                    # 电系宝可梦免疫麻痹
+                    if 'electric' in defender_types:
+                        is_immune = True
+                elif ailment_id == 5:  # poison (中毒)
+                    # 毒系和钢系宝可梦免疫中毒
+                    if 'poison' in defender_types or 'steel' in defender_types:
+                        is_immune = True
+                elif ailment_id == 4:  # burn (灼伤)
+                    # 火系宝可梦免疫灼伤
+                    if 'fire' in defender_types:
+                        is_immune = True
+                elif ailment_id == 3:  # freeze (冰冻)
+                    # 冰系宝可梦免疫冰冻
+                    if 'ice' in defender_types:
+                        is_immune = True
+                elif ailment_id == 2:  # sleep (睡眠)
+                    # 没有类型免疫，但这里提供扩展点
+                    pass  # 某些情况下可能有免疫，如携带特定道具
+
+                # 如果免疫，则跳过效果
+                if is_immune:
+                    # 可以添加日志记录免疫情况
+                    # logger.info(f"防御方宝可梦免疫了异常状态: ID={ailment_id}")
+                    pass
+                else:
+                    # 5. (可选) 将 ID 映射为代码内部使用的字符串
+                    # 这种映射关系最好定义在常量文件里，而不是写死在这里
+                    # 这里参考 PokeAPI 的标准 ID 映射：
+                    ailment_map = {
+                        1: "paralysis",  # 麻痹
+                        2: "sleep",  # 睡眠
+                        3: "freeze",  # 冰冻
+                        4: "burn",  # 灼伤
+                        5: "poison",  # 中毒
+                        6: "confusion",  # 混乱
+                        7: "infatuation",  # 着迷
+                        8: "trap",  # 束缚
+                        9: "nightmare",  # 噩梦
+                        12: "torment",  # 折磨
+                        13: "disable",  # 禁用
+                        14: "yawn",  # 困倦
+                        15: "heal block",  # 回复阻断
+                        17: "no type immunity",  # 无类型免疫
+                        18: "leech seed",  # 吸血
+                        19: "embargo",  #  embargo
+                        20: "perish song",  # 灭亡
+                        21: "ingrain",  # 同化
+                        24: "silence",  # 沉默
+                        42: "tar shot",  # 焦油射门
+                    }
+
+                    status_effect = ailment_map.get(ailment_id, "unknown")
+
+                    if status_effect != "unknown":
+                        # 6. 添加效果
+                        # 建议把 ID 也存进去，方便前端显示或后续逻辑判断
+                        meta_effects.append({
+                            "type": "ailment",
+                            "status": status_effect,
+                            "status_id": ailment_id
+                        })
+
+                        # 日志记录 (可选)
+                        # logger.info(f"招式触发了异常状态: ID={ailment_id} ({status_effect})")
+
+        elif move.meta_category_id == 2:  # net-good-stats: 提升能力 (如: 剑舞, 铁壁, 高速移动)
+        # 确保 attacker_state.stat_levels 已初始化
+            if attacker_state.stat_levels is None:
+                attacker_state.stat_levels = {}
+            # 检查 move 对象中是否包含 stat_changes 数据
+            # (这需要在 adventure_service.py 中确保传递了该字段)
+            if hasattr(move, 'stat_changes') and move.stat_changes:
+                changes_applied = False
+                for change_data in move.stat_changes:
+                    # 1. 解析数据 (兼容字典或对象属性)
+                    # stat_id: 1=Attack, 2=Defense, etc. (取决于您的数据库定义)
+                    # change: +1, +2, -1, etc.
+                    stat_id = change_data.get('stat_id') if isinstance(change_data, dict) else getattr(change_data, 'stat_id', None)
+                    change_amount = change_data.get('change') if isinstance(change_data, dict) else getattr(change_data, 'change', 0)
+
+                    if stat_id is None or change_amount == 0:
+                        continue
+                    # 2. 获取当前能力等级 (默认为 0)
+                    current_stage = attacker_state.stat_levels.get(stat_id, 0)
+                    # 3. 计算新等级 (限制在 -6 到 +6 之间)
+                    # 如果是提升能力，不能超过 6；如果是降低，不能低于 -6 (虽然 Category 2 通常是提升)
+                    new_stage = current_stage + change_amount
+                    new_stage = max(-6, min(6, new_stage))
+                    # 4. 如果等级发生了实际变化，更新状态并记录
+                    if new_stage != current_stage:
+                        if not simulate:
+                            attacker_state.stat_levels[stat_id] = new_stage
+                        changes_applied = True
+                        # 记录具体的提升效果
+                        # 建议有一个 stat_id 到 名称 的映射工具
+                        stat_names = {
+                            1: "hp", 2: "attack", 3: "defense",
+                            4: "special-attack", 5: "special-defense",
+                            6: "speed", 7: "accuracy", 8: "evasion"
+                        }
+                        stat_name = stat_names.get(stat_id, f"stat_{stat_id}")
+                        meta_effects.append({
+                            "type": "stat_raise",
+                            "stat": stat_name,  # 用于前端显示名称
+                            "stat_id": stat_id,  # 用于逻辑判断
+                            "change": new_stage - current_stage,  # 实际变化量 (比如虽然+2，但只剩+1空间)
+                            "current_stage": new_stage
+                        })
+                if not changes_applied:
+                    # 如果所有能力都已经满级 (+6)，可以记录一个“能力无法再提升”的效果
+                    meta_effects.append({"type": "message", "message": "能力没有变化"})
+            else:
+                # Fallback: 如果数据库缺失数据，可以用日志警告
+                # logger.warning(f"Move {move.name} (ID: {move.move_id}) corresponds to Category 2 but has no stat_changes defined.")
+                pass
+
+        elif move.meta_category_id == 3:  # heal: 回复
+            # 根据 move.healing 字段计算回复量
+            # healing 为比例值（如0.5表示回复最大HP的50%，-0.25表示消耗最大HP的25%）
+            heal_ratio = move.healing
+            max_hp = attacker_stats.hp
+            heal_amount = int(max_hp * heal_ratio)
+
+            if heal_amount > 0:  # 正数为回复HP
+                # 只记录效果，让 _execute_action 通过 meta_effects 来处理
+                meta_effects.append({"type": "heal", "amount": heal_amount, "heal_ratio": heal_ratio})
+            elif heal_amount < 0:  # 负数为消耗HP（如替身、诅咒等）
+                # 记录消耗效果
+                meta_effects.append({"type": "damage", "amount": -heal_amount, "damage_ratio": -heal_ratio})
+
+        elif move.meta_category_id == 4:  # damage+ailment: 攻击并造成异常状态
+            # 先计算基础伤害
+            final_damage = base_damage * eff * stab * crit_multiplier * random_multiplier
+            # 在造成伤害后，如果目标还存活，尝试施加异常状态
+            if defender_state.current_hp > 0 and defender_state.current_hp - final_damage > 0:
+                # 使用数据库中的实际几率和异常状态ID
+                chance = move.ailment_chance
+                ailment_id = move.meta_ailment_id
+
+                # 检查是否命中 (几率判定)
+                if chance > 0 and random.randint(1, 100) <= chance:
+                    # 检查类型免疫 (关键增强)
+                    # 获取防御方的类型
+                    defender_types = [t.lower() for t in defender_state.context.types]
+
+                    # 检查是否免疫此异常状态
+                    is_immune = False
+                    if ailment_id == 1:  # paralysis (麻痹)
+                        # 电系宝可梦免疫麻痹
+                        if 'electric' in defender_types:
+                            is_immune = True
+                    elif ailment_id == 5:  # poison (中毒)
+                        # 毒系和钢系宝可梦免疫中毒
+                        if 'poison' in defender_types or 'steel' in defender_types:
+                            is_immune = True
+                    elif ailment_id == 4:  # burn (灼伤)
+                        # 火系宝可梦免疫灼伤
+                        if 'fire' in defender_types:
+                            is_immune = True
+                    elif ailment_id == 3:  # freeze (冰冻)
+                        # 冰系宝可梦免疫冰冻
+                        if 'ice' in defender_types:
+                            is_immune = True
+
+                    # 如果不免疫，则应用异常状态
+                    if not is_immune:
+                        # 将 ID 映射为代码内部使用的字符串
+                        ailment_map = {
+                            1: "paralysis",  # 麻痹
+                            2: "sleep",  # 睡眠
+                            3: "freeze",  # 冰冻
+                            4: "burn",  # 灼伤
+                            5: "poison",  # 中毒
+                            6: "confusion",  # 混乱
+                            7: "infatuation",  # 着迷
+                            8: "trap",  # 束缚
+                            9: "nightmare",  # 噩梦
+                            12: "torment",  # 折磨
+                            13: "disable",  # 禁用
+                            14: "yawn",  # 困倦
+                            15: "heal block",  # 回复阻断
+                            17: "no type immunity",  # 无类型免疫
+                            18: "leech seed",  # 吸血
+                            19: "embargo",  #  embargo
+                            20: "perish song",  # 灭亡
+                            21: "ingrain",  # 同化
+                            24: "silence",  # 沉默
+                            42: "tar shot",  # 焦油射门
+                        }
+
+                        status_effect = ailment_map.get(ailment_id, "unknown")
+                        if status_effect != "unknown":
+                            meta_effects.append({
+                                "type": "ailment",
+                                "status": status_effect,
+                                "status_id": ailment_id
+                            })
+        elif move.meta_category_id == 5:  # swagger: 虚张声势类 (如: Swagger, Flatter)
+            # 目标是对手 (Defender)
+
+            # --- 1. 处理异常状态 (通常是混乱) ---
+            # 获取几率 (通常是 0 或 100，代表必中)
+            chance = move.ailment_chance
+            if chance == 0:
+                chance = 100
+
+            applied_ailment = False
+
+            # 判定几率
+            if defender_state.current_hp > 0 and random.randint(1, 100) <= chance:
+                # 获取状态 ID (混乱 ID 通常是 6)
+                ailment_id = move.meta_ailment_id
+
+                # 简单映射 (建议封装)
+                ailment_map = {6: "confusion", 1: "paralysis"}  # 这里主要针对混乱
+                status_name = ailment_map.get(ailment_id, "confusion")
+
+                # 免疫判断 (例如：已经混乱了，或者有神秘面纱)
+                # 这里做个简单检查：如果已经有该状态则失败
+                # (注：这里假设 battle_state 里有个地方存混乱状态，通常是 volatile_status)
+                # 简单起见，我们先假设它能中
+
+                meta_effects.append({
+                    "type": "ailment",
+                    "status": status_name,
+                    "status_id": ailment_id,
+                    "target": "defender"
+                })
+                applied_ailment = True
+
+            # --- 2. 处理能力提升 (Stat Raise) ---
+            # 注意：在第7世代后，如果混乱未生效(例如免疫)，能力提升也不会生效。
+            # 这里我们做一个简单判定：只有尝试施加了状态(无论是否被免疫)，才去加状态，或者根据游戏世代设定独立处理。
+            # 考虑到通用性，我们先独立处理，或者仅当命中时处理。
+
+            if applied_ailment:  # 或者直接无条件执行，取决于你想模拟哪个世代
+                if defender_state.stat_levels is None:
+                    defender_state.stat_levels = {}
+
+                # 动态读取提升的能力 (Attack vs Special Attack)
+                if hasattr(move, 'stat_changes') and move.stat_changes:
+                    for change_data in move.stat_changes:
+                        # 解析数据
+                        stat_id = change_data.get('stat_id') if isinstance(change_data,
+                                                                           dict) else getattr(
+                            change_data, 'stat_id', None)
+                        change_amount = change_data.get('change') if isinstance(change_data,
+                                                                                dict) else getattr(
+                            change_data, 'change', 0)
+
+                        if stat_id is not None and change_amount != 0:
+                            current_stage = defender_state.stat_levels.get(stat_id, 0)
+
+                            # 计算新等级 (上限 +6)
+                            new_stage = min(6, current_stage + change_amount)
+
+                            if new_stage != current_stage:
+                                defender_state.stat_levels[stat_id] = new_stage
+
+                                # 记录效果
+                                # 映射 stat_id 到名称 (建议提取为公共常量)
+                                stat_names = {2: "attack", 4: "special-attack"}
+                                stat_name = stat_names.get(stat_id, "stat")
+
+                                meta_effects.append({
+                                    "type": "stat_raise",
+                                    "stat": stat_name,
+                                    "change": change_amount,
+                                    "target": "defender"  # 标记是给对手加的
+                                })
+
+        elif move.meta_category_id == 6:  # damage+lower: 攻击并降低能力
+            # 先计算基础伤害
+            final_damage = base_damage * eff * stab * crit_multiplier * random_multiplier
+            # 然后尝试降低目标能力
+            if defender_state.stat_levels is None:
+                defender_state.stat_levels = {}
+
+            # 使用数据库中的实际几率
+            actual_chance = int(move.stat_chance * 100) if move.stat_chance is not None else 0
+            if random.randint(1, 100) <= actual_chance:
+                # 使用实际的stat_changes数据，而不是硬编码
+                if hasattr(move, 'stat_changes') and move.stat_changes:
+                    for change_data in move.stat_changes:
+                        stat_id = change_data.get('stat_id') if isinstance(change_data, dict) else getattr(change_data, 'stat_id', None)
+                        change_amount = change_data.get('change') if isinstance(change_data, dict) else getattr(change_data, 'change', 0)
+
+                        if stat_id is not None and change_amount != 0:
+                            current_stage = defender_state.stat_levels.get(stat_id, 0)
+                            # 计算新等级，限制在-6到+6之间（这里是降低，所以要确保不低于-6）
+                            new_stage = current_stage + change_amount  # change_amount should be negative for lowering
+                            new_stage = max(-6, min(6, new_stage))
+
+                            # 如果实际变化量与原值不同（比如已经到-6了），记录实际变化
+                            actual_change = new_stage - current_stage
+                            if actual_change != 0:
+                                # Only update stat levels if not simulating
+                                if not simulate:
+                                    defender_state.stat_levels[stat_id] = new_stage
+                                # 映射stat_id到名称
+                                stat_names = {
+                                    1: "hp", 2: "attack", 3: "defense",
+                                    4: "special-attack", 5: "special-defense",
+                                    6: "speed", 7: "accuracy", 8: "evasion"
+                                }
+                                stat_name = stat_names.get(stat_id, f"stat_{stat_id}")
+                                meta_effects.append({
+                                    "type": "stat_lower",
+                                    "stat": stat_name,
+                                    "stat_id": stat_id,
+                                    "change": actual_change,  # 实际变化量
+                                    "current_stage": new_stage
+                                })
+        elif move.meta_category_id == 7:  # damage+raise: 攻击并提升能力
+            # 先计算基础伤害
+            final_damage = base_damage * eff * stab * crit_multiplier * random_multiplier
+            # 然后提升自身能力
+            if attacker_state.stat_levels is None:
+                attacker_state.stat_levels = {}
+
+            # 使用数据库中的实际几率
+            actual_chance = int(move.stat_chance * 100) if move.stat_chance is not None else 0
+            if random.randint(1, 100) <= actual_chance:
+                # 使用实际的stat_changes数据，而不是硬编码
+                if hasattr(move, 'stat_changes') and move.stat_changes:
+                    for change_data in move.stat_changes:
+                        stat_id = change_data.get('stat_id') if isinstance(change_data, dict) else getattr(change_data, 'stat_id', None)
+                        change_amount = change_data.get('change') if isinstance(change_data, dict) else getattr(change_data, 'change', 0)
+
+                        if stat_id is not None and change_amount != 0:
+                            current_stage = attacker_state.stat_levels.get(stat_id, 0)
+                            # 计算新等级，限制在-6到+6之间（这里是提升，所以要确保不超过+6）
+                            new_stage = current_stage + change_amount  # change_amount should be positive for raising
+                            new_stage = max(-6, min(6, new_stage))
+
+                            # 如果实际变化量与原值不同（比如已经到+6了），记录实际变化
+                            actual_change = new_stage - current_stage
+                            if actual_change != 0:
+                                # Only update stat levels if not simulating
+                                if not simulate:
+                                    attacker_state.stat_levels[stat_id] = new_stage
+                                # 映射stat_id到名称
+                                stat_names = {
+                                    1: "hp", 2: "attack", 3: "defense",
+                                    4: "special-attack", 5: "special-defense",
+                                    6: "speed", 7: "accuracy", 8: "evasion"
+                                }
+                                stat_name = stat_names.get(stat_id, f"stat_{stat_id}")
+                                meta_effects.append({
+                                    "type": "stat_raise",
+                                    "stat": stat_name,
+                                    "stat_id": stat_id,
+                                    "change": actual_change,  # 实际变化量
+                                    "current_stage": new_stage
+                                })
+
+
+        elif move.meta_category_id == 8:  # damage+heal: 攻击并回复
+            # 先计算基础伤害
+            final_damage = base_damage * eff * stab * crit_multiplier * random_multiplier
+            # drain字段通常表示回复比例的百分比值（如50, 75, 100）
+            drain_percent = move.drain if hasattr(move, 'drain') and move.drain is not None else 50  # 默认50%如果未设置
+            drain_ratio = drain_percent / 100.0
+
+            # 将部分伤害转换为回复
+            heal_amount = int(final_damage * drain_ratio)
+            # Only update HP if not simulating (this was a mistake - healing should be handled in _execute_action)
+            # Remove direct HP modification, healing will be handled in _execute_action based on meta_effects
+            meta_effects.append({
+                "type": "heal",
+                "amount": heal_amount,
+                "heal_ratio": drain_ratio,
+                "from_drain": True,  # 标记是通过吸收伤害回复，便于前端区分显示
+                "damage_dealt": int(final_damage)
+            })
+        elif move.meta_category_id == 9:  # ohko: 一击必杀
+            # 一击必杀技能，遵循Gen 3+标准规则
+            attacker_lv = attacker_state.context.pokemon.level
+            defender_lv = defender_state.context.pokemon.level
+
+            # 检查等级检测：如果攻击者等级 < 防御者等级，招式必定失败
+            if attacker_lv < defender_lv:
+                # 招式失败，不造成伤害
+                final_damage = 0
+                meta_effects.append({"type": "ohko", "success": False, "reason": "等级不足"})
+            else:
+                # 计算特殊命中率：30 + (攻击者等级 - 防御者等级)
+                base_accuracy = 30
+                accuracy_bonus = attacker_lv - defender_lv
+                calculated_accuracy = base_accuracy + accuracy_bonus
+
+                # 检查基础命中判定
+                if random.randint(1, 100) <= calculated_accuracy:
+                    # 检查属性有效性（即使是一击必杀也受属性克制影响）
+                    eff = self.calculate_type_effectiveness([move.type_name], defender_state.context.types)
+
+                    # 如果效果为0（免疫），招式失败
+                    if eff == 0.0:
+                        final_damage = 0
+                        meta_effects.append({"type": "ohko", "success": False, "reason": "属性免疫"})
+                    else:
+                        # 招式成功，造成目标当前HP的伤害（直接秒杀）
+                        final_damage = defender_state.current_hp
+                        meta_effects.append({
+                            "type": "ohko",
+                            "success": True,
+                            "damage": defender_state.current_hp,
+                            "accuracy": calculated_accuracy
+                        })
+                else:
+                    # 命中失败
+                    final_damage = 0
+                    meta_effects.append({
+                        "type": "ohko",
+                        "success": False,
+                        "reason": "未命中",
+                        "calculated_accuracy": calculated_accuracy
+                    })
+        elif move.meta_category_id == 10:  # whole-field-effect: 全场效果
+            # 全场效果，如天气变化（此处简化处理）
+            meta_effects.append({"type": "field_effect", "effect": "weather", "duration": 5})
+        elif move.meta_category_id == 11:  # field-effect: 场地效果
+            # 场地效果，如钉子、光墙（此处简化处理）
+            meta_effects.append({"type": "terrain", "effect": "reflect", "duration": 5})
+        elif move.meta_category_id == 12:  # force-switch: 强制替换
+            # 标记强制替换（简化处理，实际需要替换逻辑）
+            meta_effects.append({"type": "force_switch", "target": "defender"})
+        elif move.meta_category_id == 13:  # unique: 特殊/独特
+            # 独特效果（根据具体技能处理）
+            meta_effects.append({"type": "unique", "effect": "special"})
+
         return int(final_damage), {
             "missed": False,
             "type_effectiveness": eff,
             "is_crit": is_crit,
-            "stab_bonus": stab
+            "stab_bonus": stab,
+            "meta_effects": meta_effects
         }
 
     def _is_user_first(self, user_state: BattleState, wild_state: BattleState,
@@ -328,6 +854,63 @@ class BattleLogic:
             
         return False
 
+    def _log_meta_effects(self, attacker, defender, meta_effects, logger_obj):
+        """记录特殊meta效果的日志"""
+        for meta_effect in meta_effects:
+            effect_type = meta_effect.get("type", "")
+            if effect_type == "ailment":
+                status = meta_effect.get("status", "unknown")
+                logger_obj.log(f"{defender.context.pokemon.name}陷入{status}状态！\n\n")
+            elif effect_type == "stat_raise":
+                stat = meta_effect.get("stat", "unknown")
+                change = meta_effect.get("change", 0)
+                logger_obj.log(f"{attacker.context.pokemon.name}的{stat}提升了！\n\n")
+            elif effect_type == "stat_lower":
+                stat = meta_effect.get("stat", "unknown")
+                logger_obj.log(f"{defender.context.pokemon.name}的{stat}降低了！\n\n")
+            elif effect_type == "heal":
+                amount = meta_effect.get("amount", 0)
+                from_drain = meta_effect.get("from_drain", False)
+                if from_drain:
+                    damage_dealt = meta_effect.get("damage_dealt", 0)
+                    logger_obj.log(f"{attacker.context.pokemon.name}通过攻击吸收了{amount}点HP！（造成伤害{damage_dealt}）\n\n")
+                else:
+                    logger_obj.log(f"{attacker.context.pokemon.name}回复了{amount}点HP！\n\n")
+            elif effect_type == "damage":
+                amount = meta_effect.get("amount", 0)
+                logger_obj.log(f"{attacker.context.pokemon.name}损失了{amount}点HP！\n\n")
+            elif effect_type == "swagger":
+                logger_obj.log(f"{defender.context.pokemon.name}陷入混乱！攻击力提升！\n\n")
+            elif effect_type == "damage_heal":
+                heal = meta_effect.get("heal", 0)
+                logger_obj.log(f"{attacker.context.pokemon.name}通过攻击回复了{heal}点HP！\n\n")
+            elif effect_type == "ohko":
+                success = meta_effect.get("success", False)
+                reason = meta_effect.get("reason", "")
+                if success:
+                    logger_obj.log(f"一击必杀！直接击败了对手！\n\n")
+                else:
+                    if reason == "等级不足":
+                        logger_obj.log(f"一击必杀失败！等级低于对手！\n\n")
+                    elif reason == "属性免疫":
+                        logger_obj.log(f"一击必杀失败！对手属性免疫！\n\n")
+                    elif reason == "未命中":
+                        calculated_accuracy = meta_effect.get("calculated_accuracy", 0)
+                        logger_obj.log(f"一击必杀失败！未命中（计算命中率: {calculated_accuracy}%）\n\n")
+                    else:
+                        logger_obj.log(f"一击必杀失败！\n\n")
+            elif effect_type == "field_effect":
+                effect = meta_effect.get("effect", "unknown")
+                logger_obj.log(f"全场{effect}效果开始！\n\n")
+            elif effect_type == "terrain":
+                effect = meta_effect.get("effect", "unknown")
+                logger_obj.log(f"场地{effect}效果开始！\n\n")
+            elif effect_type == "force_switch":
+                target = meta_effect.get("target", "unknown")
+                logger_obj.log(f"强制替换{target}的宝可梦！\n\n")
+            elif effect_type == "unique":
+                logger_obj.log(f"特殊效果触发！\n\n")
+
     def _execute_action(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo,
                         logger_obj: BattleLogger) -> bool:
         """
@@ -359,12 +942,35 @@ class BattleLogic:
 
         # Log the move usage first
         if move.power == 0:
-            logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_info}！")
+            logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_info}！\n\n")
+            # 即使是变化技能也要执行效果计算，以处理异常状态、能力变化等特殊效果
+            _, effects = self._calculate_damage_core(attacker, defender, move)
+
+            # 检查是否命中
+            if effects["missed"]:
+                logger_obj.log("没有击中目标！\n\n")
+            else:
+                # 处理特殊meta效果并记录
+                meta_effects = effects.get("meta_effects", [])
+                self._log_meta_effects(attacker, defender, meta_effects, logger_obj)
+
+                # Apply healing effects from meta_effects (e.g., drain moves)
+                for meta_effect in meta_effects:
+                    effect_type = meta_effect.get("type", "")
+                    if effect_type == "heal":
+                        heal_amount = meta_effect.get("amount", 0)
+                        attacker.current_hp = min(attacker.context.pokemon.stats.hp, attacker.current_hp + heal_amount)
+                    # 2. ✅ 新增：处理自残/消耗 (Category 3 负数 healing)
+                    elif effect_type == "damage" and meta_effect.get("damage_ratio", 0) != 0:
+                        # 注意：普通攻击的伤害也是 type="damage"，但通常由 calculate_damage_core 返回值直接扣除
+                        # 这里主要是为了处理 status move 的自我损伤
+                        damage_amount = meta_effect.get("amount", 0)
+                        attacker.current_hp = max(0, attacker.current_hp - damage_amount)
         else:
             dmg, effects = self._calculate_damage_core(attacker, defender, move)
             defender.current_hp -= dmg
 
-            desc = f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_info}！"
+            desc = f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_info}！\n\n"
             if is_struggle:
                 desc = f"{attacker.context.pokemon.name} 使用了挣扎！（PP耗尽）\n\n"
 
@@ -380,9 +986,27 @@ class BattleLogic:
                 elif eff == 0.0: logger_obj.log("似乎没有效果！\n\n")
                 elif eff < 1.0: logger_obj.log("效果不佳！\n\n")
 
+                # 处理特殊meta效果并记录
+                meta_effects = effects.get("meta_effects", [])
+                self._log_meta_effects(attacker, defender, meta_effects, logger_obj)
+
+                # Apply healing effects from meta_effects (e.g., drain moves)
+                for meta_effect in meta_effects:
+                    effect_type = meta_effect.get("type", "")
+                    if effect_type == "heal":
+                        heal_amount = meta_effect.get("amount", 0)
+                        attacker.current_hp = min(attacker.context.pokemon.stats.hp, attacker.current_hp + heal_amount)
+                    elif effect_type == "damage" and meta_effect.get("damage_ratio", 0) != 0:
+                        # 注意：普通攻击的伤害也是 type="damage"，但通常由 calculate_damage_core 返回值直接扣除
+                        # 这里主要是为了处理 status move 的自我损伤
+                        damage_amount = meta_effect.get("amount", 0)
+                        attacker.current_hp = max(0, attacker.current_hp - damage_amount)
+
         # Process stat changes from pre-loaded move data (avoiding database queries in combat loop)
         # This should happen after the move usage is logged
-        if move.move_id > 0 and move.stat_changes:
+        # ⚠️ Check if this is a meta category that's already handled in _calculate_damage_core (2, 6, 7)
+        # to avoid double effect issues
+        if move.move_id > 0 and move.stat_changes and move.meta_category_id not in [2, 6, 7]:
             # Use pre-loaded stat changes and target_id instead of querying database
             stat_changes = move.stat_changes
             target_id = move.target_id
@@ -494,14 +1118,8 @@ class BattleLogic:
     def _calculate_status_move_score(self, attacker_state: BattleState, defender_state: BattleState,
                                      move: BattleMoveInfo, logger_obj: Optional[BattleLogger] = None) -> float:
         """计算变化技能的评分"""
-        best_dmg_move_score = 0
-        for m in attacker_state.context.moves:
-            if m.power > 0:
-                dmg, _ = self._calculate_damage_core(attacker_state, defender_state, m)
-                if dmg >= defender_state.current_hp:
-                    return -100.0  # 绝对不选
-
         score = 0.0
+
 
         # 1. 使用预加载的技能属性变化数据（避免在战斗循环中查询数据库）
         stat_changes = move.stat_changes
@@ -512,25 +1130,134 @@ class BattleLogic:
             # 可以在这里扩展异常状态的逻辑
             return 10.0
 
-        # 2. 检查是否应该使用状态技能 - 如果攻击技能能造成高伤害，则降低状态技能评分
-        # 寻找当前宝可梦的所有攻击技能中预期伤害最高的
-        max_expected_damage = 0
-        for battle_move in attacker_state.context.moves:
-            if battle_move.power > 0:  # 攻击技能
-                # 估算这个技能对当前对手的预期伤害
-                hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, battle_move)
-                max_expected_damage = max(max_expected_damage, hypothetical_damage)
+        # 2. 根据meta_category_id调整评分策略
+        # 根据不同的技能类型调整评分逻辑
+        if move.meta_category_id == 0:  # damage: 纯粹的攻击招式（无附加效果）
+            # 对于纯攻击技能，保持基础评分
+            score = 0.0
 
-        # 计算预期伤害占对手总HP的百分比
-        defender_total_hp = defender_state.context.pokemon.stats.hp
-        if defender_total_hp > 0:
-            damage_percentage = max_expected_damage / defender_total_hp
-            # 如果预期伤害能打掉对手30%或以上的HP，则状态技能评分大幅降低
-            if damage_percentage >= 0.3:
-                score *= 0.2  # 降低到原来的20%
-                # 如果伤害能打掉50%或以上，几乎不考虑状态技能
-                if damage_percentage >= 0.5:
-                    score *= 0.1  # 降低到原来的10%
+        elif move.meta_category_id == 1:  # ailment: 造成异常状态
+            # 造成异常状态的技能，根据实际几率和状态类型调整评分
+            base_score = 15.0
+            # 根据异常状态触发几率调整评分
+            chance_multiplier = (move.ailment_chance / 100.0)  # 转换为0-1的倍数
+            # 如果几率为0，可能是默认100%（如纯状态技能），或者确实为0
+            if chance_multiplier == 0:
+                chance_multiplier = 1.0  # 假设为100%触发
+            score += base_score * chance_multiplier
+
+            # 根据异常状态类型调整评分
+            ailment_id = move.meta_ailment_id
+            # 不同异常状态的价值不同： paralysis(1), sleep(2), freeze(3), burn(4), poison(5)
+            # 麻痹、灼伤、中毒对战斗持续性影响较大，睡眠、冰冻能直接限制行动但可能被替换
+            if ailment_id in [1, 4, 5]:  # paralysis, burn, poison - 持续性影响
+                score *= 1.4
+            elif ailment_id in [2, 3]:  # sleep, freeze - 行动限制，但可能被替换
+                score *= 1.2
+
+            # 如果对手HP较高，异常状态技能更有价值
+            hp_ratio = defender_state.current_hp / defender_state.context.pokemon.stats.hp
+            if hp_ratio > 0.7:
+                score *= 1.3  # 高HP时异常值更高
+
+        elif move.meta_category_id == 2:  # net-good-stats: 提升能力
+            # --- 优化点 A：降低强化/削弱技能的基础权重 ---
+            # 提升自身能力的技能，大幅降低基础分
+            score += 5.0  # 原来是10.0，现在降低到5.0
+
+            # 如果对手是高攻手，提升防御更有价值
+            opponent_attack = defender_state.context.pokemon.stats.attack
+            if opponent_attack > attacker_state.context.pokemon.stats.defense:
+                score *= 1.1  # 提升防御评分，但仍然不高
+
+        elif move.meta_category_id == 3:  # heal: 回复
+            # 回复技能，根据实际healing值和当前HP状态调整评分
+            current_hp_ratio = attacker_state.current_hp / attacker_state.context.pokemon.stats.hp
+            heal_ratio = move.healing  # 获取实际的回复比例
+
+            if heal_ratio > 0:  # 正数为回复
+                # 根据回复量调整基础评分
+                score += heal_ratio * 100.0  # 回复比例越高，基础评分越高
+
+                # 如果HP较低，回复技能更有价值
+                if current_hp_ratio < 0.5:  # HP低于50%时，回复技能更珍贵
+                    score *= 2.0
+                elif current_hp_ratio < 0.8:  # HP低于80%时，回复技能有价值
+                    score *= 1.5
+            elif heal_ratio < 0:  # 负数为消耗HP（如替身、诅咒等）
+                # 消耗类技能的评分策略 - 主要基于战术价值
+                score += abs(heal_ratio) * 50.0  # 消耗比例越高，基础评分越高
+
+                # 只有在有战术意义时使用（例如：满血时用替身建立保护）
+                if current_hp_ratio > 0.9:  # 在接近满血时使用消耗技能可能更有价值
+                    score *= 1.3
+
+        elif move.meta_category_id == 4:  # damage+ailment: 攻击并造成异常状态
+            # 攻击并造成异常状态，评估为强力技能
+            score += 25.0  # 高基础加分
+            # 评估对当前对手的威胁
+            hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, move, simulate=True)
+            if hypothetical_damage > defender_state.current_hp * 0.4:  # 如果能造成40%以上伤害
+                score += 10.0
+
+        elif move.meta_category_id == 5:  # swagger: 虚张声势类
+            # 虚张声势类技能，使对手混乱但提升其攻击
+            score += 12.0  # 基础加分
+            # 如果对手攻击已经很高，让其混乱可能更危险，需要谨慎
+            opponent_attack_level = defender_state.stat_levels.get(1, 0) if defender_state.stat_levels else 0
+            if opponent_attack_level > 1:  # 如果对手攻击等级已经高于正常
+                score *= 0.7  # 降低评分
+
+        elif move.meta_category_id == 6:  # damage+lower: 攻击并降低能力
+            # 攻击并降低能力，评估为强力技能
+            # --- 优化点 A：降低强化/削弱技能的基础权重 ---
+            score += 8.0  # 原来是20.0，现在降低到8.0
+            # 评估对当前对手的威胁
+            hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, move, simulate=True)
+            if hypothetical_damage > 0:  # 如果能造成伤害
+                score += 10.0
+
+        elif move.meta_category_id == 7:  # damage+raise: 攻击并提升能力
+            # 攻击并提升能力，评估为强力技能
+            # --- 优化点 A：降低强化/削弱技能的基础权重 ---
+            score += 10.0  # 原来是22.0，现在降低到10.0
+            # 评估对当前对手的威胁
+            hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, move, simulate=True)
+            if hypothetical_damage > 0:  # 如果能造成伤害
+                score += 8.0
+
+        elif move.meta_category_id == 8:  # damage+heal: 攻击并回复
+            # 攻击并回复，评估为强力技能
+            score += 28.0  # 很高的基础加分（攻击+回复双重效果）
+            # 评估对当前对手的威胁
+            hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, move, simulate=True)
+            if hypothetical_damage > 0:  # 如果能造成伤害
+                score += 12.0
+
+        elif move.meta_category_id == 9:  # ohko: 一击必杀
+            # 一击必杀技能，需要特殊评估
+            score += 10.0  # 基础加分
+            # 但由于命中率通常很低，在评估时需要考虑
+
+        elif move.meta_category_id == 10:  # whole-field-effect: 全场效果
+            # 全场效果如天气变化
+            score += 15.0  # 基础加分
+            # 可以根据当前宝可梦类型和天气相性调整
+
+        elif move.meta_category_id == 11:  # field-effect: 场地效果
+            # 场地效果如光墙、反射壁
+            score += 18.0  # 基础加分
+            # 根据当前战斗状况调整
+
+        elif move.meta_category_id == 12:  # force-switch: 强制替换
+            # 强制替换技能
+            score += 8.0  # 基础加分
+            # 在特定情况下可能非常有用
+
+        elif move.meta_category_id == 13:  # unique: 特殊/独特
+            # 独特效果，根据具体效果调整
+            score += 12.0  # 基础加分
+            # 可以根据具体情况进一步调整
 
         # 3. 遍历所有受影响的属性
         for change in stat_changes:
@@ -554,7 +1281,7 @@ class BattleLogic:
 
                 # 基础分大幅降低，依赖战况
                 # 比如：如果对手物理攻击很高，降低攻击(Growl)价值高；如果对手是特攻手，Growl价值低
-                score += 5.0 + (current_stage * 3)
+                score += 2.0 + (current_stage * 1)  # 原来是 5.0 + (current_stage * 3)，现在大幅降低
 
             else:
                 # -- 试图提升自己能力 --
@@ -564,17 +1291,95 @@ class BattleLogic:
                 if current_stage >= 6:
                     continue
 
-                # 提升幅度越大越好 (例如剑舞+2 比 变硬+1 分高)
-                # 基础分 30，每级价值 15 分
-                score += 20.0 + (delta * 15)
+                # --- 优化点 A：只有在必要时才强化 ---
+                # 提升幅度调整，考虑已有等级的影响
+                # 基础分降低，只有在必要时（如能够确立斩杀线）才强化
+                base_value = 10.0  # 原来是20.0，现在降低
+                stage_factor = 5  # 原来是15，现在降低
 
-        # 4. 血量危机判定：如果自己快死了 (HP < 30%)，变化技能评分减半，被迫对攻
-        if attacker_state.current_hp / attacker_state.context.pokemon.stats.hp < 0.3:
-            score *= 0.5
+                # 根据当前等级调整提升欲望
+                if current_stage > 0:
+                    # 已有强化的情况下，继续强化的欲望指数级下降
+                    score += base_value + (delta * stage_factor * (0.7 ** current_stage))
+                else:
+                    # 没有强化时，正常计算
+                    score += base_value + (delta * stage_factor)
 
         # 4. 战术修正：如果对手血量很低，不需要变化技能，直接打死更好
         # 假设斩杀线是 25%
         if defender_state.current_hp < defender_state.context.pokemon.stats.hp * 0.25:
             score *= 0.1
+
+
+        # --- 优化点 B：伤害阈值判断 (最重要的修正) ---
+        # 检查是否有攻击技能能造成不错伤害，若有则优先攻击
+        max_expected_damage = 0
+        for battle_move in attacker_state.context.moves:
+            if battle_move.power > 0:
+                # 使用 simulate=True 防止副作用
+                hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, battle_move, simulate=True)
+                max_expected_damage = max(max_expected_damage, hypothetical_damage)
+
+        defender_total_hp = defender_state.context.pokemon.stats.hp
+        if defender_total_hp > 0:
+            damage_percentage = max_expected_damage / defender_total_hp
+            # 如果能打掉 25% 以上，状态技能评分 * 0.1
+            if damage_percentage >= 0.25:
+                score *= 0.1
+            # 如果能打掉 33% 以上，状态技能评分 * 0.05
+            if damage_percentage >= 0.33:
+                score *= 0.05
+            # 如果能打掉 50% 以上，基本不考虑状态技能
+            if damage_percentage >= 0.5:
+                score *= 0.01
+
+        # --- 优化点 D：根据血量健康状况决策 ---
+        # 如果 HP 低于 50%，AI 应该进入"拼命模式"，停止任何强化/削弱行为，直接输出
+        attacker_hp_ratio = attacker_state.current_hp / attacker_state.context.pokemon.stats.hp
+        if attacker_hp_ratio < 0.5:
+            score *= 0.05  # 极大降低变化技能评分
+        elif attacker_hp_ratio < 0.4:
+            score *= 0.01  # 更低的评分
+
+        # --- 优化点 C：防止反复横跳 (Ping-Pong) ---
+        # 检查自身属性等级，如果已经有强化等级（>0），继续强化的欲望应该指数级降低
+        if hasattr(attacker_state, 'stat_levels') and attacker_state.stat_levels:
+            # 优先检查攻击力、防御力和速度
+            attacker_attack_level = attacker_state.stat_levels.get(StatID.ATTACK.value, 0)
+            attacker_defense_level = attacker_state.stat_levels.get(StatID.DEFENSE.value, 0)
+            attacker_speed_level = attacker_state.stat_levels.get(StatID.SPEED.value, 0)
+
+            # 如果已有强化，进一步强化的评分大幅降低
+            if attacker_attack_level > 0 or attacker_defense_level > 0 or attacker_speed_level > 0:
+                for change in move.stat_changes if move.stat_changes else []:
+                    if change.get('change', 0) > 0:  # 增益效果
+                        # 对于已有等级的属性，进一步提升的收益降低
+                        stat_id = change.get('stat_id', 0)
+                        current_level = attacker_state.stat_levels.get(stat_id, 0)
+                        if current_level > 0:
+                            # 已经有强化的情况下，继续强化的收益指数级下降
+                            reinforcement_penalty = 0.1 * (0.5 ** current_level)
+                            score *= reinforcement_penalty
+
+        # 检查对手属性等级，如果对手已经被削弱过（< 0），进一步削弱收益降低
+        if hasattr(defender_state, 'stat_levels') and defender_state.stat_levels:
+            defender_attack_level = defender_state.stat_levels.get(StatID.ATTACK.value, 0)
+            defender_defense_level = defender_state.stat_levels.get(StatID.DEFENSE.value, 0)
+            defender_speed_level = defender_state.stat_levels.get(StatID.SPEED.value, 0)
+
+            # 如果对手已有削弱，进一步削弱的评分降低
+            if defender_attack_level < 0 or defender_defense_level < 0 or defender_speed_level < 0:
+                for change in move.stat_changes if move.stat_changes else []:
+                    if change.get('change', 0) < 0:  # 削弱效果
+                        # 对于已经被削弱的属性，进一步削弱的收益降低
+                        debuff_penalty = 0.2  # 进一步削弱收益降低
+                        score *= debuff_penalty
+
+        # --- 通用逻辑：如果当前有招式能直接斩杀对手，则完全不使用状态技能 ---
+        for m in attacker_state.context.moves:
+            if m.power > 0:
+                dmg, _ = self._calculate_damage_core(attacker_state, defender_state, m, simulate=True)
+                if dmg >= defender_state.current_hp:
+                    return -100.0  # 绝对不选
 
         return score
