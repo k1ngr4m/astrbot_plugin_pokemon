@@ -642,6 +642,12 @@ class AdventureService:
                 if pid in battle_deaths:
                     continue  # 死亡无经验
 
+                # 检查宝可梦当前的HP状态，濒死（HP=0）的宝可梦不应该获得经验
+                current_pokemon = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
+                if not current_pokemon or current_pokemon.current_hp <= 0:
+                    # 濒死的宝可梦不获得经验
+                    continue
+
                 is_participant = pid in battle_participants
                 p_exp = base_exp_gained if is_participant else (base_exp_gained // 2)
                 msg = "获得全部经验" if is_participant else "获得一半经验"
@@ -892,8 +898,12 @@ class AdventureService:
                 if not current_pokemon:
                     continue
 
-                # 确定该宝可梦的状态和对应的经验值
-                if pokemon_id in battle_deaths:
+                # 检查宝可梦当前的HP状态，濒死（HP=0）的宝可梦不应该获得经验
+                if current_pokemon.current_hp <= 0:
+                    # 濒死的宝可梦不获得经验
+                    pokemon_exp = 0
+                    exp_message = "宝可梦处于濒死状态，未获得经验"
+                elif pokemon_id in battle_deaths:
                     # 死亡的宝可梦不获得经验
                     pokemon_exp = 0
                     exp_message = "宝可梦在战斗中死亡，未获得经验"
