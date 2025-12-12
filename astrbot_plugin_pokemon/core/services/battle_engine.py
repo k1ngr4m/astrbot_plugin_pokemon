@@ -301,6 +301,7 @@ class BattleLogic:
                 if current_score >= defender_state.current_hp:
                     current_score += 1000.0
 
+
             else:
                 # 变化技能评分：基于战术价值
                 current_score = self._calculate_status_move_score(attacker_state, defender_state, move, logger_obj)
@@ -315,6 +316,15 @@ class BattleLogic:
                 best_score = current_score
                 best_move = move
 
+        # 检查是否有自爆技能（move_id == 120）并且是否应该使用它
+        # 当攻击者生命值很低且无法击败对手时，可能选择自爆来尝试拉对手垫背
+        for move in available_moves:
+            if move.move_id == 120:  # 自爆技能
+                self_destruct_score = self._calculate_self_destruct_score(attacker_state, defender_state, move, logger_obj)
+                if self_destruct_score > best_score:
+                    best_score = self_destruct_score
+                    best_move = move
+
         # 如果所有技能评分都很低（例如：攻击打不动，变化技能已加满），可能随机选一个或者还是选最高的
         if best_move is None:
             # 兜底：随机选一个
@@ -324,6 +334,68 @@ class BattleLogic:
             logger.info(f"最终选择: {best_move.move_name} (综合评分: {best_score:.2f})")
 
         return best_move
+
+    def _execute_self_destruct_move(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo, logger_obj: BattleLogger) -> bool:
+        """执行自爆技能的特殊逻辑"""
+        logger_obj.log(f"{attacker.context.pokemon.name} 使用了自爆！\n\n")
+
+        # Calculate damage to defender (normal damage calculation)
+        dmg, effects = self._calculate_damage_core(attacker, defender, move)
+        defender.current_hp -= dmg
+
+        # Log the damage
+        logger_obj.log(f"造成 {dmg} 点伤害。\n\n")
+
+        if effects["missed"]:
+            logger_obj.log("没有击中目标！\n\n")
+        else:
+            if effects["is_crit"]:
+                logger_obj.log("击中要害！\n\n")
+            eff = effects["type_effectiveness"]
+            if eff > 1.0:
+                logger_obj.log("效果绝佳！\n\n")
+            elif eff == 0.0:
+                logger_obj.log("似乎没有效果！\n\n")
+            elif eff < 1.0:
+                logger_obj.log("效果不佳！\n\n")
+
+            # Process special effects
+            meta_effects = effects.get("meta_effects", [])
+            self._log_meta_effects(attacker, defender, meta_effects, logger_obj)
+
+        # Make the attacker faint (self-destruct effect)
+        attacker.current_hp = 0
+        logger_obj.log(f"{attacker.context.pokemon.name} 发生了爆炸，因此倒下了！\n\n")
+
+        # Check if both Pokemon fainted
+        if defender.current_hp <= 0:
+            logger_obj.log(f"{defender.context.pokemon.name} 也倒下了！\n\n")
+        else:
+            logger_obj.log(f"{defender.context.pokemon.name} 还在继续战斗！\n\n")
+
+        # Battle ends if attacker fainted
+        return True
+
+    def _calculate_self_destruct_score(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo, logger_obj: Optional[BattleLogger] = None) -> float:
+        """计算自爆技能的评分"""
+        # 自爆技能的评分基于：能否击败对手 + 自身当前血量状况
+        hypothetical_damage, _ = self._calculate_damage_core(attacker_state, defender_state, move, simulate=True)
+
+        # 如果自爆能击败对手，大幅加分
+        base_score = self._calculate_move_score(attacker_state, defender_state, move, logger_obj)
+        if hypothetical_damage >= defender_state.current_hp:
+            base_score += 500.0  # 非常高的奖励，因为可以同归于尽
+        else:
+            # 如果不能击败对手，但可以造成大量伤害，也给予一定奖励
+            damage_ratio = hypothetical_damage / defender_state.context.pokemon.stats.hp
+            base_score += damage_ratio * 100.0
+
+        # 如果自身血量很低，使用自爆的倾向应该更高（反正快死了）
+        attacker_hp_ratio = attacker_state.current_hp / attacker_state.context.pokemon.stats.hp
+        if attacker_hp_ratio < 0.3:
+            base_score += (1.0 - attacker_hp_ratio) * 200.0  # 血量越低，自爆倾向越高
+
+        return base_score
 
     def _calculate_damage_core(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo, simulate: bool = False) -> Tuple[int, Dict[str, Any]]:
         # For OHKO moves, skip the regular accuracy check since they have special rules
@@ -929,6 +1001,10 @@ class BattleLogic:
                     attacker.current_pps[idx] -= 1
             except ValueError:
                 pass # Should not happen if logic is correct
+
+        # Check if this is a special move that needs custom logic
+        if move.move_id == 120:  # 自爆技能
+            return self._execute_self_destruct_move(attacker, defender, move, logger_obj)
 
         # Find the move index to show PP information
         try:
