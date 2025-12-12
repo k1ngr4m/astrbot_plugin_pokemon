@@ -79,6 +79,13 @@ class BattleLogic:
     STRUGGLE_MOVE_ID = -1
     SELF_DESTRUCT_ID = 120
 
+    # --- Target ID 常量定义 ---
+    # 2: Opponent, 8: All Opponents, 9: Random Opponent, 10: Selected, 11: All Opponents, 14: All Pokemon
+    TARGETS_OPPONENT = {2, 8, 9, 10, 11, 14}
+
+    # 3: Selected(User), 4: User, 5: All Users, 7: User(Random), 13: User+Allies, 15: User+Allies
+    TARGETS_USER = {3, 4, 5, 7, 13, 15}
+
     # 属性映射
     TYPE_NAME_MAPPING = {
         '一般': 'normal', 'normal': 'normal', '火': 'fire', 'fire': 'fire',
@@ -224,6 +231,11 @@ class BattleLogic:
             "diving": [1002],                # 冲浪等
             "bounced": [89],                 # 弹跳状态被地震击中
         }
+
+    def _is_type(self, type_raw: str, target_type_en: str) -> bool:
+        """判断输入的类型是否属于目标类型（自动处理中英文映射）"""
+        mapped = self.TYPE_NAME_MAPPING.get(type_raw, type_raw.lower())
+        return mapped == target_type_en
 
     def _create_struggle_move(self) -> BattleMoveInfo:
         return BattleMoveInfo(
@@ -810,24 +822,9 @@ class BattleLogic:
         # 1. 确定承受能力变化的目标
         target_unit = None
 
-        # 目标 ID 定义 (参考 PokeAPI):
-        # 2: Selected Pokemon (Opponent)
-        # 8: All Opponents
-        # 10: Selected Pokemon (Opponent, variable)
-        # 11: All Opponents (variable)
-        # 14: All Pokemon (Opponent)
-        OPPONENT_TARGET_IDS = [2, 8, 10, 11, 14]
-
-        # 3: Selected Pokemon (User)
-        # 4: User
-        # 5: All Users
-        # 7: User (variable)
-        # 13: User and Allies
-        USER_TARGET_IDS = [3, 4, 5, 7, 13, 15]
-
-        if target_id in OPPONENT_TARGET_IDS:
+        if target_id in self.TARGETS_OPPONENT:
             target_unit = defender
-        elif target_id in USER_TARGET_IDS:
+        elif target_id in self.TARGETS_USER:
             target_unit = attacker
         else:
             # 智能判定 Fallback：
@@ -1072,20 +1069,23 @@ class BattleLogic:
         # 检查是否是两回合技能，如果是第一回合，则考虑整体战略价值
         move_config = self.TWO_TURN_MOVES_CONFIG.get(move.move_id)
         if move_config:
-            # 如果是飞行/飞翔类技能，检查对手是否使用地面系攻击
-            if move_config.get("protect_type") == "flying":
-                ground_moves = [m for m in defender_state.context.moves if m.type_name in ['ground', '地面']]
-                if ground_moves:
+            protect_type = move_config.get("protect_type")
+
+            # 飞天 vs 地面系
+            if protect_type == "flying":
+                # 查找对手是否有地面系招式
+                has_counter_move = any(self._is_type(m.type_name, 'ground') for m in defender_state.context.moves)
+                if has_counter_move:
                     score += 10.0  # 对手有地面系技能，使用飞天/飞翔有一定价值
-            # 如果是潜水类技能，检查对手是否使用电系攻击
-            elif move_config.get("protect_type") == "diving":
-                elec_moves = [m for m in defender_state.context.moves if m.type_name in ['electric', '电']]
-                if elec_moves:
+            # 潜水 vs 电系
+            elif protect_type == "diving":
+                has_counter_move = any(self._is_type(m.type_name, 'electric') for m in defender_state.context.moves)
+                if has_counter_move:
                     score += 10.0  # 对手有电系技能，使用潜水有一定价值
-            # 如果是挖洞类技能，检查对手是否使用飞行系攻击
-            elif move_config.get("protect_type") == "underground":
-                flying_moves = [m for m in defender_state.context.moves if m.type_name in ['flying', '飞行']]
-                if flying_moves:
+            # 挖洞 vs 飞行系
+            elif protect_type == "underground":
+                has_counter_move = any(self._is_type(m.type_name, 'flying') for m in defender_state.context.moves)
+                if has_counter_move:
                     score += 10.0  # 对手有飞行系技能，使用挖洞有一定价值
             # 如果是提升属性的技能
             elif "stat_boost" in move_config or "turn_2_boost" in move_config:
