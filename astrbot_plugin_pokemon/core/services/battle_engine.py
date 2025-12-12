@@ -138,6 +138,12 @@ class BattleLogic:
         6: "confusion", 12: "torment", 13: "disable", 14: "yawn"
     }
 
+    # 中文状态名称映射
+    AILMENT_CHINESE_MAP = {
+        1: "麻痹", 2: "睡眠", 3: "冰冻", 4: "灼伤", 5: "中毒",
+        6: "混乱", 12: "挑衅", 13: "技能封印", 14: "瞌睡"
+    }
+
     def __init__(self, move_repo=None):
         self.stat_modifier_service = StatModifierService()
         self.move_repo = move_repo
@@ -785,7 +791,13 @@ class BattleLogic:
         for eff in effects:
             etype = eff.get("type")
             if etype == "ailment":
-                logger_obj.log(f"{defender.context.pokemon.name}陷入{eff['status']}状态！\n\n")
+                # 尝试使用中文状态名称
+                status_id = eff.get('status_id')
+                if status_id and status_id in self.AILMENT_CHINESE_MAP:
+                    status_name_chinese = self.AILMENT_CHINESE_MAP[status_id]
+                    logger_obj.log(f"{defender.context.pokemon.name}陷入{status_name_chinese}状态！\n\n")
+                else:
+                    logger_obj.log(f"{defender.context.pokemon.name}陷入{eff['status']}状态！\n\n")
             elif etype == "stat_change":
                 t_name = eff['target_obj'].context.pokemon.name
                 action = "提升" if eff['change'] > 0 else "降低"
