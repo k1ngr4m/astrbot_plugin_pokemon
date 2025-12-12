@@ -39,6 +39,16 @@ class BattleState:
     current_pps: List[int]
     stat_levels: Dict[int, int] = field(default_factory=dict)
 
+    # --- 重构部分 ---
+    # 不再为每个技能单独设字段，而是用通用字段记录当前蓄力状态
+    # None表示未蓄力，存储move_id表示正在该技能的蓄力回合
+    charging_move_id: Optional[int] = None
+
+    # 记录特殊的保护状态类型 (如: 'underground', 'flying', 'diving')
+    # 用于判定攻击是否能命中
+    protection_status: Optional[str] = None
+    # ----------------
+
     @classmethod
     def from_context(cls, context: BattleContext) -> 'BattleState':
         return cls(
@@ -130,6 +140,78 @@ class BattleLogic:
             self.move_service = None
         self._struggle_move = self._create_struggle_move()
 
+        # --- 两回合蓄力技能配置表 ---
+        # key: move_id
+        # msg_charge: 第一回合蓄力时的提示语
+        # msg_release: 第二回合释放后的提示语 (可选)
+        # protect_type: 第一回合获得的保护类型 (underground/flying/diving/bouncing/bounced/None)
+        # stat_boost: 第一回合提升的能力 (可选, 格式同 stat_changes)
+        # bypass_protect: 第二回合攻击时是否穿透保护 (如暗影潜袭)
+        self.TWO_TURN_MOVES_CONFIG = {
+            19: {  # 飞翔
+                "msg_charge": "飞上了天空！",
+                "msg_release": "从天空中下来了！",
+                "protect_type": "flying"
+            },
+            76: {  # 日光束
+                "msg_charge": "收集满满的日光！",
+                "msg_release": "发射了光束！"
+            },
+            91: {  # 挖洞
+                "msg_charge": "挖洞潜入了地下！",
+                "msg_release": "从地下钻出来了！",
+                "protect_type": "underground"
+            },
+            130: {  # 火箭头锤
+                "msg_charge": "把头缩进去，防御提高了！",
+                "msg_release": "收回了缩进的头！",
+                "stat_boost": [{'stat_id': 3, 'change': 1}],  # 防御+1
+            },
+            291: { # 潜水
+                "msg_charge": "潜入了水中！",
+                "msg_release": "从水中浮上来了！",
+                "protect_type": "diving"
+            },
+            340: {  # 弹跳
+                "msg_charge": "弹跳到高高的空中！",
+                "msg_release": "从高空中降落！",
+                "protect_type": "flying"  # 类似飞行
+            },
+            467: { # 暗影潜袭
+                "msg_charge": "消失踪影！",
+                "msg_release": "从阴影中现身！",
+                "protect_type": "vanished",
+                "bypass_protect": True # 可以击中保护
+            },
+            566: { # 潜灵奇袭
+                "msg_charge": "消失在某处！",
+                "msg_release": "从某处现身！",
+                "protect_type": "vanished",
+                "bypass_protect": True
+            },
+            601: { # 大地掌控
+                "msg_charge": "吸收能量！",
+                "msg_release": "完成了能量吸收！",
+                # 注意：大地掌控是第二回合加属性，这个比较特殊，可以在通用逻辑里特判，或者配置支持 turn_2_boost
+                "turn_2_boost": [{'stat_id': 4, 'change': 1}, {'stat_id': 5, 'change': 1}, {'stat_id': 6, 'change': 1}] # 特攻+1, 特防+1, 速度+1
+            },
+            669: {  # 日光刃
+                "msg_charge": "收集满满的日光！",
+                "msg_release": "用剑攻击了！"
+            },
+            800: {  # 流星光束
+                "msg_charge": "聚集宇宙之力，特攻提高了！",
+                "msg_release": "发射了流星光束！",
+                "stat_boost": [{'stat_id': 4, 'change': 1}]  # 特攻+1
+            },
+        }
+        # 定义哪些技能可以击中特定的保护状态
+        # key: protect_type, value: list of move_ids that can hit
+        self.PROTECTION_PENETRATION = {
+            "underground": [89],        # 地震(89)等
+            "flying": [87],            # 打雷(87)等
+        }
+
     def _create_struggle_move(self) -> BattleMoveInfo:
         return BattleMoveInfo(
             power=40, accuracy=100.0, type_name='normal', damage_class_id=2,
@@ -205,24 +287,91 @@ class BattleLogic:
                         logger_obj: BattleLogger) -> bool:
         """执行单次行动。返回战斗是否结束。"""
         is_struggle = (move.move_id == self.STRUGGLE_MOVE_ID)
+        move_config = self.TWO_TURN_MOVES_CONFIG.get(move.move_id)
 
-        # A. 消耗 PP
+        # --- Phase 1: 蓄力状态检查 (Charging Check) ---
+
+        # 如果当前正在蓄力，且使用的就是蓄力技能 -> 说明是第二回合，准备攻击
+        if attacker.charging_move_id == move.move_id:
+            # 清除蓄力状态
+            attacker.charging_move_id = None
+            attacker.protection_status = None
+            # (注意：此时不return，继续向下执行伤害计算)
+
+            # 特殊处理：大地掌控在第二回合提升能力
+            if move_config and "turn_2_boost" in move_config:
+                attacker.stat_levels = attacker.stat_levels or {}
+                _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                    attacker.context.pokemon.stats, move_config["turn_2_boost"], attacker.stat_levels)
+                attacker.stat_levels = new_levels
+                logger_obj.log(f"{attacker.context.pokemon.name}的能力提升了！\n\n")
+
+        # 如果当前没有蓄力，但是使用了蓄力技能 -> 说明是第一回合，进入蓄力
+        elif move_config:
+            # 1. 设置状态
+            attacker.charging_move_id = move.move_id
+            attacker.protection_status = move_config.get("protect_type")
+
+            # 2. 扣除PP & 日志
+            pp_str = self._get_pp_str(attacker, move)
+            logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_str}！\n\n")
+            logger_obj.log(f"{attacker.context.pokemon.name} {move_config['msg_charge']}\n\n")
+            if not is_struggle: self._deduct_pp(attacker, move)
+
+            # 3. 应用第一回合的属性提升 (如流星光束、火箭头锤)
+            if "stat_boost" in move_config:
+                attacker.stat_levels = attacker.stat_levels or {}
+                _, new_levels = self.stat_modifier_service.apply_stat_changes(
+                    attacker.context.pokemon.stats, move_config["stat_boost"], attacker.stat_levels)
+                attacker.stat_levels = new_levels
+                logger_obj.log(f"{attacker.context.pokemon.name}的能力提升了！\n\n")
+
+            return False  # 第一回合结束，不造成伤害
+
+        # --- Phase 2: 命中与保护判定 (Protection Check) ---
+
+        # 检查防御方是否处于无敌/特殊保护状态
+        if defender.protection_status:
+            can_hit = False
+
+            # 1. 技能本身是否无视保护 (如暗影潜袭)
+            if move_config and move_config.get("bypass_protect"):
+                can_hit = True
+
+            # 2. 技能属性是否克制该保护状态 (如地震打挖洞)
+            allowed_moves = self.PROTECTION_PENETRATION.get(defender.protection_status, [])
+            if move.move_id in allowed_moves:
+                can_hit = True
+
+            if not can_hit:
+                if not is_struggle: self._deduct_pp(attacker, move)
+                logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}！\n\n")
+                logger_obj.log("但是没有击中目标！\n\n")
+                return False
+
+        # D. 准备日志信息
+        # 只有非蓄力技能或者是蓄力技能的第二回合才会走到这里
+        # 补一条日志：如果是蓄力技能释放
+        if move_config and "msg_release" in move_config:
+             logger_obj.log(f"{attacker.context.pokemon.name} {move_config['msg_release']}\n\n")
+        elif not move_config:
+             # 普通技能日志
+             pp_str = self._get_pp_str(attacker, move)
+             logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_str}！\n\n")
+
+        # B. 消耗 PP
         if not is_struggle:
             self._deduct_pp(attacker, move)
 
-        # B. 准备日志信息
-        pp_str = self._get_pp_str(attacker, move)
-        logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_str}！\n\n")
-
-        # C. 计算结果 (Calculate)
+        # E. 计算结果 (Calculate)
         # 此步骤只计算数据，不修改任何状态
         outcome = self._calculate_move_outcome(attacker, defender, move)
 
-        # D. 应用结果 (Apply)
+        # F. 应用结果 (Apply)
 
         # 1. 命中判定
         if outcome.missed:
-            # 只有非OHKO的未命中才显示“没有击中”
+            # 只有非OHKO的未命中才显示"没有击中"
             # OHKO的未命中在meta_effects里处理了
             if move.meta_category_id != 9:
                 logger_obj.log("没有击中目标！\n\n")
@@ -253,7 +402,7 @@ class BattleLogic:
         if move.move_id > 0 and move.stat_changes and move.meta_category_id not in [2, 6, 7]:
             self._apply_residual_stat_changes(attacker, defender, move, logger_obj)
 
-        # E. 特殊逻辑处理
+        # G. 特殊逻辑处理
 
         # 1. 挣扎反伤
         if is_struggle:
@@ -266,7 +415,7 @@ class BattleLogic:
             attacker.current_hp = 0
             logger_obj.log(f"{attacker.context.pokemon.name} 发生了爆炸，因此倒下了！\n\n")
 
-        # F. 胜负判定
+        # H. 胜负判定
         if attacker.current_hp <= 0:
             # logger_obj.log(f"{attacker.context.pokemon.name} 倒下了！\n\n") # 交给外部或最后统一显示
             return True
@@ -804,6 +953,42 @@ class BattleLogic:
         # Cat 10-13: 场地/全场/特殊
         elif cat_id in [10, 11, 12, 13]:
             score += 15.0  # 简单的战术加分
+
+        # --- 额外检查：对于两回合技能的特殊评分 ---
+        # 检查是否是两回合技能，如果是第一回合，则考虑整体战略价值
+        move_config = self.TWO_TURN_MOVES_CONFIG.get(move.move_id)
+        if move_config:
+            # 如果是飞行/飞翔类技能，检查对手是否使用地面系攻击
+            if move_config.get("protect_type") == "flying":
+                ground_moves = [m for m in defender_state.context.moves if m.type_name in ['ground', '地面']]
+                if ground_moves:
+                    score += 10.0  # 对手有地面系技能，使用飞天/飞翔有一定价值
+            # 如果是潜水类技能，检查对手是否使用电系攻击
+            elif move_config.get("protect_type") == "diving":
+                elec_moves = [m for m in defender_state.context.moves if m.type_name in ['electric', '电']]
+                if elec_moves:
+                    score += 10.0  # 对手有电系技能，使用潜水有一定价值
+            # 如果是挖洞类技能，检查对手是否使用飞行系攻击
+            elif move_config.get("protect_type") == "underground":
+                flying_moves = [m for m in defender_state.context.moves if m.type_name in ['flying', '飞行']]
+                if flying_moves:
+                    score += 10.0  # 对手有飞行系技能，使用挖洞有一定价值
+            # 如果是提升属性的技能
+            elif "stat_boost" in move_config or "turn_2_boost" in move_config:
+                # 两回合技能，但第一回合就提升属性，对持久战有帮助
+                if "stat_boost" in move_config:
+                    boost_count = len(move_config["stat_boost"])
+                    score += 10.0 * boost_count  # 根据提升的属性数量评分
+                elif "turn_2_boost" in move_config:
+                    boost_count = len(move_config["turn_2_boost"])
+                    score += 10.0 * boost_count  # 根据提升的属性数量评分
+            # 如果是穿透保护的技能
+            elif move_config.get("bypass_protect"):
+                # 这些技能可以穿透保护，对使用保护技能的对手特别有效
+                score += 20.0
+            else:
+                # 对于其他两回合技能，基于基础威力评分
+                score += move.power * 0.2
 
         # --- 3. 战术修正 (Contextual Penalties) ---
         # 这些修正主要用于“如果不造成伤害，这回合是否浪费了”的判断
