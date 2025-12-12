@@ -135,13 +135,19 @@ class BattleLogic:
 
     AILMENT_MAP = {
         1: "paralysis", 2: "sleep", 3: "freeze", 4: "burn", 5: "poison",
-        6: "confusion", 12: "torment", 13: "disable", 14: "yawn"
+        6: "confusion", 7: "infatuation", 8: "trap",
+        9: "nightmare", 12: "torment", 13: "disable", 14: "yawn",
+        15: "heal-block", 17: "no-type-immunity", 18: "leech-seed",
+        19: "embargo", 20: "perish-song", 21: "ingrain", 24: "silence", 42: "tar-shot"
     }
 
     # 中文状态名称映射
     AILMENT_CHINESE_MAP = {
         1: "麻痹", 2: "睡眠", 3: "冰冻", 4: "灼伤", 5: "中毒",
-        6: "混乱", 12: "挑衅", 13: "技能封印", 14: "瞌睡"
+        6: "混乱", 7: "Infatuation", 8: "陷阱",
+        9: "噩梦", 12: "挑衅", 13: "技能封印", 14: "瞌睡",
+        15: "治疗阻塞", 17: "无类型免疫", 18: "Leech Seed",
+        19: "Embargo", 20: "Perish Song", 21: "Ingrain", 24: "沉默", 42: "Tar Shot"
     }
 
     def __init__(self, move_repo=None):
