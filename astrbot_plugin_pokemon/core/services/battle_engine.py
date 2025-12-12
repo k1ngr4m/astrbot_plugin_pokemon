@@ -49,6 +49,15 @@ class BattleState:
     protection_status: Optional[str] = None
     # ----------------
 
+    # --- 新增：状态异常存储 ---
+    # 主要状态 (1:麻痹, 2:睡眠, 3:冰冻, 4:灼伤, 5:中毒) - 只能存在一个
+    non_volatile_status: Optional[int] = None
+    status_turns: int = 0  # 用于记录睡眠回合数、剧毒累积层数等
+
+    # 挥发性状态 (如 6:混乱, 18:寄生种子) - ID -> 剩余回合数/参数
+    volatile_statuses: Dict[int, int] = field(default_factory=dict)
+    # -----------------------
+
     @classmethod
     def from_context(cls, context: BattleContext) -> 'BattleState':
         return cls(
@@ -277,6 +286,17 @@ class BattleLogic:
         if self._execute_action(first[0], first[1], first[2], logger_obj): return True
         if self._execute_action(second[0], second[1], second[2], logger_obj): return True
 
+        # --- 新增：回合末结算 ---
+        self._apply_turn_end_effects(user_state, wild_state, logger_obj)
+        if user_state.current_hp <= 0 or wild_state.current_hp <= 0:
+            # 处理结算死亡逻辑...
+            return True
+
+        self._apply_turn_end_effects(wild_state, user_state, logger_obj)
+        if user_state.current_hp <= 0 or wild_state.current_hp <= 0:
+            return True
+        # ---------------------
+
         return False
 
     def get_best_move(self, attacker_state: BattleState, defender_state: BattleState,
@@ -325,6 +345,22 @@ class BattleLogic:
         """执行单次行动。返回战斗是否结束。"""
         is_struggle = (move.move_id == self.STRUGGLE_MOVE_ID)
         move_config = self.TWO_TURN_MOVES_CONFIG.get(move.move_id)
+
+        # --- 插入点：状态检查 ---
+        # 只有非挣扎技能才检查状态（挣扎通常可以强制发动，或者简化为都检查）
+        if not self._check_can_move(attacker, move, logger_obj):
+            # 即使不能行动，有些状态回合结束逻辑需要处理，但此处直接中断本次攻击
+            return False
+        # ---------------------
+
+        # --- 插入：受击解冻逻辑 ---
+        # 如果防御方被冰冻，且受到火系攻击，解除冰冻
+        if defender.non_volatile_status == 3 and move.type_name in ['fire', '火']:
+             defender.non_volatile_status = None
+             if logger_obj.should_log_details():
+                 logger.info(f"[DEBUG] {defender.context.pokemon.name} 被火系攻击融化了冰冻！")
+             logger_obj.log(f"{defender.context.pokemon.name}身上的冰融化了！\n\n")
+        # ------------------------
 
         # 添加调试日志
         if logger_obj.should_log_details():
@@ -792,6 +828,45 @@ class BattleLogic:
                             stat_name = self.STAT_NAMES.get(sid, f"未知属性({sid})")
                             logger.info(f"[DEBUG] 属性变化: {target.context.pokemon.name}的{stat_name}等级从 {old_level} 变为 {new_val}")
 
+            # --- 新增：处理状态附加 ---
+            elif etype == "ailment":
+                status_id = eff.get("status_id")
+                if not status_id: continue
+
+                # A. 主要状态 (Non-Volatile: 1-5)
+                if status_id <= 5:
+                    # 只有在没有主要状态时才能施加
+                    if defender.non_volatile_status is None:
+                        defender.non_volatile_status = status_id
+                        defender.status_turns = 0
+
+                        # 睡眠回合设定 (2-4回合)
+                        if status_id == 2:
+                            defender.status_turns = random.randint(2, 4)
+
+                # B. 挥发性状态 (Volatile: >5)
+                else:
+                    # 6: 混乱 (2-5回合)
+                    if status_id == 6:
+                        if 6 not in defender.volatile_statuses: # 已经混乱则不重置
+                            defender.volatile_statuses[6] = random.randint(2, 5)
+
+                    # 7: 着迷 (持续直到下场，这里给个极大值或特殊标记)
+                    elif status_id == 7:
+                        # 还需要判断性别逻辑，暂略，假设必定成功
+                        if 7 not in defender.volatile_statuses:
+                            defender.volatile_statuses[7] = 999
+
+                    # 8: 束缚 (4-5回合)
+                    elif status_id == 8:
+                        defender.volatile_statuses[8] = random.randint(4, 5)
+
+                    # 18: 寄生种子 (持续无限，但草系免疫)
+                    elif status_id == 18:
+                         if 'grass' not in [t.lower() for t in defender.context.types]: # 草系免疫
+                            defender.volatile_statuses[18] = 999
+            # -----------------------
+
     def _log_meta_effects(self, attacker, defender, effects, logger_obj):
         """统一日志记录"""
         for eff in effects:
@@ -824,6 +899,70 @@ class BattleLogic:
                     logger_obj.log("一击必杀！直接击败了对手！\n\n")
                 else:
                     logger_obj.log(f"一击必杀失败！{eff.get('reason', '')}\n\n")
+
+    def _check_can_move(self, attacker: BattleState, move: BattleMoveInfo, logger_obj: BattleLogger) -> bool:
+        """
+        检查状态异常是否阻止行动。
+        返回 True 表示可以行动，False 表示无法行动。
+        """
+        name = attacker.context.pokemon.name
+
+        # 1. 冰冻 (Freeze - ID 3)
+        if attacker.non_volatile_status == 3:
+            # 特殊机制：某些火系技能（如火焰轮、闪焰冲锋）可以由使用者融化自身冰冻
+            # 这里简单判断：如果是火系攻击技能，且威力>0，尝试自我解冻 (Gen 5+ 机制)
+            if move.type_name in ['fire', '火'] and move.power > 0:
+                attacker.non_volatile_status = None
+                logger_obj.log(f"{name}的火焰融化了周围的冰！\n\n")
+            # 否则进行每回合 20% 的解冻判定
+            elif random.random() < 0.2:
+                attacker.non_volatile_status = None
+                logger_obj.log(f"{name}的冰冻解除了！\n\n")
+            else:
+                logger_obj.log(f"{name}身体冻结无法动弹！\n\n")
+                return False
+
+        # 2. 睡眠 (Sleep - ID 2)
+        if attacker.non_volatile_status == 2:
+            attacker.status_turns -= 1
+            if attacker.status_turns <= 0:
+                attacker.non_volatile_status = None
+                logger_obj.log(f"{name}醒过来了！\n\n")
+            else:
+                # 梦话(Snore)或梦话(Sleep Talk)可以在睡眠中使用，此处暂略
+                logger_obj.log(f"{name}正在熟睡！\n\n")
+                return False
+
+        # 3. 麻痹 (Paralysis - ID 1)
+        if attacker.non_volatile_status == 1:
+            if random.random() < 0.25:
+                logger_obj.log(f"{name}身体麻痹无法动弹！\n\n")
+                return False
+
+        # 4. 着迷 (Infatuation - ID 7)
+        if 7 in attacker.volatile_statuses:
+            logger_obj.log(f"{name}着迷了！\n\n")
+            if random.random() < 0.5:
+                logger_obj.log(f"{name}因为着迷而无法行动！\n\n")
+                return False
+
+        # 5. 混乱 (Confusion - ID 6)
+        if 6 in attacker.volatile_statuses:
+            attacker.volatile_statuses[6] -= 1
+            if attacker.volatile_statuses[6] <= 0:
+                del attacker.volatile_statuses[6]
+                logger_obj.log(f"{name}的混乱解除了！\n\n")
+            else:
+                logger_obj.log(f"{name}混乱了！\n\n")
+                if random.random() < 0.33:
+                    # 混乱自伤：威力40的无属性物理攻击
+                    # 简化计算：约为最大生命的 1/8 左右，受防御影响这里简化处理
+                    self_dmg = max(1, int(attacker.context.pokemon.stats.hp / 8))
+                    attacker.current_hp -= self_dmg
+                    logger_obj.log(f"在混乱中攻击了自己！(扣除 {self_dmg} HP)\n\n")
+                    return False
+
+        return True
 
     def _apply_residual_stat_changes(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo,
                                      logger_obj: BattleLogger):
@@ -886,7 +1025,7 @@ class BattleLogic:
                     # 记录日志
                     stat_name = self.STAT_NAMES.get(stat_id, f"未知属性({stat_id})")
 
-                    # 判断是“提升”还是“降低” (基于实际产生的变化，而非原始数值)
+                    # 判断是"提升"还是"降低" (基于实际产生的变化，而非原始数值)
                     # 例如：如果已经是 +6，再 +1，new_stage == current_stage，不会进到这里，符合逻辑
                     # 如果是 +5，再 +2，new_stage 变成 +6，实际提升了 1 级
 
@@ -903,11 +1042,74 @@ class BattleLogic:
         if u_spd != w_spd: return u_spd > w_spd
         return random.random() < 0.5
 
+    def _apply_turn_end_effects(self, state: BattleState, opponent: BattleState, logger_obj: BattleLogger):
+        """处理回合结束时的残留伤害"""
+        if state.current_hp <= 0: return
+
+        name = state.context.pokemon.name
+        max_hp = state.context.pokemon.stats.hp
+
+        # 1. 烧伤 (Burn - ID 4)
+        if state.non_volatile_status == 4:
+            dmg = max(1, int(max_hp / 16))
+            state.current_hp -= dmg
+            logger_obj.log(f"{name}因烧伤受到了伤害！\n\n")
+
+        # 2. 中毒 (Poison - ID 5)
+        elif state.non_volatile_status == 5:
+            # 剧毒逻辑(Toxic)需要累加 status_turns，普通中毒固定 1/8
+            # 这里简化为普通中毒
+            dmg = max(1, int(max_hp / 8))
+            state.current_hp -= dmg
+            logger_obj.log(f"{name}因中毒受到了伤害！\n\n")
+
+        # 3. 束缚 (Trap - ID 8)
+        # 对应：紧束(Bind)、火焰旋涡(Fire Spin)、流沙地狱等
+        if 8 in state.volatile_statuses:
+            dmg = max(1, int(max_hp / 8))
+            state.current_hp -= dmg
+            logger_obj.log(f"{name}因束缚受到了伤害！\n\n")
+
+            # 扣除回合数
+            state.volatile_statuses[8] -= 1
+            if state.volatile_statuses[8] <= 0:
+                del state.volatile_statuses[8]
+                logger_obj.log(f"{name}摆脱了束缚！\n\n")
+
+        # 4. 寄生种子 (Leech Seed - ID 18)
+        if 18 in state.volatile_statuses:
+            dmg = max(1, int(max_hp / 8))
+            state.current_hp -= dmg
+            logger_obj.log(f"{name}的体力被寄生种子夺走了！\n\n")
+            # 吸血给对手
+            if opponent.current_hp > 0:
+                heal = dmg
+                opponent.current_hp = min(opponent.context.pokemon.stats.hp, opponent.current_hp + heal)
+                # logger_obj.log(f"{opponent.context.pokemon.name}回复了体力！\n\n") # 可选日志
+
+        # 确保 HP 不为负
+        state.current_hp = max(0, state.current_hp)
+
     def _get_modified_stats(self, state: BattleState):
-        if not state.stat_levels: return state.context.pokemon.stats
-        mod, _ = self.stat_modifier_service.apply_stat_changes(
-            state.context.pokemon.stats, [], state.stat_levels
-        )
+        # 获取基础修正 stats
+        if not state.stat_levels:
+            mod, _ = self.stat_modifier_service.apply_stat_changes(
+                state.context.pokemon.stats, [], {}
+            )
+        else:
+            mod, _ = self.stat_modifier_service.apply_stat_changes(
+                state.context.pokemon.stats, [], state.stat_levels
+            )
+
+        # --- 新增：状态对数值的修正 ---
+        # 麻痹：速度减半 (Gen 7+ 是 0.5倍, 以前是0.25)
+        if state.non_volatile_status == 1:
+            mod.speed = int(mod.speed * 0.5)
+
+        # 烧伤：物攻减半 (除非有毅力特性，这里暂不考虑特性)
+        if state.non_volatile_status == 4:
+            mod.attack = int(mod.attack * 0.5)
+
         return mod
 
     def calculate_type_effectiveness(self, atk_types: List[str], def_types: List[str]) -> float:
