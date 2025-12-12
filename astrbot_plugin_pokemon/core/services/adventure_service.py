@@ -365,39 +365,78 @@ class AdventureService:
             for mid in valid_ids:
                 m_data = self.move_repo.get_move_by_id(mid)
                 if m_data:
-                    max_pp = m_data.get('pp', 5) or 5
-                    # 预加载技能的属性变化数据和目标信息
+                    # 基础数值强转，防止数据库返回字符串导致逻辑判断失败
+                    max_pp = int(m_data.get('pp', 5) or 5)
+                    power = int(m_data.get('power', 0) or 0)
+                    accuracy = int(m_data.get('accuracy', 100) or 100)
+                    priority = int(m_data.get('priority', 0) or 0)
+                    target_id = int(m_data.get('target_id', 0) or 0)
+                    damage_class_id = int(m_data.get('damage_class_id', 2) or 2)
+                    meta_category_id = int(m_data.get('meta_category_id', 0) or 0)
+                    # 其他相关字段也建议强转
+                    stat_chance = float(m_data.get('stat_chance', 0.0) or 0.0)
+                    drain = float(m_data.get('drain', 0.0) or 0.0)
+                    ailment_chance = int(m_data.get('ailment_chance', 0) or 0)
+                    meta_ailment_id = int(m_data.get('meta_ailment_id', 0) or 0)
+                    healing = float(m_data.get('healing', 0.0) or 0.0)
+                    # 预加载技能的属性变化数据
                     stat_changes = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
-                    target_id = m_data.get('target_id', 0)
-                    # 预加载技能的meta类别ID
-                    meta_category_id = m_data.get('meta_category_id', 0)
-                    # 预加载技能的stat_chance
-                    stat_chance = m_data.get('stat_chance', 0.0)
-                    # 预加载技能的drain
-                    drain = m_data.get('drain', 0.0)
 
                     loaded_moves.append(BattleMoveInfo(
-                        power=m_data.get('power', 0) or 0,
-                        accuracy=m_data.get('accuracy', 100) or 100,
+                        power=power,
+                        accuracy=accuracy,
                         type_name=m_data.get('type_name', 'normal'),
-                        damage_class_id=m_data.get('damage_class_id', 2),
-                        priority=m_data.get('priority', 0),
+                        damage_class_id=damage_class_id,
+                        priority=priority,
                         type_effectiveness=1.0,
                         stab_bonus=1.0,
                         move_id=mid,
                         move_name=m_data.get('name_zh', 'Unknown Move'),
                         max_pp=max_pp,
                         current_pp=max_pp,
-                        # 预加载的属性变化数据，避免在战斗循环中查询数据库
+                        # 预加载的属性变化数据
                         stat_changes=stat_changes,
                         target_id=target_id,
                         meta_category_id=meta_category_id,
-                        ailment_chance=m_data.get('ailment_chance', 0.0),
-                        meta_ailment_id=m_data.get('meta_ailment_id', 0),
-                        healing=m_data.get('healing', 0.0),
+                        ailment_chance=ailment_chance,
+                        meta_ailment_id=meta_ailment_id,
+                        healing=healing,
                         stat_chance=stat_chance,
                         drain=drain
                     ))
+
+                    # max_pp = m_data.get('pp', 5) or 5
+                    # 预加载技能的属性变化数据和目标信息
+                    # stat_changes = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
+                    # target_id = m_data.get('target_id', 0)
+                    # # 预加载技能的meta类别ID
+                    # meta_category_id = m_data.get('meta_category_id', 0)
+                    # # 预加载技能的stat_chance
+                    # stat_chance = m_data.get('stat_chance', 0.0)
+                    # # 预加载技能的drain
+                    # drain = m_data.get('drain', 0.0)
+                    # loaded_moves.append(BattleMoveInfo(
+                    #     power=m_data.get('power', 0) or 0,
+                    #     accuracy=m_data.get('accuracy', 100) or 100,
+                    #     type_name=m_data.get('type_name', 'normal'),
+                    #     damage_class_id=m_data.get('damage_class_id', 2),
+                    #     priority=m_data.get('priority', 0),
+                    #     type_effectiveness=1.0,
+                    #     stab_bonus=1.0,
+                    #     move_id=mid,
+                    #     move_name=m_data.get('name_zh', 'Unknown Move'),
+                    #     max_pp=max_pp,
+                    #     current_pp=max_pp,
+                    #     # 预加载的属性变化数据，避免在战斗循环中查询数据库
+                    #     stat_changes=stat_changes,
+                    #     target_id=target_id,
+                    #     meta_category_id=meta_category_id,
+                    #     ailment_chance=m_data.get('ailment_chance', 0.0),
+                    #     meta_ailment_id=m_data.get('meta_ailment_id', 0),
+                    #     healing=m_data.get('healing', 0.0),
+                    #     stat_chance=stat_chance,
+                    #     drain=drain
+                    # ))
         return loaded_moves
 
     def execute_real_battle(self, user_ctx: BattleContext, wild_ctx: BattleContext) -> tuple[str, Any, int, int]:

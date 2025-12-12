@@ -1036,6 +1036,8 @@ class BattleLogic:
                     if effect_type == "heal":
                         heal_amount = meta_effect.get("amount", 0)
                         attacker.current_hp = min(attacker.context.pokemon.stats.hp, attacker.current_hp + heal_amount)
+                        # 确保HP不会低于0
+                        attacker.current_hp = max(0, attacker.current_hp)
                     # 2. ✅ 新增：处理自残/消耗 (Category 3 负数 healing)
                     elif effect_type == "damage" and meta_effect.get("damage_ratio", 0) != 0:
                         # 注意：普通攻击的伤害也是 type="damage"，但通常由 calculate_damage_core 返回值直接扣除
@@ -1072,6 +1074,8 @@ class BattleLogic:
                     if effect_type == "heal":
                         heal_amount = meta_effect.get("amount", 0)
                         attacker.current_hp = min(attacker.context.pokemon.stats.hp, attacker.current_hp + heal_amount)
+                        # 确保HP不会低于0
+                        attacker.current_hp = max(0, attacker.current_hp)
                     elif effect_type == "damage" and meta_effect.get("damage_ratio", 0) != 0:
                         # 注意：普通攻击的伤害也是 type="damage"，但通常由 calculate_damage_core 返回值直接扣除
                         # 这里主要是为了处理 status move 的自我损伤
