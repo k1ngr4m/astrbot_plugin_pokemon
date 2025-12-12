@@ -422,14 +422,18 @@ class BattleLogic:
 
     def _gen_stat_change_effect(self, target: BattleState, move: BattleMoveInfo, default_target: str) -> List[Dict]:
         """生成能力等级变化效果"""
-        # 检查几率
-        chance = int(move.stat_chance * 100) if move.stat_chance is not None else 100
+        # [修复] 概率判定逻辑：
+        # 数据库中 stat_chance 为 0 或 None 通常表示 100% 触发（例如 Category 2 的必中变化技）
+        # 只有当明确配置了数值（如 0.1 代表 10%）时，才应用概率检查
+        raw_chance = int(move.stat_chance * 100) if move.stat_chance is not None else 0
+        chance = raw_chance if raw_chance > 0 else 100
+
         if random.randint(1, 100) > chance: return []
 
         effects = []
         if hasattr(move, 'stat_changes') and move.stat_changes:
             for change in move.stat_changes:
-                # 兼容字典或对象
+                # 兼容字典或对象访问
                 sid = change.get('stat_id') if isinstance(change, dict) else getattr(change, 'stat_id', None)
                 amt = change.get('change') if isinstance(change, dict) else getattr(change, 'change', 0)
 
@@ -441,7 +445,7 @@ class BattleLogic:
 
                 if new_stage != curr:
                     effects.append({
-                        "type": "stat_change",  # 统一类型，不用区分 raise/lower
+                        "type": "stat_change",
                         "stat_id": sid,
                         "stat_name": self.STAT_NAMES.get(sid, "stat"),
                         "change": new_stage - curr,
