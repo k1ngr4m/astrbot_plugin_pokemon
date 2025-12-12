@@ -270,7 +270,12 @@ class AdventureService:
                 "details": log_data
             })
 
-            if battle_outcome == "win":
+            # 检查野生宝可梦是否被击败
+            if wild_pokemon_info.stats.hp <= 0:
+                # 野生宝可梦被击败，战斗成功
+                battle_result_str = "success"
+                break
+            elif battle_outcome == "win":
                 battle_result_str = "success"
                 break
             else:
@@ -779,7 +784,11 @@ class AdventureService:
                 "details": details
             })
 
-            if outcome == "win":
+            # 检查训练家宝可梦是否被击败
+            if t_ctx.pokemon.stats.hp <= 0:
+                # 训练家宝可梦被击败，对方下一只上场
+                t_idx += 1  # 击败对方一只，对方下一只上场
+            elif outcome == "win":
                 t_idx += 1  # 击败对方一只，对方下一只上场
             else:
                 u_idx += 1  # 我方战败，下一只上场
