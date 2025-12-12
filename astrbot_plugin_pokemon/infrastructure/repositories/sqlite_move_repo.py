@@ -121,10 +121,13 @@ class SqliteMoveRepository(AbstractMoveRepository):
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    SELECT id, name_en, name_zh, type_id, power, pp, accuracy,
-                           priority, target_id, damage_class_id, effect_id, effect_chance, description
-                    FROM moves
-                    WHERE id = ?
+                    SELECT m.id, m.name_en, m.name_zh, m.type_id, m.power, m.pp, m.accuracy,
+                           m.priority, m.target_id, m.damage_class_id, m.effect_id, m.effect_chance, m.description,
+                           mm.meta_category_id, mm.meta_ailment_id, mm.min_hits, mm.max_hits, mm.min_turns, mm.max_turns,
+                           mm.drain, mm.healing, mm.crit_rate, mm.ailment_chance, mm.flinch_chance, mm.stat_chance
+                    FROM moves m
+                    JOIN move_meta mm ON m.id = mm.move_id
+                    WHERE m.id = ?
                 """, (move_id,))
                 row = cursor.fetchone()
                 if row:
@@ -146,7 +149,19 @@ class SqliteMoveRepository(AbstractMoveRepository):
                         "damage_class_id": row[9],
                         "effect_id": row[10],
                         "effect_chance": row[11],
-                        "description": row[12]
+                        "description": row[12],
+                        "meta_category_id": row[13],
+                        "meta_ailment_id": row[14],
+                        "min_hits": row[15],
+                        "max_hits": row[16],
+                        "min_turns": row[17],
+                        "max_turns": row[18],
+                        "drain": row[19],
+                        "healing": row[20],
+                        "crit_rate": row[21],
+                        "ailment_chance": row[22],
+                        "flinch_chance": row[23],
+                        "stat_chance": row[24],
                     }
         except Exception as e:
             logger.error(f"获取招式详细信息失败: {e}")

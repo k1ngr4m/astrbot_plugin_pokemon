@@ -166,7 +166,6 @@ class BattleLogic:
                 # 将防御方类型转换为英文
                 def_english = self._get_english_type_name(def_type)
                 effectiveness *= atk_dict.get(def_english, 1.0)
-        # logger.info(f"calculate_type_effectiveness: {attacker_types} vs {defender_types} = {effectiveness}")
         return effectiveness
 
     def _get_atk_def_ratio(self, attacker_state: BattleState, defender_state: BattleState, move: BattleMoveInfo) -> float:
@@ -260,9 +259,9 @@ class BattleLogic:
 
         if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
             logger.info(
-                f"评分计算详情 - {move.move_name}: "
-                f"基础伤害({move.power}) * 命中率({move.accuracy/100.0:.2f}) * "
-                f"克制({eff}) * STAB({stab}) * 攻防比({atk_def_ratio:.2f}) = {score:.2f}"
+                f"[DEBUG] 评分计算详情 - {move.move_name}: "
+                f"[DEBUG] 基础伤害({move.power}) * 命中率({move.accuracy/100.0:.2f}) * "
+                f"[DEBUG] 克制({eff}) * STAB({stab}) * 攻防比({atk_def_ratio:.2f}) = {score:.2f}"
             )
         return score
 
@@ -281,7 +280,7 @@ class BattleLogic:
 
         if not available_moves:
             if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
-                logger.info("没有可用招式，使用挣扎")
+                logger.info("[DEBUG] 没有可用招式，使用挣扎")
             return self.get_struggle_move()
 
         best_move = None
@@ -310,7 +309,7 @@ class BattleLogic:
                 current_score += random.uniform(0, 5)
 
             if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
-                logger.info(f"技能 {move.move_name} 评分: {current_score:.2f}")
+                logger.info(f"[DEBUG] 技能 {move.move_name} 评分: {current_score:.2f}")
 
             if current_score > best_score:
                 best_score = current_score
@@ -331,7 +330,7 @@ class BattleLogic:
             return random.choice(available_moves)
 
         if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
-            logger.info(f"最终选择: {best_move.move_name} (综合评分: {best_score:.2f})")
+            logger.info(f"[DEBUG] 最终选择: {best_move.move_name} (综合评分: {best_score:.2f})")
 
         return best_move
 
@@ -473,7 +472,7 @@ class BattleLogic:
                 # 如果免疫，则跳过效果
                 if is_immune:
                     # 可以添加日志记录免疫情况
-                    # logger.info(f"防御方宝可梦免疫了异常状态: ID={ailment_id}")
+                    logger.info(f"[DEBUG] 防御方宝可梦免疫了异常状态: ID={ailment_id}")
                     pass
                 else:
                     # 5. (可选) 将 ID 映射为代码内部使用的字符串
@@ -514,7 +513,7 @@ class BattleLogic:
                         })
 
                         # 日志记录 (可选)
-                        # logger.info(f"招式触发了异常状态: ID={ailment_id} ({status_effect})")
+                        logger.info(f"[DEBUG] 招式触发了异常状态: ID={ailment_id} ({status_effect})")
 
         elif move.meta_category_id == 2:  # net-good-stats: 提升能力 (如: 剑舞, 铁壁, 高速移动)
         # 确保 attacker_state.stat_levels 已初始化
@@ -812,7 +811,9 @@ class BattleLogic:
             # 先计算基础伤害
             final_damage = base_damage * eff * stab * crit_multiplier * random_multiplier
             # drain字段通常表示回复比例的百分比值（如50, 75, 100）
-            drain_percent = move.drain if hasattr(move, 'drain') and move.drain is not None else 50  # 默认50%如果未设置
+            raw_drain = getattr(move, 'drain', 0)
+            drain_percent = raw_drain if raw_drain and raw_drain > 0 else 50
+            # drain_percent = move.drain if hasattr(move, 'drain') and move.drain is not None else 50  # 默认50%如果未设置
             drain_ratio = drain_percent / 100.0
 
             # 将部分伤害转换为回复
@@ -945,7 +946,7 @@ class BattleLogic:
                 from_drain = meta_effect.get("from_drain", False)
                 if from_drain:
                     damage_dealt = meta_effect.get("damage_dealt", 0)
-                    logger_obj.log(f"{attacker.context.pokemon.name}通过攻击吸收了{amount}点HP！（造成伤害{damage_dealt}）\n\n")
+                    logger_obj.log(f"{attacker.context.pokemon.name}通过攻击吸收了{amount}点HP！\n\n")
                 else:
                     logger_obj.log(f"{attacker.context.pokemon.name}回复了{amount}点HP！\n\n")
             elif effect_type == "damage":

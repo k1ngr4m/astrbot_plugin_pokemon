@@ -459,7 +459,7 @@ class AdventureService:
         turn = 0
         max_turns = 50
         winner = None
-        logger.info("=====================执行实战，生成详细日志=====================")
+        logger.info(f"[DEBUG] =====================执行实战，生成详细日志=====================")
         
         while user_state.current_hp > 0 and wild_state.current_hp > 0 and turn < max_turns:
             turn += 1
