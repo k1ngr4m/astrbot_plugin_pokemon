@@ -174,13 +174,21 @@ class AdventureService:
             location_id=location.id,
             encounter_rate=selected_ap.encounter_rate,
         )
+
+        # 检查该宝可梦物种是否已被用户捕捉
+        pokedex_result = self.user_pokemon_repo.get_user_pokedex_ids(user_id)
+        is_pokemon_caught = False
+        if pokedex_result and wild_pokemon_info.species_id in pokedex_result.get("caught", set()):
+            is_pokemon_caught = True
+
         return BaseResult(
             success=True,
             message=AnswerEnum.ADVENTURE_SUCCESS.value,
             data=AdventureResult(
                 wild_pokemon=wild_pokemon_info,
                 location=LocationInfo(id=location.id, name=location.name),
-                trainer=None
+                trainer=None,
+                is_pokemon_caught=is_pokemon_caught
             )
         )
 

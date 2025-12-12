@@ -338,25 +338,38 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
         """优化：使用 UNION 一次性查询"""
         conn = self._get_connection()
 
-        # 1. 仅仅查询已捕捉的 IDs
+        # 1. 查询已捕捉的 IDs (包括当前拥有的和历史上捕获过的)
+        # 从用户拥有的宝可梦获取
         cursor = conn.execute("SELECT DISTINCT species_id FROM user_pokemon WHERE user_id = ? AND isdel = 0",
                               (user_id,))
-        caught_ids = {row[0] for row in cursor.fetchall()}
+        current_pokemon_species = {row[0] for row in cursor.fetchall()}
 
-        # 2. 查询“遇到过”的 IDs (包含已捕捉的和在野外遇到的)
-        # SQL逻辑：(用户拥有的) UNION (遇到记录关联的野怪种族)
+        # 从图鉴捕获历史获取
+        cursor = conn.execute("SELECT DISTINCT species_id FROM user_pokedex_capture_history WHERE user_id = ? AND isdel = 0",
+                              (user_id,))
+        captured_history_species = {row[0] for row in cursor.fetchall()}
+
+        # 合并所有已捕获的物种ID
+        caught_ids = current_pokemon_species | captured_history_species
+
+        # 2. 查询"遇到过"的 IDs (包含已捕捉的和在野外遇到的)
+        # SQL逻辑：(用户拥有的) UNION (图鉴捕获历史) UNION (遇到记录关联的野怪种族)
         sql_seen = """
-                   SELECT species_id \
-                   FROM user_pokemon \
+                   SELECT species_id
+                   FROM user_pokemon
+                   WHERE user_id = ?
+                   UNION
+                   SELECT species_id
+                   FROM user_pokedex_capture_history
                    WHERE user_id = ?
                    UNION
                    SELECT w.species_id
                    FROM wild_pokemon_encounter_log log
                             JOIN wild_pokemon w ON log.wild_pokemon_id = w.id
-                   WHERE log.user_id = ? \
-                     AND w.isdel = 0 \
+                   WHERE log.user_id = ?
+                     AND w.isdel = 0
                    """
-        cursor = conn.execute(sql_seen, (user_id, user_id))
+        cursor = conn.execute(sql_seen, (user_id, user_id, user_id))
         seen_ids = {row[0] for row in cursor.fetchall()}
 
         return {"caught": caught_ids, "seen": seen_ids}
@@ -429,3 +442,13 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                 SET current_trainer_encounter_id = NULL
                 WHERE user_id = ?
             """, (user_id,))
+
+    def record_pokedex_capture(self, user_id: str, species_id: int) -> None:
+        """记录用户捕获的宝可梦物种到图鉴历史"""
+        conn = self._get_connection()
+        with conn:
+            conn.execute("""
+                INSERT OR IGNORE INTO user_pokedex_capture_history
+                    (user_id, species_id)
+                VALUES (?, ?)
+            """, (user_id, species_id))

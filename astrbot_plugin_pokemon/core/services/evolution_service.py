@@ -58,7 +58,10 @@ class EvolutionService:
                 current_pokemon.nature_id  # 使用原来的性格
             )
 
-            # 6. 写入数据库
+            # 6. 记录原始物种ID到图鉴历史，确保在图鉴中保持"已捕获"状态
+            self.user_pokemon_repo.record_pokedex_capture(user_id, current_pokemon.species_id)
+
+            # 7. 写入数据库
             self.user_pokemon_repo._update_user_pokemon_fields(
                 user_id, pokemon_id,
                 species_id=evolved_species.id,
@@ -79,6 +82,7 @@ class EvolutionService:
                 "original_name": current_pokemon.name,
                 "evolved_name": evolved_species.name_zh,
                 "evolved_species_id": evolved_species.id,
+                "original_species_id": current_pokemon.species_id,  # 添加原始物种ID到返回值
                 "new_stats": new_stats.__dict__
             }
 

@@ -76,6 +76,7 @@ class AdventureResult:
     wild_pokemon: WildPokemonInfo
     location: LocationInfo
     trainer: Optional[BattleTrainer] = None  # 遇到的训练家信息
+    is_pokemon_caught: bool = False  # 该宝可梦物种是否已被用户捕捉过
 
 @dataclass
 class BattleResult:

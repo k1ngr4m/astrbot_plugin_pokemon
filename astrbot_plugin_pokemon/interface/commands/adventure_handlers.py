@@ -136,11 +136,17 @@ class AdventureHandlers:
             )
         else:
             # 遭遇了野生宝可梦
+            if not d.is_pokemon_caught:
+                caught_status = " 🔥未捕捉！"
+                additional_info = "\n\n💡 赶快捕捉它，这可能是一次珍贵的机会！"
+            else:
+                caught_status = " ✅已拥有"
+                additional_info = ""
             message = (
                 f"🌳 在 {d.location.name} 中冒险！\n\n"
-                f"✨ 遇到了野生的 {d.wild_pokemon.name}！\n"
+                f"✨ 遇到了野生的 {d.wild_pokemon.name}{caught_status}！\n"
                 f"等级: {d.wild_pokemon.level}\n"
-                f"{AnswerEnum.ADVENTURE_LOCATION_POKEMON_ENCOUNTERED.value}"
+                f"{AnswerEnum.ADVENTURE_LOCATION_POKEMON_ENCOUNTERED.value}{additional_info}"
             )
 
         yield event.plain_result(message)

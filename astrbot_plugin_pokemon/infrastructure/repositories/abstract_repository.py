@@ -348,6 +348,11 @@ class AbstractUserPokemonRepository(ABC):
     @abstractmethod
     def clear_user_current_trainer_encounter(self, user_id: str) -> None: pass
 
+    # ==========图鉴历史管理==========
+    # 记录用户捕获的宝可梦物种到图鉴历史
+    @abstractmethod
+    def record_pokedex_capture(self, user_id: str, species_id: int) -> None: pass
+
 class AbstractUserItemRepository(ABC):
     """用户物品数据仓储接口"""
     # ==========增==========

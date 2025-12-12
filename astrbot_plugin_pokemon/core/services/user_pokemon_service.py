@@ -55,6 +55,9 @@ class UserPokemonService:
         # 创建用户宝可梦记录，使用模板数据完善实例
         pokemon_new_id = self.user_pokemon_repo.create_user_pokemon(user_id, user_pokemon_info)
 
+        # 记录到图鉴历史
+        self.user_pokemon_repo.record_pokedex_capture(user_id, new_pokemon.base_pokemon.id)
+
         # 更新用户的初始选择状态
         pokemon_id = new_pokemon.base_pokemon.id
         self.user_repo.update_init_select(user_id, pokemon_id)
@@ -221,6 +224,8 @@ class UserPokemonService:
         """
         try:
             pid = self.user_pokemon_repo.create_user_pokemon(user_id, pokemon_info)
+            # 记录到图鉴历史
+            self.user_pokemon_repo.record_pokedex_capture(user_id, pokemon_info.species_id)
             return BaseResult(
                 success=True,
                 message=AnswerEnum.USER_POKEMON_CREATED.value,
@@ -241,6 +246,8 @@ class UserPokemonService:
             , nature_id=wild.nature_id
         )
         pid = self.user_pokemon_repo.create_user_pokemon(user_id, info)
+        # 记录到图鉴历史
+        self.user_pokemon_repo.record_pokedex_capture(user_id, wild.species_id)
         return self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
 
     def get_user_pokedex_ids(self, user_id: str) -> BaseResult[dict]:
