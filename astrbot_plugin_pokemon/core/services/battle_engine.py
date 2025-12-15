@@ -469,66 +469,177 @@ class BattleLogic:
         if not is_struggle:
             self._deduct_pp(attacker, move)
 
-        # E. 计算结果 (Calculate)
+        # E. 计算结果 (Calculate) - 需要处理连续攻击逻辑
         # 此步骤只计算数据，不修改任何状态
         if logger_obj.should_log_details():
             logger.info(f"[DEBUG] 开始计算招式结果: {move.move_name}")
-        outcome = self._calculate_move_outcome(attacker, defender, move)
-        if logger_obj.should_log_details():
-            logger.info(f"[DEBUG] 招式结果计算完成: 伤害={outcome.damage}, 命中={not outcome.missed}, 暴击={outcome.is_crit}, 效果={outcome.effectiveness}x")
 
-        # F. 应用结果 (Apply)
+        # 检查是否是连续攻击技能
+        if move.min_hits > 1 or move.max_hits > 1:
+            # 连续攻击逻辑
+            total_damage_dealt = 0
+            hits_to_perform = self._calculate_hits_to_perform(move)
+            hits_landed = 0
+            move_missed = False
+            outcome = None  # 初始化outcome变量
+            first_outcome = None  # 初始化first_outcome变量
 
-        # 1. 命中判定
-        if outcome.missed:
-            # 只有非OHKO的未命中才显示"没有击中"
-            # OHKO的未命中在meta_effects里处理了
-            if move.meta_category_id != 9:
-                logger_obj.log("没有击中目标！\n\n")
+            # 第一次攻击使用正常命中判定，后续攻击默认命中
+            first_outcome = self._calculate_move_outcome(attacker, defender, move, bypass_accuracy=False)
 
-        # 2. 伤害判定 (如果有伤害)
-        if outcome.damage > 0:
+            if first_outcome.missed:
+                # 如果第一次攻击未命中，整个连续攻击失败
+                move_missed = True
+                if move.meta_category_id != 9:
+                    logger_obj.log("没有击中目标！\n\n")
+            else:
+                # 依次进行所有攻击
+                for hit_i in range(hits_to_perform):
+                    # 对于连续攻击，只有第一次攻击需要进行命中判定，后续攻击默认命中
+                    bypass_accuracy = (hit_i > 0)
+                    outcome = self._calculate_move_outcome(attacker, defender, move, bypass_accuracy=bypass_accuracy)
+
+                    # 如果第一次就miss了，不应该进入这个循环
+                    if hit_i == 0 and outcome.missed:
+                        move_missed = True
+                        break
+
+                    # 如果后续攻击miss了（虽然概率很低），跳过这次攻击
+                    if outcome.missed:
+                        continue
+
+                    # 检查是否击倒目标，如果击倒则停止后续攻击
+                    if defender.current_hp - outcome.damage <= 0:
+                        # 造成这次伤害并击倒对手
+                        defender.current_hp -= outcome.damage
+                        hits_landed += 1
+                        total_damage_dealt += outcome.damage
+                        # 检查是否需要在击倒前记录伤害
+                        if logger_obj.should_log_details():
+                            logger.info(f"[DEBUG] 连击在第{hit_i+1}次攻击后击倒对手，累计造成 {total_damage_dealt} 点伤害")
+                        break
+                    else:
+                        # 造成伤害
+                        defender.current_hp -= outcome.damage
+                        hits_landed += 1
+                        total_damage_dealt += outcome.damage
+                        if logger_obj.should_log_details():
+                            logger.info(f"[DEBUG] 连击第{hit_i+1}次攻击造成 {outcome.damage} 点伤害")
+
+            # 统一显示结果
+            if not move_missed:
+                if total_damage_dealt > 0:
+                    # 记录最后一次攻击的暴击和效果状态
+                    if logger_obj.should_log_details():
+                        logger.info(f"[DEBUG] 连续攻击总共造成 {total_damage_dealt} 点伤害")
+                    logger_obj.log(f"击中了 {hits_landed} 次！造成总计 {total_damage_dealt} 点伤害。\n\n")
+
+                    # 显示暴击和效果拔群提示（基于最后一次攻击）
+                    if outcome and outcome.is_crit:
+                        logger_obj.log("击中要害！\n\n")
+                        if logger_obj.should_log_details():
+                            logger.info("[DEBUG] 触发暴击")
+                    if outcome and outcome.effectiveness > 1.0:
+                        logger_obj.log("效果绝佳！\n\n")
+                        if logger_obj.should_log_details():
+                            logger.info("[DEBUG] 效果绝佳")
+                    elif outcome and outcome.effectiveness == 0.0:
+                        logger_obj.log("似乎没有效果！\n\n")
+                        if logger_obj.should_log_details():
+                            logger.info("[DEBUG] 技能对目标无效")
+                    elif outcome and outcome.effectiveness < 1.0:
+                        logger_obj.log("效果不佳！\n\n")
+                        if logger_obj.should_log_details():
+                            logger.info("[DEBUG] 效果不佳")
+                else:
+                    if hits_landed > 0:
+                        # 如果命中了但是没有造成伤害（例如对钢系宝可梦使用地面系技能）
+                        logger_obj.log(f"击中了 {hits_landed} 次！\n\n")
+                    else:
+                        if move.meta_category_id != 9:
+                            logger_obj.log("没有击中目标！\n\n")
+        else:
+            # 传统单次攻击逻辑
+            outcome = self._calculate_move_outcome(attacker, defender, move)
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 造成伤害: {outcome.damage} 点, 防御方HP从 {defender.current_hp} 变为 {max(0, defender.current_hp - outcome.damage)}")
+                logger.info(f"[DEBUG] 招式结果计算完成: 伤害={outcome.damage}, 命中={not outcome.missed}, 暴击={outcome.is_crit}, 效果={outcome.effectiveness}x")
 
-            defender.current_hp -= outcome.damage
-            if is_struggle:
-                logger_obj.log(f"{attacker.context.pokemon.name} 使用了挣扎！（PP耗尽）\n\n")
-            logger_obj.log(f"造成 {outcome.damage} 点伤害。\n\n")
+            # F. 应用结果 (Apply)
 
-            # 效果拔群等提示
-            if outcome.is_crit:
-                logger_obj.log("击中要害！\n\n")
+            # 1. 命中判定
+            if outcome.missed:
+                # 只有非OHKO的未命中才显示"没有击中"
+                # OHKO的未命中在meta_effects里处理了
+                if move.meta_category_id != 9:
+                    logger_obj.log("没有击中目标！\n\n")
+
+            # 2. 伤害判定 (如果有伤害)
+            if outcome.damage > 0:
                 if logger_obj.should_log_details():
-                    logger.info("[DEBUG] 触发暴击")
-            if outcome.effectiveness > 1.0:
-                logger_obj.log("效果绝佳！\n\n")
-                if logger_obj.should_log_details():
-                    logger.info("[DEBUG] 效果绝佳")
-            elif outcome.effectiveness == 0.0:
-                logger_obj.log("似乎没有效果！\n\n")
-                if logger_obj.should_log_details():
-                    logger.info("[DEBUG] 技能对目标无效")
-            elif outcome.effectiveness < 1.0:
-                logger_obj.log("效果不佳！\n\n")
-                if logger_obj.should_log_details():
-                    logger.info("[DEBUG] 效果不佳")
+                    logger.info(f"[DEBUG] 造成伤害: {outcome.damage} 点, 防御方HP从 {defender.current_hp} 变为 {max(0, defender.current_hp - outcome.damage)}")
+
+                defender.current_hp -= outcome.damage
+                if is_struggle:
+                    logger_obj.log(f"{attacker.context.pokemon.name} 使用了挣扎！（PP耗尽）\n\n")
+                logger_obj.log(f"造成 {outcome.damage} 点伤害。\n\n")
+
+                # 效果拔群等提示
+                if outcome.is_crit:
+                    logger_obj.log("击中要害！\n\n")
+                    if logger_obj.should_log_details():
+                        logger.info("[DEBUG] 触发暴击")
+                if outcome.effectiveness > 1.0:
+                    logger_obj.log("效果绝佳！\n\n")
+                    if logger_obj.should_log_details():
+                        logger.info("[DEBUG] 效果绝佳")
+                elif outcome.effectiveness == 0.0:
+                    logger_obj.log("似乎没有效果！\n\n")
+                    if logger_obj.should_log_details():
+                        logger.info("[DEBUG] 技能对目标无效")
+                elif outcome.effectiveness < 1.0:
+                    logger_obj.log("效果不佳！\n\n")
+                    if logger_obj.should_log_details():
+                        logger.info("[DEBUG] 效果不佳")
 
         # 3. 应用特效 (Meta Effects)
         # 包括：异常状态、能力变化、回复、吸血、反伤、一击必杀
+        # 对于连续攻击技能，只在第一次命中时应用特效（通常是只触发一次的异常状态或能力变化）
         if logger_obj.should_log_details():
-            logger.info(f"[DEBUG] 开始应用特效: {len(outcome.meta_effects)} 个效果")
+            # 只有在outcome存在时才记录特效数量
+            if 'outcome' in locals() and outcome is not None:
+                logger.info(f"[DEBUG] 开始应用特效: {len(outcome.meta_effects)} 个效果")
+            elif move.min_hits > 1 or move.max_hits > 1:
+                # 对于连续攻击，我们用first_outcome来记录特效
+                logger.info(f"[DEBUG] 开始应用特效: {len(first_outcome.meta_effects)} 个效果")
+                self._log_meta_effects(attacker, defender, first_outcome.meta_effects, logger_obj)
+                self._apply_meta_effect_changes(attacker, defender, first_outcome.meta_effects)
+            else:
+                logger.info("[DEBUG] 开始应用特效: 0 个效果")
 
-        self._log_meta_effects(attacker, defender, outcome.meta_effects, logger_obj)
-        self._apply_meta_effect_changes(attacker, defender, outcome.meta_effects)
+        # 只在非连续攻击技能或连续攻击的第一次命中时应用特效
+        # 连续攻击技能通常只有第一次攻击能触发异常状态
+        if 'outcome' in locals() and outcome is not None:
+            if move.min_hits == 1 and move.max_hits == 1 or (move.min_hits > 1 or move.max_hits > 1):
+                # 为连续攻击技能只应用一次特效（在第一次命中时）
+                self._log_meta_effects(attacker, defender, outcome.meta_effects, logger_obj)
+                self._apply_meta_effect_changes(attacker, defender, outcome.meta_effects)
+        elif 'first_outcome' in locals() and first_outcome is not None and (move.min_hits > 1 or move.max_hits > 1):
+            # 对于连续攻击，应用第一次攻击的特效
+            self._log_meta_effects(attacker, defender, first_outcome.meta_effects, logger_obj)
+            self._apply_meta_effect_changes(attacker, defender, first_outcome.meta_effects)
 
         if logger_obj.should_log_details():
-            # 记录属性变化
-            if any(e.get('type') == 'stat_change' for e in outcome.meta_effects):
-                logger.info(f"[DEBUG] 应用属性变化后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
+            # 记录属性变化 - 只在outcome存在时检查
+            if 'outcome' in locals() and outcome is not None:
+                if any(e.get('type') == 'stat_change' for e in outcome.meta_effects):
+                    logger.info(f"[DEBUG] 应用属性变化后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
+            elif 'first_outcome' in locals() and first_outcome is not None:
+                if any(e.get('type') == 'stat_change' for e in first_outcome.meta_effects):
+                    logger.info(f"[DEBUG] 应用属性变化后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
 
         # 4. 应用额外属性变化 (Residual Stat Changes)
         # 处理那些虽然是攻击技能，但带有额外属性变化的情况
+        # 连续攻击技能通常只有第一次攻击能触发额外属性变化
         if move.move_id > 0 and move.stat_changes and move.meta_category_id not in [2, 6, 7]:
             if logger_obj.should_log_details():
                 logger.info(f"[DEBUG] 应用额外属性变化 - 技能 {move.move_name} 的 stat_changes: {move.stat_changes}")
@@ -575,12 +686,12 @@ class BattleLogic:
     # --- 4. 计算层 (业务逻辑) ---
 
     def _calculate_move_outcome(self, attacker: BattleState, defender: BattleState,
-                                move: BattleMoveInfo) -> MoveOutcome:
+                                move: BattleMoveInfo, bypass_accuracy: bool = False) -> MoveOutcome:
         """核心计算函数：计算伤害和生成特效"""
         outcome = MoveOutcome()
 
-        # 1. 命中判定 (OHKO 除外)
-        if move.meta_category_id != 9:
+        # 1. 命中判定 (OHKO 除外) - 如果 bypass_accuracy 为 True，则跳过命中判定
+        if move.meta_category_id != 9 and not bypass_accuracy:
             if random.random() * 100 > move.accuracy:
                 outcome.missed = True
                 return outcome
@@ -696,6 +807,41 @@ class BattleLogic:
 
         return final_dmg, eff, is_crit
 
+    def _calculate_hits_to_perform(self, move: BattleMoveInfo) -> int:
+        """
+        计算连续攻击技能的实际攻击次数
+        实现宝可梦游戏中的攻击次数概率分布：
+        - 如果 min_hits == max_hits，则总是该数值（如二连踢总是2次）
+        - 如果 min_hits=2, max_hits=5，则按照宝可梦机制分配概率：
+          2次: ~33.33%, 3次: ~33.33%, 4次: ~16.67%, 5次: ~16.67%
+        """
+        min_hits = move.min_hits if move.min_hits > 0 else 1
+        max_hits = move.max_hits if move.max_hits > 0 else 1
+
+        if min_hits == max_hits:
+            # 固定攻击次数
+            return min_hits
+        else:
+            # 使用宝可梦中的概率分布（例如乱击、飞弹针等）
+            # 简单实现：在 min_hits 和 max_hits 之间均匀分布
+            # 更真实的实现：根据宝可梦世代，通常是偏向较小次数的分布
+            if min_hits == 2 and max_hits == 5:
+                # 为2-5次的攻击实现更接近原版游戏的概率
+                # 在实际游戏中，这个分布可能更复杂，这里使用一个简化的分布：
+                # 2: 33.33%, 3: 33.33%, 4: 16.67%, 5: 16.67%
+                rand_val = random.random()
+                if rand_val < 0.3333:
+                    return 2
+                elif rand_val < 0.6666:
+                    return 3
+                elif rand_val < 0.8333:
+                    return 4
+                else:
+                    return 5
+            else:
+                # 对于其他范围，使用均匀分布
+                return random.randint(min_hits, max_hits)
+
     def _gen_ailment_effect(self, target: BattleState, move: BattleMoveInfo, force_status_id=None) -> List[Dict]:
         """生成异常状态效果"""
         chance = move.ailment_chance if move.ailment_chance > 0 else 100
@@ -782,8 +928,8 @@ class BattleLogic:
             if attacker.current_pps[idx] > 0:
                 attacker.current_pps[idx] -= 1
                 # 添加调试日志
-                if hasattr(logger, 'info'):
-                    logger.info(f"[DEBUG] PP消耗: {attacker.context.pokemon.name}的{move.move_name} PP从 {old_pp} 变为 {attacker.current_pps[idx]}")
+                # if hasattr(logger, 'info'):
+                #     logger.info(f"[DEBUG] PP消耗: {attacker.context.pokemon.name}的{move.move_name} PP从 {old_pp} 变为 {attacker.current_pps[idx]}")
         except ValueError:
             pass
 
@@ -1283,7 +1429,7 @@ class BattleLogic:
 
         # Cat 10-13: 场地/全场/特殊
         elif cat_id in [10, 11, 12, 13]:
-            score += 15.0  # 简单的战术加分
+            score -= 100.0  # 先不使用这些技能
 
         # --- 额外检查：对于两回合技能的特殊评分 ---
         # 检查是否是两回合技能，如果是第一回合，则考虑整体战略价值

@@ -379,6 +379,9 @@ class AdventureService:
                     ailment_chance = int(m_data.get('ailment_chance', 0) or 0)
                     meta_ailment_id = int(m_data.get('meta_ailment_id', 0) or 0)
                     healing = float(m_data.get('healing', 0.0) or 0.0)
+                    # 获取连续攻击字段
+                    min_hits = int(m_data.get('min_hits', 1) or 1)
+                    max_hits = int(m_data.get('max_hits', 1) or 1)
                     # 预加载技能的属性变化数据
                     stat_changes = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
 
@@ -402,7 +405,9 @@ class AdventureService:
                         meta_ailment_id=meta_ailment_id,
                         healing=healing,
                         stat_chance=stat_chance,
-                        drain=drain
+                        drain=drain,
+                        min_hits=min_hits,
+                        max_hits=max_hits
                     ))
         logger.info(f"[DEBUG] 招式详情：{loaded_moves}")
 

@@ -31,6 +31,9 @@ class BattleMoveInfo:
     healing: float = 0.0  # 技能回复量，正数为回复，负数为消耗
     stat_chance: float = 0.0  # 能力变化触发概率
     drain: float = 0.0  # 吸收伤害比例（百分比），用于吸血技能
+    # 新增：连续攻击字段
+    min_hits: int = 1  # 最少攻击次数
+    max_hits: int = 1  # 最多攻击次数
 
 
 
