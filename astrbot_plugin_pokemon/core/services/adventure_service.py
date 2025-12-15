@@ -328,7 +328,20 @@ class AdventureService:
                     "details": log_data
                 })
 
-            # 检查对手宝可梦是否被击败
+            # 检查战斗结束条件 BEFORE updating indices
+            if battle_type == 'wild':
+                # 野生对战：对手被击败即胜利
+                # 使用对手战斗上下文的 current_hp，因为 WildPokemonInfo 没有 current_hp 属性
+                if opponent_ctx.current_hp <= 0:
+                    battle_result_str = "success"
+                    break
+            else:
+                # 训练家对战：所有对手被击败才胜利
+                if opponent_idx >= len(opponent_contexts):
+                    battle_result_str = "success"
+                    break
+
+            # 检查对手宝可梦是否被击败 (using battle context HP which is properly updated)
             if opponent_ctx.current_hp <= 0:
                 # 对手宝可梦被击败，对方下一只上场
                 opponent_idx += 1
@@ -338,18 +351,6 @@ class AdventureService:
             else:
                 # 我方战败，下一只上场
                 current_idx += 1
-
-            # 检查战斗结束条件
-            if battle_type == 'wild':
-                # 野生对战：对手被击败即胜利
-                if opponent_list[0].stats.hp <= 0:  # 对于野生对战，opponent_list 是包含单个元素的列表
-                    battle_result_str = "success"
-                    break
-            else:
-                # 训练家对战：所有对手被击败才胜利
-                if opponent_idx >= len(opponent_contexts):
-                    battle_result_str = "success"
-                    break
 
         # 计算最终胜率
         final_u_rate, final_w_rate = 0.0, 100.0

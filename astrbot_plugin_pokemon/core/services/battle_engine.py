@@ -896,10 +896,10 @@ class BattleLogic:
                     target.stat_levels[sid] = new_val
 
                     # 添加调试日志
-                    if hasattr(target, 'context') and hasattr(target.context.pokemon, 'name'):
-                        if target.context.pokemon.name:  # 确保name存在
-                            stat_name = self.STAT_NAMES.get(sid, f"未知属性({sid})")
-                            logger.info(f"[DEBUG] 属性变化: {target.context.pokemon.name}的{stat_name}等级从 {old_level} 变为 {new_val}")
+                    # if hasattr(target, 'context') and hasattr(target.context.pokemon, 'name'):
+                    #     if target.context.pokemon.name:  # 确保name存在
+                    #         stat_name = self.STAT_NAMES.get(sid, f"未知属性({sid})")
+                    #         logger.info(f"[DEBUG] 属性变化: {target.context.pokemon.name}的{stat_name}等级从 {old_level} 变为 {new_val}")
 
             # --- 新增：处理状态附加 ---
             elif etype == "ailment":
