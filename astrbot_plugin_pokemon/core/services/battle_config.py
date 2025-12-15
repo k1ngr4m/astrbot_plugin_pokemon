@@ -8,7 +8,7 @@ class BattleConfigLoader:
 
     def __init__(self, config_path: str = None):
         if config_path is None:
-            config_path = Path(__file__).parent.parent / "config" / "battle_configs.json"
+            config_path = Path(__file__).parent.parent.parent / "config" / "battle_configs.json"
 
         with open(config_path, 'r', encoding='utf-8') as f:
             self.config = json.load(f)

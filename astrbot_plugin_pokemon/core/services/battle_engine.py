@@ -6,7 +6,6 @@ from astrbot.api import logger
 from ..models.adventure_models import BattleContext, BattleMoveInfo
 from .stat_modifier_service import StatModifierService, StatID
 from .battle_config import battle_config
-from .move_strategies import MoveStrategyFactory
 
 
 # --- 基础协议与数据类 ---
@@ -122,9 +121,8 @@ class BattleLogic:
             self.move_service = move_repo
         else:
             self.move_service = None
-        self._struggle_move = self._create_struggle_move()
 
-        # 从配置加载数据
+        # 从配置加载数据（必须在使用这些值之前）
         constants = battle_config.get_constants()
         self.TRAINER_ENCOUNTER_RATE = constants.get("trainer_encounter_rate", 0.3)
         self.CRIT_RATE = constants.get("crit_rate", 0.0625)
@@ -157,6 +155,9 @@ class BattleLogic:
         # 从配置加载技能配置
         self.TWO_TURN_MOVES_CONFIG = battle_config.get_two_turn_moves_config()
         self.PROTECTION_PENETRATION = battle_config.get_protection_penetration()
+
+        # 在所有配置加载完成后创建挣扎技能
+        self._struggle_move = self._create_struggle_move()
 
     def _is_type(self, type_raw: str, target_type_en: str) -> bool:
         """判断输入的类型是否属于目标类型（自动处理中英文映射）"""
@@ -627,6 +628,9 @@ class BattleLogic:
                               outcome: MoveOutcome) -> List[Dict]:
         """根据 meta_category_id 生成特效列表"""
         cat = move.meta_category_id
+
+        # 使用局部导入避免循环导入
+        from .move_strategies import MoveStrategyFactory
 
         # 使用策略模式替代 if-elif 链
         strategy = MoveStrategyFactory.create_strategy(cat)
