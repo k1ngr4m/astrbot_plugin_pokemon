@@ -44,6 +44,18 @@ class BattleContext:
     types: List[str]
     current_hp: int
     is_user: bool
+    # --- 战斗状态字段 ---
+    # 能力等级变化
+    stat_levels: Optional[Dict[int, int]] = None
+    # 主要状态异常 (1:麻痹, 2:睡眠, 3:冰冻, 4:灼伤, 5:中毒)
+    non_volatile_status: Optional[int] = None
+    status_turns: int = 0  # 睡眠回合数、剧毒层数等
+    # 挥发性状态 (6:混乱, 18:寄生种子等) - ID -> 剩余回合数
+    volatile_statuses: Optional[Dict[int, int]] = None
+    # 蓄力状态 - 存储技能ID或None
+    charging_move_id: Optional[int] = None
+    # 保护状态 (如 'underground', 'flying', 'diving')
+    protection_status: Optional[str] = None
 
 
 

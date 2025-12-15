@@ -64,8 +64,39 @@ class BattleState:
             context=context,
             current_hp=context.current_hp,
             current_pps=[m.current_pp for m in context.moves],
-            stat_levels={}
+            stat_levels=context.stat_levels.copy() if context.stat_levels else {},
+            non_volatile_status=context.non_volatile_status,
+            status_turns=context.status_turns,
+            volatile_statuses=context.volatile_statuses.copy() if context.volatile_statuses else {},
+            charging_move_id=context.charging_move_id,
+            protection_status=context.protection_status
         )
+
+    def commit_to_context(self):
+        """将 BattleState 的当前状态提交到关联的 BattleContext，确保数据一致性"""
+        # 同步当前HP
+        self.context.current_hp = self.current_hp
+
+        # 同步当前PP
+        for i, move in enumerate(self.context.moves):
+            if i < len(self.current_pps):
+                move.current_pp = self.current_pps[i]
+
+        # 同步能力等级变化
+        self.context.stat_levels = self.stat_levels.copy() if self.stat_levels else {}
+
+        # 同步主要状态异常
+        self.context.non_volatile_status = self.non_volatile_status
+        self.context.status_turns = self.status_turns
+
+        # 同步挥发性状态
+        self.context.volatile_statuses = self.volatile_statuses.copy() if self.volatile_statuses else {}
+
+        # 同步蓄力状态
+        self.context.charging_move_id = self.charging_move_id
+
+        # 同步保护状态
+        self.context.protection_status = self.protection_status
 
 
 @dataclass

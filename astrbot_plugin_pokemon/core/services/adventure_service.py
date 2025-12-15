@@ -216,13 +216,39 @@ class AdventureService:
         Returns:
             tuple: (battle_result_str, battle_log, final_u_rate, final_w_rate, user_pokemon_contexts)
         """
-        user_pokemon_contexts = []
+        # 性能优化：一次性获取所有用户宝可梦的完整信息，避免N次数据库查询
+        # 首先批量获取所有用户宝可梦的基本信息
+        user_pokemon_map = {}
         for pid in user_team_list:
             u_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
+            if u_info and u_info.current_hp > 0:  # 只处理HP>0的宝可梦
+                user_pokemon_map[pid] = u_info
+
+        # 性能优化：一次性获取所有用户宝可梦的技能数据，避免N次数据库查询
+        all_user_move_ids = set()
+        for u_info in user_pokemon_map.values():
+            move_ids = [u_info.moves.move1_id, u_info.moves.move2_id, u_info.moves.move3_id, u_info.moves.move4_id]
+            valid_ids = [m for m in move_ids if m and m > 0]
+            all_user_move_ids.update(valid_ids)
+
+        # 批量获取所有招式数据
+        all_moves_cache = {}
+        all_stat_changes_cache = {}
+        if self.move_repo and all_user_move_ids:
+            all_moves_cache = self.move_repo.get_moves_by_ids(list(all_user_move_ids))
+
+            # 批量获取所有属性变化数据
+            for mid in all_user_move_ids:
+                all_stat_changes_cache[mid] = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
+
+        # 使用缓存数据创建所有战斗上下文
+        user_pokemon_contexts = []
+        for pid in user_team_list:
+            u_info = user_pokemon_map.get(pid)
             if u_info:
-                # 检查宝可梦的当前HP，如果为0则跳过
-                if u_info.current_hp > 0:
-                    user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True))
+                user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True,
+                                                                       all_moves_cache=all_moves_cache,
+                                                                       all_stat_changes_cache=all_stat_changes_cache))
 
         # 检查是否有可用的宝可梦参与战斗
         if not user_pokemon_contexts:
@@ -338,10 +364,11 @@ class AdventureService:
                 break
             ctx = user_pokemon_contexts[i]
             # 更新用户宝可梦的当前HP和当前PP
+            # 通过commit_to_context已经将BattleState的最终状态同步到了BattleContext
             self.user_pokemon_repo._update_user_pokemon_fields(
                 user_id=user_id,
                 pokemon_id=ctx.pokemon.id,
-                current_hp=ctx.pokemon.stats.hp,
+                current_hp=ctx.current_hp,  # 使用战斗后同步的当前HP
                 current_pp1=ctx.moves[0].current_pp if len(ctx.moves) > 0 else 0,
                 current_pp2=ctx.moves[1].current_pp if len(ctx.moves) > 1 else 0,
                 current_pp3=ctx.moves[2].current_pp if len(ctx.moves) > 2 else 0,
@@ -359,7 +386,26 @@ class AdventureService:
                 return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
             user_team_list = user_team_data.team_pokemon_ids
 
-        wild_ctx = self._create_battle_context(wild_pokemon_info, is_user=False)
+        # 性能优化：为野生宝可梦也实现批量查询，避免单独查询
+        # 提取野生宝可梦的技能ID
+        wild_move_ids = [wild_pokemon_info.moves.move1_id, wild_pokemon_info.moves.move2_id,
+                         wild_pokemon_info.moves.move3_id, wild_pokemon_info.moves.move4_id]
+        wild_valid_ids = [m for m in wild_move_ids if m and m > 0]
+
+        # 批量获取野生宝可梦的招式数据
+        wild_moves_cache = {}
+        wild_stat_changes_cache = {}
+        if self.move_repo and wild_valid_ids:
+            wild_moves_cache = self.move_repo.get_moves_by_ids(wild_valid_ids)
+
+            # 批量获取所有属性变化数据
+            for mid in wild_valid_ids:
+                wild_stat_changes_cache[mid] = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
+
+        # 使用缓存数据创建野生宝可梦战斗上下文
+        wild_ctx = self._create_battle_context(wild_pokemon_info, is_user=False,
+                                               all_moves_cache=wild_moves_cache,
+                                               all_stat_changes_cache=wild_stat_changes_cache)
         # 对于野生对战，我们创建一个包含单个对手的列表，这样可以复用通用逻辑
         opponent_contexts = [wild_ctx]
         opponent_list = wild_pokemon_info  # 需要传递实际对象以更新其状态
@@ -411,9 +457,10 @@ class AdventureService:
         )
 
     def _create_battle_context(self, pokemon_info: Union[UserPokemonInfo, WildPokemonInfo],
-                               is_user: bool) -> BattleContext:
+                               is_user: bool, all_moves_cache: Dict[int, Dict[str, Any]] = None,
+                               all_stat_changes_cache: Dict[int, List[Dict[str, Any]]] = None) -> BattleContext:
         types = self.pokemon_repo.get_pokemon_types(pokemon_info.species_id) or ['normal']
-        moves_list = self._preload_moves(pokemon_info)
+        moves_list = self._preload_moves(pokemon_info, all_moves_cache, all_stat_changes_cache)
         # 如果是用户的宝可梦，使用current_hp；如果是野生宝可梦，使用stats.hp
         if isinstance(pokemon_info, UserPokemonInfo):
             current_hp = pokemon_info.current_hp
@@ -424,23 +471,48 @@ class AdventureService:
             moves=moves_list,
             types=types,
             current_hp=current_hp,
-            is_user=is_user
+            is_user=is_user,
+            # 初始化战斗状态字段
+            stat_levels={},
+            non_volatile_status=None,
+            status_turns=0,
+            volatile_statuses={},
+            charging_move_id=None,
+            protection_status=None
         )
 
-    def _preload_moves(self, pokemon: Any) -> List[BattleMoveInfo]:
+    def _preload_moves(self, pokemon: Any, all_moves_cache: Dict[int, Dict[str, Any]] = None,
+                      all_stat_changes_cache: Dict[int, List[Dict[str, Any]]] = None) -> List[BattleMoveInfo]:
         """批量加载宝可梦的所有招式详情，包括预加载的属性变化数据"""
         move_ids = [pokemon.moves.move1_id, pokemon.moves.move2_id, pokemon.moves.move3_id, pokemon.moves.move4_id]
         valid_ids = [m for m in move_ids if m and m > 0]
         loaded_moves = []
 
         if self.move_repo and valid_ids:
-            # 使用批量查询一次性获取所有招式信息
-            moves_data = self.move_repo.get_moves_by_ids(valid_ids)
+            # 如果提供了缓存且不为空，则使用缓存数据，否则进行批量查询
+            if all_moves_cache is not None and all_stat_changes_cache is not None and all_moves_cache and all_stat_changes_cache:
+                # 使用缓存的数据
+                moves_data = {mid: all_moves_cache[mid] for mid in valid_ids if mid in all_moves_cache}
+                all_stat_changes = {mid: all_stat_changes_cache[mid] for mid in valid_ids if mid in all_stat_changes_cache}
 
-            # 为后续获取技能属性变化做准备，批量获取所有相关的属性变化
-            all_stat_changes = {}
-            for mid in valid_ids:
-                all_stat_changes[mid] = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
+                # 检查是否所有需要的技能数据都已缓存，如果没有则进行批量查询补充
+                missing_ids = [mid for mid in valid_ids if mid not in all_moves_cache]
+                if missing_ids:
+                    # 获取未缓存的招式数据并合并
+                    new_moves_data = self.move_repo.get_moves_by_ids(missing_ids)
+                    moves_data.update(new_moves_data)
+
+                    # 获取未缓存的属性变化数据并合并
+                    for mid in missing_ids:
+                        all_stat_changes[mid] = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
+            else:
+                # 使用批量查询一次性获取所有招式信息
+                moves_data = self.move_repo.get_moves_by_ids(valid_ids)
+
+                # 为后续获取技能属性变化做准备，批量获取所有相关的属性变化
+                all_stat_changes = {}
+                for mid in valid_ids:
+                    all_stat_changes[mid] = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
 
             for mid in valid_ids:
                 m_data = moves_data.get(mid)
@@ -538,11 +610,9 @@ class AdventureService:
         
         logger.info("[DEBUG] =====================实战结束=====================")
 
-        # Sync PP back to moves in context (HP is handled by the caller)
-        for i, move in enumerate(user_ctx.moves):
-            move.current_pp = user_state.current_pps[i]
-        for i, move in enumerate(wild_ctx.moves):
-            move.current_pp = wild_state.current_pps[i]
+        # 使用 commit 模式同步状态变化到上下文，确保数据一致性
+        user_state.commit_to_context()
+        wild_state.commit_to_context()
 
         return result, logger_obj.logs, wild_state.current_hp, user_state.current_hp
         # return result, logger_obj.logs, wild_state.current_hp
@@ -756,7 +826,26 @@ class AdventureService:
 
         # 预加载数据
         trainer_pokes = battle_trainer.pokemon_list
-        trainer_contexts = [self._create_battle_context(p, False) for p in trainer_pokes]
+
+        # 性能优化：一次性获取所有训练家宝可梦的技能数据，避免N次数据库查询
+        all_trainer_move_ids = set()
+        for p in trainer_pokes:
+            move_ids = [p.moves.move1_id, p.moves.move2_id, p.moves.move3_id, p.moves.move4_id]
+            valid_ids = [m for m in move_ids if m and m > 0]
+            all_trainer_move_ids.update(valid_ids)
+
+        # 批量获取所有招式数据
+        all_moves_cache = {}
+        all_stat_changes_cache = {}
+        if self.move_repo and all_trainer_move_ids:
+            all_moves_cache = self.move_repo.get_moves_by_ids(list(all_trainer_move_ids))
+
+            # 批量获取所有属性变化数据
+            for mid in all_trainer_move_ids:
+                all_stat_changes_cache[mid] = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
+
+        # 使用缓存数据创建所有战斗上下文
+        trainer_contexts = [self._create_battle_context(p, False, all_moves_cache, all_stat_changes_cache) for p in trainer_pokes]
 
         # 使用通用战斗方法
         battle_result_str, battle_log, final_u_rate, final_w_rate, user_contexts = \
