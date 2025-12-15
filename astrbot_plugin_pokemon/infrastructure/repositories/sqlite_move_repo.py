@@ -270,3 +270,65 @@ class SqliteMoveRepository(AbstractMoveRepository):
         except Exception as e:
             logger.error(f"获取招式能力变化数据失败: {e}")
             return []
+
+    def get_moves_by_ids(self, move_ids: List[int]) -> Dict[int, Dict[str, Any]]:
+        """批量获取招式详细信息"""
+        if not move_ids:
+            return {}
+
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                # 使用参数化查询和 IN 语句进行批量查询
+                placeholders = ','.join('?' for _ in move_ids)
+                cursor.execute(f"""
+                    SELECT m.id, m.name_en, m.name_zh, m.type_id, m.power, m.pp, m.accuracy,
+                           m.priority, m.target_id, m.damage_class_id, m.effect_id, m.effect_chance, m.description,
+                           mm.meta_category_id, mm.meta_ailment_id, mm.min_hits, mm.max_hits, mm.min_turns, mm.max_turns,
+                           mm.drain, mm.healing, mm.crit_rate, mm.ailment_chance, mm.flinch_chance, mm.stat_chance
+                    FROM moves m
+                    JOIN move_meta mm ON m.id = mm.move_id
+                    WHERE m.id IN ({placeholders})
+                """, move_ids)
+                rows = cursor.fetchall()
+
+                # 构建结果字典，键为 move_id
+                result = {}
+                for row in rows:
+                    # 获取招式类型名称
+                    cursor.execute("SELECT name_en FROM pokemon_types WHERE id = ?", (row[3],))  # type_id
+                    type_row = cursor.fetchone()
+                    type_name = type_row[0] if type_row else "normal"
+
+                    result[row[0]] = {  # row[0] is move.id
+                        "id": row[0],
+                        "name_en": row[1],
+                        "name_zh": row[2],
+                        "type_name": type_name.lower(),
+                        "power": row[4] if row[4] is not None else 0,
+                        "pp": row[5] if row[5] is not None else 1,
+                        "accuracy": row[6] if row[6] is not None else 100,
+                        "priority": row[7] if row[7] is not None else 0,
+                        "target_id": row[8],
+                        "damage_class_id": row[9],
+                        "effect_id": row[10],
+                        "effect_chance": row[11],
+                        "description": row[12],
+                        "meta_category_id": row[13],
+                        "meta_ailment_id": row[14],
+                        "min_hits": row[15],
+                        "max_hits": row[16],
+                        "min_turns": row[17],
+                        "max_turns": row[18],
+                        "drain": row[19],
+                        "healing": row[20],
+                        "crit_rate": row[21],
+                        "ailment_chance": row[22],
+                        "flinch_chance": row[23],
+                        "stat_chance": row[24],
+                    }
+
+                return result
+        except Exception as e:
+            logger.error(f"批量获取招式详细信息失败: {e}")
+            return {}

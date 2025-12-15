@@ -726,7 +726,9 @@ class BattleLogic:
 
         # Cat 2: Stat Raise (纯提升)
         elif cat == 2:
-            effects.extend(self._gen_stat_change_effect(attacker, move, default_target="user"))
+            # 根据 move.target_id 来决定能力变化的目标
+            target_for_stat_change = self._get_target_by_target_id(attacker, defender, move.target_id)
+            effects.extend(self._gen_stat_change_effect(target_for_stat_change, move, default_target="user"))
 
         # Cat 3: Heal (回复/自残)
         elif cat == 3:
@@ -775,6 +777,72 @@ class BattleLogic:
             effects.append({"type": map_type.get(cat, "unique"), "effect": "active"})
 
         return effects
+
+    def _get_target_by_target_id(self, attacker: BattleState, defender: BattleState, target_id: int) -> BattleState:
+        """
+        根据move.target_id来决定能力变化的目标
+        完整的target_id列表：
+        0: 未知（默认返回攻击者）
+        1: specific-move (特定招式，通常指对手)
+        2: selected-pokemon-me-first (选择的宝可梦，优先选择我方)
+        3: ally (队友)
+        4: users-field (使用者场地)
+        5: user-or-ally (使用者或队友)
+        6: opponents-field (对手场地)
+        7: user (使用者)
+        8: random-opponent (随机对手)
+        9: all-other-pokemon (其他所有宝可梦)
+        10: selected-pokemon (选择的宝可梦)
+        11: all-opponents (所有对手)
+        12: entire-field (整个场地)
+        13: user-and-allies (使用者和队友)
+        14: all-pokemon (所有宝可梦)
+        15: all-allies (所有队友)
+        16: fainting-pokemon (濒死宝可梦)
+        """
+        if target_id == 0:
+            # 未知，默认返回使用者
+            return attacker
+        elif target_id == 1:
+            # specific-move，通常指对手
+            return defender
+        elif target_id == 2:
+            # selected-pokemon-me-first，优先选择我方，返回使用者
+            return attacker
+        elif target_id == 3:
+            # ally，队友，返回使用者（单打模式下通常指使用者自己）
+            return attacker
+        elif target_id == 4:
+            # users-field，使用者场地，返回使用者
+            return attacker
+        elif target_id == 5:
+            # user-or-ally，返回使用者
+            return attacker
+        elif target_id == 6:
+            # opponents-field，对手场地，返回对手
+            return defender
+        elif target_id == 7:
+            # user，使用者
+            return attacker
+        elif target_id == 8:
+            # random-opponent，随机对手，返回对手
+            return defender
+        elif target_id == 10:
+            # selected-pokemon，通常返回对手
+            return defender
+        elif target_id == 11:
+            # all-opponents，所有对手，返回对手作为代表
+            return defender
+        elif target_id in [9, 12, 13, 14, 15]:
+            # all-other-pokemon, entire-field, user-and-allies, all-pokemon, all-allies -
+            # 这些是群体效果，返回使用者作为代表
+            return attacker
+        elif target_id == 16:
+            # fainting-pokemon，濒死宝可梦，通常是对手
+            return defender
+        else:
+            # 对于未定义的target_id，默认返回使用者
+            return attacker
 
     # --- 5. 辅助逻辑 (Helpers) ---
 
@@ -895,6 +963,7 @@ class BattleLogic:
                         "target_obj": target  # 引用目标对象以便 execute 阶段修改
                     })
         return effects
+
 
     def _gen_heal_effect(self, target: BattleState, move: BattleMoveInfo) -> List[Dict]:
         ratio = move.healing
