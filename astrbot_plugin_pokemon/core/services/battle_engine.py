@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from astrbot.api import logger
 from ..models.adventure_models import BattleContext, BattleMoveInfo
 from .stat_modifier_service import StatModifierService, StatID
+from .battle_config import battle_config
+from .move_strategies import MoveStrategyFactory
 
 
 # --- 基础协议与数据类 ---
@@ -113,83 +115,6 @@ class MoveOutcome:
 # --- 核心逻辑类 ---
 
 class BattleLogic:
-    # --- 1. 常量定义 (易维护区) ---
-    TRAINER_ENCOUNTER_RATE = 0.3
-    CRIT_RATE = 0.0625
-    STRUGGLE_MOVE_ID = -1
-    SELF_DESTRUCT_ID = 120
-
-    # --- Target ID 常量定义 ---
-    # 2: Opponent, 8: All Opponents, 9: Random Opponent, 10: Selected, 11: All Opponents, 14: All Pokemon
-    TARGETS_OPPONENT = {2, 8, 9, 10, 11, 14}
-
-    # 3: Selected(User), 4: User, 5: All Users, 7: User(Random), 13: User+Allies, 15: User+Allies
-    TARGETS_USER = {3, 4, 5, 7, 13, 15}
-
-    # 属性映射
-    TYPE_NAME_MAPPING = {
-        '一般': 'normal', 'normal': 'normal', '火': 'fire', 'fire': 'fire',
-        '水': 'water', 'water': 'water', '电': 'electric', 'electric': 'electric',
-        '草': 'grass', 'grass': 'grass', '冰': 'ice', 'ice': 'ice',
-        '格斗': 'fighting', 'fighting': 'fighting', '毒': 'poison', 'poison': 'poison',
-        '地面': 'ground', 'ground': 'ground', '飞行': 'flying', 'flying': 'flying',
-        '超能力': 'psychic', 'psychic': 'psychic', '虫': 'bug', 'bug': 'bug',
-        '岩石': 'rock', 'rock': 'rock', '幽灵': 'ghost', 'ghost': 'ghost',
-        '龙': 'dragon', 'dragon': 'dragon', '恶': 'dark', 'dark': 'dark',
-        '钢': 'steel', 'steel': 'steel', '妖精': 'fairy', 'fairy': 'fairy'
-    }
-
-    # 属性克制表 (完整版建议放在独立JSON或Config文件，此处保留核心)
-    TYPE_CHART = {
-        'normal': {'rock': 0.5, 'ghost': 0.0, 'steel': 0.5},
-        'fire': {'fire': 0.5, 'water': 0.5, 'grass': 2.0, 'ice': 2.0, 'bug': 2.0, 'rock': 0.5, 'dragon': 0.5,
-                 'steel': 2.0},
-        'water': {'fire': 2.0, 'water': 0.5, 'grass': 0.5, 'ground': 2.0, 'rock': 2.0, 'dragon': 0.5},
-        'electric': {'water': 2.0, 'electric': 0.5, 'grass': 0.5, 'ground': 0.0, 'flying': 2.0, 'dragon': 0.5},
-        'grass': {'fire': 0.5, 'water': 2.0, 'grass': 0.5, 'poison': 0.5, 'ground': 2.0, 'flying': 0.5, 'bug': 0.5,
-                  'rock': 2.0, 'dragon': 0.5, 'steel': 0.5},
-        'ice': {'fire': 0.5, 'water': 0.5, 'grass': 2.0, 'ice': 0.5, 'ground': 2.0, 'flying': 2.0, 'dragon': 2.0,
-                'steel': 0.5},
-        'fighting': {'normal': 2.0, 'ice': 2.0, 'poison': 0.5, 'flying': 0.5, 'psychic': 0.5, 'bug': 0.5, 'rock': 2.0,
-                     'ghost': 0.0, 'dark': 2.0, 'steel': 2.0, 'fairy': 0.5},
-        'poison': {'grass': 2.0, 'poison': 0.5, 'ground': 0.5, 'rock': 0.5, 'ghost': 0.5, 'steel': 0.0, 'fairy': 2.0},
-        'ground': {'fire': 2.0, 'electric': 2.0, 'grass': 0.5, 'poison': 2.0, 'flying': 0.0, 'bug': 0.5, 'rock': 2.0,
-                   'steel': 2.0},
-        'flying': {'electric': 0.5, 'grass': 2.0, 'fighting': 2.0, 'bug': 2.0, 'rock': 0.5, 'steel': 0.5},
-        'psychic': {'fighting': 2.0, 'poison': 2.0, 'psychic': 0.5, 'dark': 0.0, 'steel': 0.5},
-        'bug': {'fire': 0.5, 'grass': 2.0, 'fighting': 0.5, 'poison': 0.5, 'flying': 0.5, 'psychic': 2.0, 'ghost': 0.5,
-                'dark': 2.0, 'steel': 0.5, 'fairy': 0.5},
-        'rock': {'fire': 2.0, 'ice': 2.0, 'fighting': 0.5, 'ground': 0.5, 'flying': 2.0, 'bug': 2.0, 'steel': 0.5},
-        'ghost': {'normal': 0.0, 'psychic': 2.0, 'ghost': 2.0, 'dark': 0.5},
-        'dragon': {'dragon': 2.0, 'steel': 0.5, 'fairy': 0.0},
-        'dark': {'fighting': 0.5, 'psychic': 2.0, 'ghost': 2.0, 'dark': 0.5, 'fairy': 0.5},
-        'steel': {'fire': 0.5, 'water': 0.5, 'electric': 0.5, 'ice': 2.0, 'rock': 2.0, 'steel': 0.5, 'fairy': 2.0},
-        'fairy': {'fighting': 2.0, 'poison': 0.5, 'bug': 0.5, 'dragon': 2.0, 'dark': 2.0, 'steel': 0.5}
-    }
-
-    # 状态与异常映射
-    STAT_NAMES = {
-        1: "HP", 2: "攻击", 3: "防御", 4: "特攻", 5: "特防",
-        6: "速度", 7: "命中", 8: "闪避"
-    }
-
-    AILMENT_MAP = {
-        1: "paralysis", 2: "sleep", 3: "freeze", 4: "burn", 5: "poison",
-        6: "confusion", 7: "infatuation", 8: "trap",
-        9: "nightmare", 12: "torment", 13: "disable", 14: "yawn",
-        15: "heal-block", 17: "no-type-immunity", 18: "leech-seed",
-        19: "embargo", 20: "perish-song", 21: "ingrain", 24: "silence", 42: "tar-shot"
-    }
-
-    # 中文状态名称映射
-    AILMENT_CHINESE_MAP = {
-        1: "麻痹", 2: "睡眠", 3: "冰冻", 4: "灼伤", 5: "中毒",
-        6: "混乱", 7: "Infatuation", 8: "陷阱",
-        9: "噩梦", 12: "挑衅", 13: "技能封印", 14: "瞌睡",
-        15: "治疗阻塞", 17: "无类型免疫", 18: "Leech Seed",
-        19: "Embargo", 20: "Perish Song", 21: "Ingrain", 24: "沉默", 42: "Tar Shot"
-    }
-
     def __init__(self, move_repo=None):
         self.stat_modifier_service = StatModifierService()
         self.move_repo = move_repo
@@ -199,90 +124,39 @@ class BattleLogic:
             self.move_service = None
         self._struggle_move = self._create_struggle_move()
 
-        # --- 两回合蓄力技能配置表 ---
-        # key: move_id
-        # msg_charge: 第一回合蓄力时的提示语
-        # msg_release: 第二回合释放后的提示语 (可选)
-        # protect_type: 第一回合获得的保护类型 (underground/flying/diving/bouncing/bounced/None)
-        # stat_boost: 第一回合提升的能力 (可选, 格式同 stat_changes)
-        # turn_2_boost: 第二回合提升的能力 (如大地掌控)
-        # bypass_protect: 第二回合攻击时是否穿透保护 (如暗影潜袭)
-        self.TWO_TURN_MOVES_CONFIG = {
-            19: {  # 飞翔 (Fly)
-                "msg_charge": "飞上了天空！",
-                "msg_release": "从天空中下来了！",
-                "protect_type": "flying"
-            },
-            84: {  # 飞天 (Fly，可能是另一个ID)
-                "msg_charge": "飞到了天上！",
-                "msg_release": "从天空中下来了！",
-                "protect_type": "flying"
-            },
-            76: {  # 日光束 (Solar Beam)
-                "msg_charge": "收集满满的日光！",
-                "msg_release": "发射了光束！"
-            },
-            91: {  # 挖洞 (Dig)
-                "msg_charge": "挖洞潜入了地下！",
-                "msg_release": "从地下钻出来了！",
-                "protect_type": "underground"
-            },
-            90: {  # 潜水 (Dive) - 另一个ID
-                "msg_charge": "潜入了水下！",
-                "msg_release": "从水中浮上来了！",
-                "protect_type": "diving"
-            },
-            130: {  # 火箭头锤 (Skull Bash)
-                "msg_charge": "把头缩进去，防御提高了！",
-                "msg_release": "收回了缩进的头！",
-                "stat_boost": [{'stat_id': 3, 'change': 1}],  # 防御+1
-            },
-            291: { # 潜水 (Dive)
-                "msg_charge": "潜入了水中！",
-                "msg_release": "从水中浮上来了！",
-                "protect_type": "diving"
-            },
-            340: {  # 弹跳 (Bounce)
-                "msg_charge": "弹跳到高高的空中！",
-                "msg_release": "从高空中降落！",
-                "protect_type": "flying"  # 类似飞行
-            },
-            467: { # 暗影潜袭 (Shadow Force)
-                "msg_charge": "消失踪影！",
-                "msg_release": "从阴影中现身！",
-                "protect_type": "vanished",
-                "bypass_protect": True # 可以击中保护
-            },
-            566: { # 潜灵奇袭 (Phantom Force)
-                "msg_charge": "消失在某处！",
-                "msg_release": "从某处现身！",
-                "protect_type": "vanished",
-                "bypass_protect": True
-            },
-            601: { # 大地掌控 (Geomancy)
-                "msg_charge": "吸收能量！",
-                "msg_release": "完成了能量吸收！",
-                # 注意：大地掌控是第二回合加属性，这个比较特殊，可以在通用逻辑里特判
-                "turn_2_boost": [{'stat_id': 4, 'change': 1}, {'stat_id': 5, 'change': 1}, {'stat_id': 6, 'change': 1}] # 特攻+1, 特防+1, 速度+1
-            },
-            669: {  # 日光刃 (Solar Blade)
-                "msg_charge": "收集满满的日光！",
-                "msg_release": "用剑攻击了！"
-            },
-            800: {  # 流星光束 (Meteor Beam)
-                "msg_charge": "聚集宇宙之力，特攻提高了！",
-                "msg_release": "发射了流星光束！",
-                "stat_boost": [{'stat_id': 4, 'change': 1}]  # 特攻+1
-            },
+        # 从配置加载数据
+        constants = battle_config.get_constants()
+        self.TRAINER_ENCOUNTER_RATE = constants.get("trainer_encounter_rate", 0.3)
+        self.CRIT_RATE = constants.get("crit_rate", 0.0625)
+        self.STRUGGLE_MOVE_ID = constants.get("struggle_move_id", -1)
+        self.SELF_DESTRUCT_ID = constants.get("self_destruct_id", 120)
+
+        # 从配置加载属性相关数据
+        self.TYPE_CHART = battle_config.get_type_chart()
+        self.STAT_NAMES = battle_config.get_stat_names()
+        self.AILMENT_MAP = battle_config.get_ailment_map()
+        self.AILMENT_CHINESE_MAP = battle_config.get_ailment_chinese_map()
+
+        # 目标ID映射
+        self.TARGETS_OPPONENT = {2, 8, 9, 10, 11, 14}
+        self.TARGETS_USER = {3, 4, 5, 7, 13, 15}
+
+        # 属性映射
+        self.TYPE_NAME_MAPPING = {
+            '一般': 'normal', 'normal': 'normal', '火': 'fire', 'fire': 'fire',
+            '水': 'water', 'water': 'water', '电': 'electric', 'electric': 'electric',
+            '草': 'grass', 'grass': 'grass', '冰': 'ice', 'ice': 'ice',
+            '格斗': 'fighting', 'fighting': 'fighting', '毒': 'poison', 'poison': 'poison',
+            '地面': 'ground', 'ground': 'ground', '飞行': 'flying', 'flying': 'flying',
+            '超能力': 'psychic', 'psychic': 'psychic', '虫': 'bug', 'bug': 'bug',
+            '岩石': 'rock', 'rock': 'rock', '幽灵': 'ghost', 'ghost': 'ghost',
+            '龙': 'dragon', 'dragon': 'dragon', '恶': 'dark', 'dark': 'dark',
+            '钢': 'steel', 'steel': 'steel', '妖精': 'fairy', 'fairy': 'fairy'
         }
-        # 定义哪些技能可以击中特定的保护状态
-        # key: protect_type, value: list of move_ids that can hit
-        self.PROTECTION_PENETRATION = {
-            "underground": [89, 1000],        # 地震(89)等
-            "flying": [87, 1001],            # 打雷(87)等
-            "diving": [1002],                # 冲浪等
-            "bounced": [89],                 # 弹跳状态被地震击中
-        }
+
+        # 从配置加载技能配置
+        self.TWO_TURN_MOVES_CONFIG = battle_config.get_two_turn_moves_config()
+        self.PROTECTION_PENETRATION = battle_config.get_protection_penetration()
 
     def _is_type(self, type_raw: str, target_type_en: str) -> bool:
         """判断输入的类型是否属于目标类型（自动处理中英文映射）"""
@@ -641,9 +515,13 @@ class BattleLogic:
                 logger.info(f"[DEBUG] 开始应用特效: {len(outcome.meta_effects)} 个效果")
             elif move.min_hits > 1 or move.max_hits > 1:
                 # 对于连续攻击，我们用first_outcome来记录特效
-                logger.info(f"[DEBUG] 开始应用特效: {len(first_outcome.meta_effects)} 个效果")
-                self._log_meta_effects(attacker, defender, first_outcome.meta_effects, logger_obj)
-                self._apply_meta_effect_changes(attacker, defender, first_outcome.meta_effects)
+                # 安全地检查first_outcome是否存在并应用特效
+                if 'first_outcome' in locals() and first_outcome is not None:
+                    logger.info(f"[DEBUG] 开始应用特效: {len(first_outcome.meta_effects)} 个效果")
+                    self._log_meta_effects(attacker, defender, first_outcome.meta_effects, logger_obj)
+                    self._apply_meta_effect_changes(attacker, defender, first_outcome.meta_effects)
+                else:
+                    logger.info("[DEBUG] 开始应用特效: 0 个效果")
             else:
                 logger.info("[DEBUG] 开始应用特效: 0 个效果")
 
@@ -749,65 +627,10 @@ class BattleLogic:
                               outcome: MoveOutcome) -> List[Dict]:
         """根据 meta_category_id 生成特效列表"""
         cat = move.meta_category_id
-        effects = []
 
-        # Cat 1: Ailment (纯异常)
-        if cat == 1:
-            effects.extend(self._gen_ailment_effect(defender, move))
-
-        # Cat 2: Stat Raise (纯提升)
-        elif cat == 2:
-            # 根据 move.target_id 来决定能力变化的目标
-            target_for_stat_change = self._get_target_by_target_id(attacker, defender, move.target_id)
-            effects.extend(self._gen_stat_change_effect(target_for_stat_change, move, default_target="user"))
-
-        # Cat 3: Heal (回复/自残)
-        elif cat == 3:
-            effects.extend(self._gen_heal_effect(attacker, move))
-
-        # Cat 4: Damage + Ailment
-        elif cat == 4:
-            # 只有造成伤害且目标存活时才触发
-            if outcome.damage > 0:  # 简化判定，实际应该看是否被免疫
-                effects.extend(self._gen_ailment_effect(defender, move))
-
-        # Cat 5: Swagger (混乱+提升攻击)
-        elif cat == 5:
-            effects.extend(self._gen_ailment_effect(defender, move, force_status_id=6))  # 混乱
-            # 无论混乱是否命中，通常都会尝试提升能力(依赖具体世代，这里简化为独立触发)
-            effects.extend(self._gen_stat_change_effect(defender, move, default_target="opponent"))
-
-        # Cat 6: Damage + Lower
-        elif cat == 6:
-            effects.extend(self._gen_stat_change_effect(defender, move, default_target="opponent"))
-
-        # Cat 7: Damage + Raise
-        elif cat == 7:
-            effects.extend(self._gen_stat_change_effect(attacker, move, default_target="user"))
-
-        # Cat 8: Damage + Drain (吸血)
-        elif cat == 8:
-            drain_pct = getattr(move, 'drain', 50) or 50
-            heal_amt = int(outcome.damage * (drain_pct / 100.0))
-            if heal_amt > 0:
-                effects.append({"type": "heal", "amount": heal_amt, "from_drain": True, "damage_dealt": outcome.damage})
-
-        # Cat 9: OHKO (一击必杀)
-        elif cat == 9:
-            success, reason = self._check_ohko(attacker, defender, move, outcome.effectiveness)
-            if success:
-                outcome.damage = defender.current_hp  # 覆盖伤害
-                effects.append({"type": "ohko", "success": True})
-            else:
-                outcome.damage = 0
-                effects.append({"type": "ohko", "success": False, "reason": reason})
-
-        # Cat 10-13: 场地等
-        elif cat in [10, 11, 12, 13]:
-            map_type = {10: "field_effect", 11: "terrain", 12: "force_switch", 13: "unique"}
-            effects.append({"type": map_type.get(cat, "unique"), "effect": "active"})
-
-        return effects
+        # 使用策略模式替代 if-elif 链
+        strategy = MoveStrategyFactory.create_strategy(cat)
+        return strategy.execute(attacker, defender, move, outcome, self)
 
     def _get_target_by_target_id(self, attacker: BattleState, defender: BattleState, target_id: int) -> BattleState:
         """

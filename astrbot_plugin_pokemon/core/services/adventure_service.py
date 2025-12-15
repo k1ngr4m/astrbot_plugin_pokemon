@@ -289,16 +289,20 @@ class AdventureService:
 
             # 更新对手状态
             if battle_type == 'wild':
-                # 野生宝可梦：直接更新野生宝可梦信息（opponent_list[0]）
-                opponent_list[0].stats.hp = max(0, rem_opponent_hp)  # 对于野生对战，opponent_list 是包含单个元素的列表
-                opponent_ctx.current_hp = opponent_list[0].stats.hp
+                # 野生宝可梦：更新野生宝可梦信息（opponent_list[0]）的current_hp而不是stats.hp
+                if hasattr(opponent_list[0], 'current_hp'):
+                    opponent_list[0].current_hp = max(0, rem_opponent_hp)
+                opponent_ctx.current_hp = max(0, rem_opponent_hp)  # 更新战斗上下文中的当前HP
             else:
-                # 训练家对战：更新训练家宝可梦列表中的对象
-                opponent_list[opponent_idx].stats.hp = max(0, rem_opponent_hp)
-                opponent_ctx.current_hp = opponent_list[opponent_idx].stats.hp
+                # 训练家对战：更新训练家宝可梦列表中的对象的current_hp而不是stats.hp
+                if hasattr(opponent_list[opponent_idx], 'current_hp'):
+                    opponent_list[opponent_idx].current_hp = max(0, rem_opponent_hp)
+                opponent_ctx.current_hp = max(0, rem_opponent_hp)  # 更新战斗上下文中的当前HP
 
-            user_ctx.pokemon.stats.hp = max(0, rem_user_hp)
-            user_ctx.current_hp = user_ctx.pokemon.stats.hp  # 也要更新上下文中的current_hp以确保一致性
+            user_ctx.current_hp = max(0, rem_user_hp)  # 只更新战斗上下文中的当前HP，不修改基础属性
+            # 同时更新关联的Pokemon对象的current_hp（如果是UserPokemonInfo的话）
+            if hasattr(user_ctx.pokemon, 'current_hp'):
+                user_ctx.pokemon.current_hp = max(0, rem_user_hp)
 
             # 记录战斗日志
             if battle_type == 'wild':

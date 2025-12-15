@@ -1,0 +1,138 @@
+{
+  "type_chart": {
+    "normal": {"rock": 0.5, "ghost": 0.0, "steel": 0.5},
+    "fire": {"fire": 0.5, "water": 0.5, "grass": 2.0, "ice": 2.0, "bug": 2.0, "rock": 0.5, "dragon": 0.5, "steel": 2.0},
+    "water": {"fire": 2.0, "water": 0.5, "grass": 0.5, "ground": 2.0, "rock": 2.0, "dragon": 0.5},
+    "electric": {"water": 2.0, "electric": 0.5, "grass": 0.5, "ground": 0.0, "flying": 2.0, "dragon": 0.5},
+    "grass": {"fire": 0.5, "water": 2.0, "grass": 0.5, "poison": 0.5, "ground": 2.0, "flying": 0.5, "bug": 0.5, "rock": 2.0, "dragon": 0.5, "steel": 0.5},
+    "ice": {"fire": 0.5, "water": 0.5, "grass": 2.0, "ice": 0.5, "ground": 2.0, "flying": 2.0, "dragon": 2.0, "steel": 0.5},
+    "fighting": {"normal": 2.0, "ice": 2.0, "poison": 0.5, "flying": 0.5, "psychic": 0.5, "bug": 0.5, "rock": 2.0, "ghost": 0.0, "dark": 2.0, "steel": 2.0, "fairy": 0.5},
+    "poison": {"grass": 2.0, "poison": 0.5, "ground": 0.5, "rock": 0.5, "ghost": 0.5, "steel": 0.0, "fairy": 2.0},
+    "ground": {"fire": 2.0, "electric": 2.0, "grass": 0.5, "poison": 2.0, "flying": 0.0, "bug": 0.5, "rock": 2.0, "steel": 2.0},
+    "flying": {"electric": 0.5, "grass": 2.0, "fighting": 2.0, "bug": 2.0, "rock": 0.5, "steel": 0.5},
+    "psychic": {"fighting": 2.0, "poison": 2.0, "psychic": 0.5, "dark": 0.0, "steel": 0.5},
+    "bug": {"fire": 0.5, "grass": 2.0, "fighting": 0.5, "poison": 0.5, "flying": 0.5, "psychic": 2.0, "ghost": 0.5, "dark": 2.0, "steel": 0.5, "fairy": 0.5},
+    "rock": {"fire": 2.0, "ice": 2.0, "fighting": 0.5, "ground": 0.5, "flying": 2.0, "bug": 2.0, "steel": 0.5},
+    "ghost": {"normal": 0.0, "psychic": 2.0, "ghost": 2.0, "dark": 0.5},
+    "dragon": {"dragon": 2.0, "steel": 0.5, "fairy": 0.0},
+    "dark": {"fighting": 0.5, "psychic": 2.0, "ghost": 2.0, "dark": 0.5, "fairy": 0.5},
+    "steel": {"fire": 0.5, "water": 0.5, "electric": 0.5, "ice": 2.0, "rock": 2.0, "steel": 0.5, "fairy": 2.0},
+    "fairy": {"fighting": 2.0, "poison": 0.5, "bug": 0.5, "dragon": 2.0, "dark": 2.0, "steel": 0.5}
+  },
+  "stat_names": {
+    "1": "HP", "2": "攻击", "3": "防御", "4": "特攻", "5": "特防", "6": "速度", "7": "命中", "8": "闪避"
+  },
+  "ailment_map": {
+    "1": "paralysis", "2": "sleep", "3": "freeze", "4": "burn", "5": "poison",
+    "6": "confusion", "7": "infatuation", "8": "trap",
+    "9": "nightmare", "12": "torment", "13": "disable", "14": "yawn",
+    "15": "heal-block", "17": "no-type-immunity", "18": "leech-seed",
+    "19": "embargo", "20": "perish-song", "21": "ingrain", "24": "silence", "42": "tar-shot"
+  },
+  "ailment_chinese_map": {
+    "1": "麻痹", "2": "睡眠", "3": "冰冻", "4": "灼伤", "5": "中毒",
+    "6": "混乱", "7": "Infatuation", "8": "陷阱",
+    "9": "噩梦", "12": "挑衅", "13": "技能封印", "14": "瞌睡",
+    "15": "治疗阻塞", "17": "无类型免疫", "18": "Leech Seed",
+    "19": "Embargo", "20": "Perish Song", "21": "Ingrain", "24": "沉默", "42": "Tar Shot"
+  },
+  "two_turn_moves_config": {
+    "19": {
+      "msg_charge": "飞上了天空！",
+      "msg_release": "从天空中下来了！",
+      "protect_type": "flying"
+    },
+    "84": {
+      "msg_charge": "飞到了天上！",
+      "msg_release": "从天空中下来了！",
+      "protect_type": "flying"
+    },
+    "76": {
+      "msg_charge": "收集满满的日光！",
+      "msg_release": "发射了光束！"
+    },
+    "91": {
+      "msg_charge": "挖洞潜入了地下！",
+      "msg_release": "从地下钻出来了！",
+      "protect_type": "underground"
+    },
+    "90": {
+      "msg_charge": "潜入了水下！",
+      "msg_release": "从水中浮上来了！",
+      "protect_type": "diving"
+    },
+    "130": {
+      "msg_charge": "把头缩进去，防御提高了！",
+      "msg_release": "收回了缩进的头！",
+      "stat_boost": [{"stat_id": 3, "change": 1}]
+    },
+    "291": {
+      "msg_charge": "潜入了水中！",
+      "msg_release": "从水中浮上来了！",
+      "protect_type": "diving"
+    },
+    "340": {
+      "msg_charge": "弹跳到高高的空中！",
+      "msg_release": "从高空中降落！",
+      "protect_type": "flying"
+    },
+    "467": {
+      "msg_charge": "消失踪影！",
+      "msg_release": "从阴影中现身！",
+      "protect_type": "vanished",
+      "bypass_protect": true
+    },
+    "566": {
+      "msg_charge": "消失在某处！",
+      "msg_release": "从某处现身！",
+      "protect_type": "vanished",
+      "bypass_protect": true
+    },
+    "601": {
+      "msg_charge": "吸收能量！",
+      "msg_release": "完成了能量吸收！",
+      "turn_2_boost": [{"stat_id": 4, "change": 1}, {"stat_id": 5, "change": 1}, {"stat_id": 6, "change": 1}]
+    },
+    "669": {
+      "msg_charge": "收集满满的日光！",
+      "msg_release": "用剑攻击了！"
+    },
+    "800": {
+      "msg_charge": "聚集宇宙之力，特攻提高了！",
+      "msg_release": "发射了流星光束！",
+      "stat_boost": [{"stat_id": 4, "change": 1}]
+    }
+  },
+  "protection_penetration": {
+    "underground": [89, 1000],
+    "flying": [87, 1001],
+    "diving": [1002],
+    "bounced": [89]
+  },
+  "constants": {
+    "trainer_encounter_rate": 0.3,
+    "crit_rate": 0.0625,
+    "struggle_move_id": -1,
+    "self_destruct_id": 120
+  },
+  "target_id_mapping": {
+    "0": {"description": "未知（默认返回攻击者）", "default_target": "attacker"},
+    "1": {"description": "specific-move (特定招式，通常指对手)", "default_target": "defender"},
+    "2": {"description": "selected-pokemon-me-first (选择的宝可梦，优先选择我方)", "default_target": "attacker"},
+    "3": {"description": "ally (队友)", "default_target": "attacker"},
+    "4": {"description": "users-field (使用者场地)", "default_target": "attacker"},
+    "5": {"description": "user-or-ally (使用者或队友)", "default_target": "attacker"},
+    "6": {"description": "opponents-field (对手场地)", "default_target": "defender"},
+    "7": {"description": "user (使用者)", "default_target": "attacker"},
+    "8": {"description": "random-opponent (随机对手)", "default_target": "defender"},
+    "9": {"description": "all-other-pokemon (其他所有宝可梦)", "default_target": "attacker"},
+    "10": {"description": "selected-pokemon (选择的宝可梦)", "default_target": "defender"},
+    "11": {"description": "all-opponents (所有对手)", "default_target": "defender"},
+    "12": {"description": "entire-field (整个场地)", "default_target": "attacker"},
+    "13": {"description": "user-and-allies (使用者和队友)", "default_target": "attacker"},
+    "14": {"description": "all-pokemon (所有宝可梦)", "default_target": "attacker"},
+    "15": {"description": "all-allies (所有队友)", "default_target": "attacker"},
+    "16": {"description": "fainting-pokemon (濒死宝可梦)", "default_target": "defender"}
+  }
+  }
+}
