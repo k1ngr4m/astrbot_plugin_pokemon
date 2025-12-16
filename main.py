@@ -7,7 +7,7 @@ from astrbot.api import logger, AstrBotConfig
 from .astrbot_plugin_pokemon.core.container import GameContainer
 
 from .astrbot_plugin_pokemon.infrastructure.database.migration import run_migrations
-from .astrbot_plugin_pokemon.core.services.data_setup_service import DataSetupService
+from .astrbot_plugin_pokemon.core.services import DataSetupService
 
 from .astrbot_plugin_pokemon.interface.commands.common_handlers import CommonHandlers
 from .astrbot_plugin_pokemon.interface.commands.pokemon_handlers import PokemonHandlers

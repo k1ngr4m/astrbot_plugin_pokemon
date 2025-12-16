@@ -1,15 +1,8 @@
-from ..core.services.user_pokemon_service import UserPokemonService
-from ..core.services.pokemon_service import PokemonService
-from ..core.services.team_service import TeamService
-from ..core.services.adventure_service import AdventureService
-from ..core.services.exp_service import ExpService
-from ..core.services.user_service import UserService
-from ..core.services.item_service import ItemService
-from ..core.services.shop_service import ShopService
-from ..core.services.move_service import MoveService
-from ..core.services.evolution_service import EvolutionService
-from ..core.services.nature_service import NatureService
-from ..core.services.trainer_service import TrainerService
+from ..core.services import (
+    UserPokemonService, PokemonService, TeamService, AdventureService,
+    ExpService, UserService, ItemService, ShopService, MoveService,
+    EvolutionService, NatureService, TrainerService
+)
 
 from ..infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
 from ..infrastructure.repositories.sqlite_nature_repo import SqliteNatureRepository

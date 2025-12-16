@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
-from ..models.adventure_models import BattleMoveInfo, BattleContext
+from ...models.adventure_models import BattleMoveInfo, BattleContext
 from .battle_engine import BattleState, MoveOutcome, StatModifierService
 from .battle_config import battle_config
 

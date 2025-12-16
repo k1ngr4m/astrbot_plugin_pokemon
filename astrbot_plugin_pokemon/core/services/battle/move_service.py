@@ -1,7 +1,7 @@
 from typing import Dict, Any, List, Optional
 
-from ...infrastructure.repositories.abstract_repository import AbstractMoveRepository
-from ..models.common_models import BaseResult
+from ....infrastructure.repositories.abstract_repository import AbstractMoveRepository
+from ...models.common_models import BaseResult
 
 
 class MoveService:

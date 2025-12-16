@@ -3,23 +3,23 @@ import random
 from typing import Dict, Any, List, Tuple, Optional, Union
 from dataclasses import dataclass, replace
 
-from . import user_pokemon_service
-from .exp_service import ExpService
-from .pokemon_service import PokemonService
-from ..models.common_models import BaseResult
-from ...interface.response.answer_enum import AnswerEnum
-from ..models.pokemon_models import (
+from ..player import user_pokemon_service
+from ..mechanics.exp_service import ExpService
+from ..mechanics.pokemon_service import PokemonService
+from ...models.common_models import BaseResult
+from ....interface.response.answer_enum import AnswerEnum
+from ...models.pokemon_models import (
     WildPokemonInfo, PokemonStats, PokemonIVs, PokemonEVs,
     UserPokemonInfo, WildPokemonEncounterLog, PokemonMoves
 )
-from ..models.trainer_models import BattleTrainer
-from ..models.user_models import UserTeam, UserItems
-from ...infrastructure.repositories.abstract_repository import (
+from ...models.trainer_models import BattleTrainer
+from ...models.user_models import UserTeam, UserItems
+from ....infrastructure.repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository,
     AbstractUserPokemonRepository, AbstractBattleRepository, AbstractUserItemRepository, AbstractMoveRepository
 )
-from ..models.adventure_models import AdventureResult, LocationInfo, BattleResult, BattleMoveInfo, BattleContext
-from .battle_engine import BattleLogic, BattleState, ListBattleLogger, NoOpBattleLogger
+from ...models.adventure_models import AdventureResult, LocationInfo, BattleResult, BattleMoveInfo, BattleContext
+from ..battle.battle_engine import BattleLogic, BattleState, ListBattleLogger, NoOpBattleLogger
 from astrbot.api import logger
 
 
@@ -669,7 +669,7 @@ class AdventureService:
             return {"success": False, "message": msg}
 
         # 初始化精灵球计算器
-        from ..models.pokeball_enum import PokeballCalculator
+        from ...models.pokeball_enum import PokeballCalculator
         calculator = PokeballCalculator()
 
         # 处理特殊精灵球逻辑

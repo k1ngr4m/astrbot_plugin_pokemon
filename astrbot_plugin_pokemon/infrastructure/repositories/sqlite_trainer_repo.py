@@ -3,7 +3,7 @@
 import sqlite3
 import threading
 from typing import Optional, List
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.trainer_models import Trainer, TrainerPokemon, TrainerEncounter, TrainerLocation, TrainerDetail
+from ...core.models.trainer_models import Trainer, TrainerPokemon, TrainerEncounter, TrainerLocation, TrainerDetail
 from .abstract_repository import AbstractTrainerRepository
 from ...core.models.pokemon_models import PokemonSpecies
 

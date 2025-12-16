@@ -3,13 +3,13 @@
 import random
 from typing import List, Optional, Dict, Any
 from astrbot.api import logger
-from ...infrastructure.repositories.sqlite_trainer_repo import SqliteTrainerRepository
-from ...infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
-from ...infrastructure.repositories.sqlite_user_pokemon_repo import SqliteUserPokemonRepository
-from ...infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
-from ..models.trainer_models import Trainer, TrainerPokemon, TrainerEncounter, BattleTrainer
-from ..models.pokemon_models import PokemonSpecies, UserPokemonInfo
-from .pokemon_service import PokemonService
+from ....infrastructure.repositories.sqlite_trainer_repo import SqliteTrainerRepository
+from ....infrastructure.repositories.sqlite_pokemon_repo import SqlitePokemonRepository
+from ....infrastructure.repositories.sqlite_user_pokemon_repo import SqliteUserPokemonRepository
+from ....infrastructure.repositories.sqlite_user_repo import SqliteUserRepository
+from ...models.trainer_models import Trainer, TrainerPokemon, TrainerEncounter, BattleTrainer
+from ...models.pokemon_models import PokemonSpecies, UserPokemonInfo
+from ..mechanics.pokemon_service import PokemonService
 
 class TrainerService:
     """训练家服务类"""

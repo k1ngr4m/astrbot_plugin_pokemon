@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict, Any, Optional, Protocol
 from dataclasses import dataclass, field
 
 from astrbot.api import logger
-from ..models.adventure_models import BattleContext, BattleMoveInfo
+from ...models.adventure_models import BattleContext, BattleMoveInfo
 from .stat_modifier_service import StatModifierService, StatID
 from .battle_config import battle_config
 

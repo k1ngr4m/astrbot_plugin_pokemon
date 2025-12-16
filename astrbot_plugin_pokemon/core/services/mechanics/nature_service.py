@@ -1,8 +1,8 @@
 import random
 from typing import Dict, Any, Optional
 
-from ..models.pokemon_models import PokemonStats
-from ...infrastructure.repositories.abstract_repository import AbstractNatureRepository
+from ...models.pokemon_models import PokemonStats
+from ....infrastructure.repositories.abstract_repository import AbstractNatureRepository
 
 
 class NatureService:

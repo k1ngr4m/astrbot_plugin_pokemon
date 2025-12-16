@@ -1,13 +1,13 @@
 from typing import Dict, Any, List
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import UserPokemonInfo
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
+from ...models.common_models import BaseResult
+from ...models.pokemon_models import UserPokemonInfo
+from ....infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository, AbstractUserPokemonRepository,
 )
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.user_models import UserTeam
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.interface.response.answer_enum import AnswerEnum
+from ...models.user_models import UserTeam
+from ....interface.response.answer_enum import AnswerEnum
 
 
 class TeamService:

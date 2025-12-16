@@ -1,8 +1,8 @@
 from typing import Dict, Any
 
-from ...interface.response.answer_enum import AnswerEnum
-from ...core.models.user_models import UserItems
-from ...infrastructure.repositories.abstract_repository import AbstractUserRepository, AbstractUserItemRepository
+from ....interface.response.answer_enum import AnswerEnum
+from ....core.models.user_models import UserItems
+from ....infrastructure.repositories.abstract_repository import AbstractUserRepository, AbstractUserItemRepository
 
 
 class ItemService:

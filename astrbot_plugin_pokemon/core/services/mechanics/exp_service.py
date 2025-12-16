@@ -1,10 +1,10 @@
 import math
 from typing import Dict, Any
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonBaseStats, \
+from ...models.pokemon_models import PokemonBaseStats, \
     PokemonMoves, PokemonStats
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.services.nature_service import NatureService
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
+from ..mechanics.nature_service import NatureService
+from ....infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractTeamRepository, AbstractMoveRepository,
     AbstractUserPokemonRepository,
 )

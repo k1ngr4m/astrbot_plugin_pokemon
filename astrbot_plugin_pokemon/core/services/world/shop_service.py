@@ -1,5 +1,5 @@
 from typing import Dict, List, Any
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import \
+from ....infrastructure.repositories.abstract_repository import \
     AbstractUserRepository, AbstractShopRepository, AbstractUserItemRepository
 
 

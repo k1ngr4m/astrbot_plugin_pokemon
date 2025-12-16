@@ -1,10 +1,10 @@
 from typing import Dict, Any, Optional, Tuple
 from astrbot.api import logger
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import (
+from ...models.pokemon_models import (
     UserPokemonInfo, PokemonIVs, PokemonEVs, PokemonStats, PokemonMoves, PokemonEvolution
 )
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.services.nature_service import NatureService
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
+from ..mechanics.nature_service import NatureService
+from ....infrastructure.repositories.abstract_repository import (
     AbstractUserPokemonRepository, AbstractPokemonRepository, AbstractNatureRepository
 )
 

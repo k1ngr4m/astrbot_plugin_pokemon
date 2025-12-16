@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from ...infrastructure.repositories.abstract_repository import (
+from ....infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository,
     AbstractAdventureRepository,
     AbstractShopRepository,
@@ -388,12 +388,12 @@ class DataSetupService:
 
                     # 尝试批量插入，如果Repo不支持则降级为单条插入
                     if hasattr(self.trainer_repo, 'create_trainers_batch'):
-                        from ..models.trainer_models import Trainer
+                        from ...models.trainer_models import Trainer
                         # 将字典转换为Trainer对象列表
                         trainer_list = [Trainer(**data) for data in trainers_data_list if data]
                         self.trainer_repo.create_trainers_batch(trainer_list)
                     else:
-                        from ..models.trainer_models import Trainer
+                        from ...models.trainer_models import Trainer
                         for data in trainers_data_list:
                             try:
                                 self.trainer_repo.create_trainer(Trainer(**data))
@@ -418,12 +418,12 @@ class DataSetupService:
                     ]
 
                     if hasattr(self.trainer_repo, 'create_trainer_pokemons_batch'):
-                        from ..models.trainer_models import TrainerPokemon
+                        from ...models.trainer_models import TrainerPokemon
                         # 将字典转换为TrainerPokemon对象列表
                         trainer_pokemon_list = [TrainerPokemon(**data) for data in tp_data_list if data]
                         self.trainer_repo.create_trainer_pokemons_batch(trainer_pokemon_list)
                     else:
-                        from ..models.trainer_models import TrainerPokemon
+                        from ...models.trainer_models import TrainerPokemon
                         for data in tp_data_list:
                             try:
                                 self.trainer_repo.create_trainer_pokemon(TrainerPokemon(**data))
@@ -448,7 +448,7 @@ class DataSetupService:
                     ]
 
                     if hasattr(self.trainer_repo, 'create_location_trainers_batch'):
-                        from ..models.trainer_models import TrainerLocation
+                        from ...models.trainer_models import TrainerLocation
                         # 将字典转换为TrainerLocation对象列表
                         location_trainers_list = [TrainerLocation(**data) for data in tl_params if data]
                         self.trainer_repo.create_location_trainers_batch(location_trainers_list)

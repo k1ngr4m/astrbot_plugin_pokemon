@@ -2,14 +2,14 @@ import random
 from typing import Dict, Any, Optional, List
 
 from astrbot.api import logger
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.common_models import BaseResult
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.infrastructure.repositories.abstract_repository import (
+from ...models.common_models import BaseResult
+from ....infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository, AbstractMoveRepository, AbstractUserPokemonRepository)
 
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import PokemonCreateResult, \
+from ...models.pokemon_models import PokemonCreateResult, \
     PokemonDetail, PokemonStats, PokemonIVs, \
     PokemonEVs, WildPokemonInfo, PokemonMoves, PokemonSpecies
-from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.interface.response.answer_enum import AnswerEnum
+from ....interface.response.answer_enum import AnswerEnum
 from .nature_service import NatureService
 
 

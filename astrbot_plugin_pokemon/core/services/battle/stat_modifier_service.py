@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 from enum import Enum
 
-from ..models.pokemon_models import PokemonStats
+from ...models.pokemon_models import PokemonStats
 
 
 class StatID(Enum):

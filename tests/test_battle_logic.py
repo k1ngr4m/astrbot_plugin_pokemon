@@ -1,4 +1,4 @@
-import sys
+ import sys
 import os
 
 # Add project root to path
@@ -13,7 +13,7 @@ mock_astrbot.api.logger = mock_logger
 sys.modules['astrbot'] = mock_astrbot
 sys.modules['astrbot.api'] = mock_astrbot.api
 
-from astrbot_plugin_pokemon.core.services.battle_engine import BattleLogic, BattleState, ListBattleLogger
+from astrbot_plugin_pokemon.core.services.battle.battle_engine import BattleLogic, BattleState, ListBattleLogger
 from astrbot_plugin_pokemon.core.models.adventure_models import BattleContext, BattleMoveInfo
 from astrbot_plugin_pokemon.core.models.pokemon_models import PokemonStats, WildPokemonInfo, PokemonMoves, PokemonIVs, PokemonEVs
 
