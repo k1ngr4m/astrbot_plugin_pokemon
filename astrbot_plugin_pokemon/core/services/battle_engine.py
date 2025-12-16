@@ -815,7 +815,7 @@ class BattleLogic:
                     effects.append({
                         "type": "stat_change",
                         "stat_id": sid,
-                        "stat_name": self.STAT_NAMES.get(sid, "stat"),
+                        "stat_name": self.STAT_NAMES.get(str(sid), "stat"),
                         "change": new_stage - curr,
                         "new_stage": new_stage,
                         "target_obj": target  # 引用目标对象以便 execute 阶段修改
@@ -824,7 +824,8 @@ class BattleLogic:
 
 
     def _gen_heal_effect(self, target: BattleState, move: BattleMoveInfo) -> List[Dict]:
-        ratio = move.healing
+        # 【修复】将百分比数值转换为小数 (50.0 -> 0.5)
+        ratio = move.healing / 100.0
         if ratio == 0: return []
 
         max_hp = target.context.pokemon.stats.hp
@@ -1096,7 +1097,7 @@ class BattleLogic:
                     target_unit.stat_levels[stat_id] = new_stage
 
                     # 记录日志
-                    stat_name = self.STAT_NAMES.get(stat_id, f"未知属性({stat_id})")
+                    stat_name = self.STAT_NAMES.get(str(stat_id), f"未知属性({stat_id})")
 
                     # 判断是"提升"还是"降低" (基于实际产生的变化，而非原始数值)
                     # 例如：如果已经是 +6，再 +1，new_stage == current_stage，不会进到这里，符合逻辑
@@ -1292,7 +1293,8 @@ class BattleLogic:
         # Cat 3: 回复 (如自我再生)
         elif cat_id == 3:
             current_hp_ratio = attacker_state.current_hp / attacker_state.context.pokemon.stats.hp
-            heal_ratio = move.healing
+            # 【修复】将百分比数值转换为小数
+            heal_ratio = move.healing / 100.0
 
             if heal_ratio > 0:  # 回复
                 score += heal_ratio * 100.0

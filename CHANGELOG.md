@@ -1,5 +1,12 @@
 # 变更日志 (Changelog)
 
+## [0.1.15] - 2025-12-16
+
+### 🐛 修复 (Bug Fixes)
+- 修复宝可梦回复时状态效果的bug
+- 修复PokeballStrategy.get_ultra_ball_multiplier() got an unexpected keyword argument 'user_id'
+- 修复stat状态显示的bug
+
 ## [0.1.14] - 2025-12-15
 
 ### ✨ 新功能 (Features)

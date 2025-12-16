@@ -42,12 +42,13 @@ class AilmentMoveStrategy(BaseMoveStrategy):
 
     def execute(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo,
                 outcome: MoveOutcome, battle_logic: 'BattleLogic' = None) -> List[Dict]:
-        if outcome.damage <= 0:  # 只在造成伤害时才尝试附加异常状态
+        # 【修复】变化类技能本身不造成伤害，应该检查是否 Miss，而不是检查伤害值
+        if outcome.missed:
             return []
 
         # 如果有battle_logic，使用其辅助方法，这样可以处理免疫检查和概率判定
         if battle_logic:
-            # ✅ 修复：根据 move.target_id 来决定异常状态的目标
+            # 根据 move.target_id 来决定异常状态的目标
             target_unit = battle_logic._get_target_by_target_id(attacker, defender, move.target_id)
 
             # 使用BattleLogic的辅助方法生成异常状态效果
@@ -55,14 +56,15 @@ class AilmentMoveStrategy(BaseMoveStrategy):
         else:
             # 后备逻辑：基本的异常状态处理
             chance = self._get_ailment_chance(move)
-            if outcome.damage <= 0 or outcome.missed:  # 简化判断
+            # 【修复】这里同样去掉 outcome.damage <= 0 的判断
+            if outcome.missed:
                 return []
 
-            if outcome.damage > 0:
-                ailment_id = move.meta_ailment_id
-                status_name = self.AILMENT_MAP.get(ailment_id, "unknown")
-                if status_name != "unknown":
-                    return [{"type": "ailment", "status": status_name, "status_id": ailment_id}]
+            # 移除原来的 if outcome.damage > 0 判断，直接处理
+            ailment_id = move.meta_ailment_id
+            status_name = self.AILMENT_MAP.get(ailment_id, "unknown")
+            if status_name != "unknown":
+                return [{"type": "ailment", "status": status_name, "status_id": ailment_id}]
 
         return []
 
@@ -82,7 +84,8 @@ class StatChangeMoveStrategy(BaseMoveStrategy):
     def execute(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo,
                 outcome: MoveOutcome, battle_logic: 'BattleLogic' = None) -> List[Dict]:
         chance = self._get_stat_change_chance(move)
-        if outcome.damage <= 0 or outcome.missed:
+        # 纯能力变化技能不需要造成伤害，只需检查是否 Miss
+        if outcome.missed:
             return []
 
         effects = []
@@ -173,12 +176,13 @@ class HealMoveStrategy(BaseMoveStrategy):
 
     def execute(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo,
                 outcome: MoveOutcome, battle_logic: 'BattleLogic' = None) -> List[Dict]:
-        ratio = move.healing
+        # 【修复】将百分比数值转换为小数
+        ratio = move.healing / 100.0
         if ratio == 0:
             return []
 
         if battle_logic:
-            # ✅ 修复：根据 move.target_id 来决定回复效果的目标
+            # 根据 move.target_id 来决定回复效果的目标
             target_unit = battle_logic._get_target_by_target_id(attacker, defender, move.target_id)
 
             # 使用BattleLogic的辅助方法处理回复效果
@@ -230,9 +234,10 @@ class DamageAilmentMoveStrategy(BaseMoveStrategy):
     def execute(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo,
                 outcome: MoveOutcome, battle_logic: 'BattleLogic' = None) -> List[Dict]:
         effects = []
-        if outcome.damage > 0:  # 简化判定，实际应该看是否被免疫
+        # 伤害+异常状态技能需要成功命中才有后续效果
+        if not outcome.missed and outcome.damage >= 0:  # damage可以为0（例如被保护类技能完全阻挡）
             if battle_logic:
-                # ✅ 修复：根据 move.target_id 来决定异常状态的目标
+                # 根据 move.target_id 来决定异常状态的目标
                 target_unit = battle_logic._get_target_by_target_id(attacker, defender, move.target_id)
 
                 # 使用BattleLogic的辅助方法处理异常状态，确保一致性
