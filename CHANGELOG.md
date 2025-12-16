@@ -6,13 +6,13 @@
 - 修复宝可梦回复时状态效果的bug
 - 修复PokeballStrategy.get_ultra_ball_multiplier() got an unexpected keyword argument 'user_id'
 - 修复stat状态显示的bug
+- 修复异常状态处理的bug
 
 ## [0.1.14] - 2025-12-15
 
 ### ✨ 新功能 (Features)
 - 添加状态效果
 - 处理连续技能的伤害计算
-
 
 ## [0.1.13] - 2025-12-12
 

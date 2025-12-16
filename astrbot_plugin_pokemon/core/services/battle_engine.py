@@ -783,7 +783,7 @@ class BattleLogic:
                 (ailment_id == 3 and 'ice' in target_types):
             return []
 
-        status_name = self.AILMENT_MAP.get(ailment_id, "unknown")
+        status_name = self.AILMENT_MAP.get(str(ailment_id), "unknown")
         if status_name != "unknown":
             return [{"type": "ailment", "status": status_name, "status_id": ailment_id}]
         return []
@@ -948,8 +948,8 @@ class BattleLogic:
             if etype == "ailment":
                 # 尝试使用中文状态名称
                 status_id = eff.get('status_id')
-                if status_id and status_id in self.AILMENT_CHINESE_MAP:
-                    status_name_chinese = self.AILMENT_CHINESE_MAP[status_id]
+                if status_id and str(status_id) in self.AILMENT_CHINESE_MAP:
+                    status_name_chinese = self.AILMENT_CHINESE_MAP[str(status_id)]
                     logger_obj.log(f"{defender.context.pokemon.name}陷入{status_name_chinese}状态！\n\n")
                 else:
                     logger_obj.log(f"{defender.context.pokemon.name}陷入{eff['status']}状态！\n\n")

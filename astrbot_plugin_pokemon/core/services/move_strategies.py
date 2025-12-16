@@ -62,7 +62,7 @@ class AilmentMoveStrategy(BaseMoveStrategy):
 
             # 移除原来的 if outcome.damage > 0 判断，直接处理
             ailment_id = move.meta_ailment_id
-            status_name = self.AILMENT_MAP.get(ailment_id, "unknown")
+            status_name = self.AILMENT_MAP.get(str(ailment_id), "unknown")
             if status_name != "unknown":
                 return [{"type": "ailment", "status": status_name, "status_id": ailment_id}]
 
