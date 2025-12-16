@@ -1141,7 +1141,7 @@ class BattleLogic:
         if state.non_volatile_status == 4:
             dmg = max(1, int(max_hp / 16))
             state.current_hp -= dmg
-            logger_obj.log(f"{name}因烧伤受到了伤害！\n\n")
+            logger_obj.log(f"{name}因烧伤受到了{dmg}点伤害！\n\n")
 
         # 2. 中毒 (Poison - ID 5)
         elif state.non_volatile_status == 5:
@@ -1149,14 +1149,14 @@ class BattleLogic:
             # 这里简化为普通中毒
             dmg = max(1, int(max_hp / 8))
             state.current_hp -= dmg
-            logger_obj.log(f"{name}因中毒受到了伤害！\n\n")
+            logger_obj.log(f"{name}因中毒受到了{dmg}点伤害！\n\n")
 
         # 3. 束缚 (Trap - ID 8)
         # 对应：紧束(Bind)、火焰旋涡(Fire Spin)、流沙地狱等
         if 8 in state.volatile_statuses:
             dmg = max(1, int(max_hp / 8))
             state.current_hp -= dmg
-            logger_obj.log(f"{name}因束缚受到了伤害！\n\n")
+            logger_obj.log(f"{name}因束缚受到了{dmg}点伤害！\n\n")
 
             # 扣除回合数
             state.volatile_statuses[8] -= 1
@@ -1168,7 +1168,7 @@ class BattleLogic:
         if 18 in state.volatile_statuses:
             dmg = max(1, int(max_hp / 8))
             state.current_hp -= dmg
-            logger_obj.log(f"{name}的体力被寄生种子夺走了！\n\n")
+            logger_obj.log(f"{name}的体力被寄生种子夺走了{dmg}点！\n\n")
             # 吸血给对手
             if opponent.current_hp > 0:
                 heal = dmg
