@@ -278,10 +278,10 @@ class DamageRaiseMoveStrategy(BaseMoveStrategy):
     def execute(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo,
                 outcome: MoveOutcome, battle_logic: 'BattleLogic' = None) -> List[Dict]:
         # 在 _execute_action 中已经通过 meta_category_id 分配了策略，这里主要处理能力提升
+        # Category 7 (Damage+Raise) 的定义就是提升"使用者"的能力，无论攻击打向谁，Buff 总是加给攻击者自己
         if battle_logic:
-            # ✅ 修复：根据 move.target_id 来决定副作用的目标
-            # 例如"龙星群" target_id=7 (User)，这里就会返回 attacker
-            target_unit = battle_logic._get_target_by_target_id(attacker, defender, move.target_id)
+            # 修复：Category 7 (Damage+Raise) 的能力提升始终作用于攻击者自己
+            target_unit = attacker
 
             # 使用正确的 target_unit 生成效果
             stat_effects = battle_logic._gen_stat_change_effect(target_unit, move, default_target="user")

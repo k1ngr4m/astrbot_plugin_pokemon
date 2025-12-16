@@ -281,10 +281,13 @@ class BattleLogic:
 
         # 如果当前正在蓄力，且使用的就是蓄力技能 -> 说明是第二回合，准备攻击
         if attacker.charging_move_id == move.move_id:
+            # 设置标记，表明当前正在执行两回合技能的第二回合（用于PP消耗逻辑）
+            self._executing_second_turn = True
             # 清除蓄力状态
             attacker.charging_move_id = None
             attacker.protection_status = None
             # (注意：此时不return，继续向下执行伤害计算)
+            # 注意：第二回合不需要再次消耗PP，PP已经在第一回合消耗过了
 
             # 特殊处理：大地掌控在第二回合提升能力
             if move_config and "turn_2_boost" in move_config:
@@ -304,7 +307,10 @@ class BattleLogic:
             attacker.charging_move_id = move.move_id
             attacker.protection_status = move_config.get("protect_type")
 
-            # 2. 扣除PP & 日志
+            # 2. 扣除PP，然后生成日志（确保日志显示的是扣除后的PP）
+            if not is_struggle:
+                self._deduct_pp(attacker, move)
+
             pp_str = self._get_pp_str(attacker, move)
             logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_str}！\n\n")
             logger_obj.log(f"{attacker.context.pokemon.name} {move_config['msg_charge']}\n\n")
@@ -312,8 +318,6 @@ class BattleLogic:
             # 添加调试日志
             if logger_obj.should_log_details():
                 logger.info(f"[DEBUG] 攻击方开始蓄力: charging_move_id={attacker.charging_move_id}, protection_status={attacker.protection_status}")
-
-            if not is_struggle: self._deduct_pp(attacker, move)
 
             # 3. 应用第一回合的属性提升 (如流星光束、火箭头锤)
             if "stat_boost" in move_config:
@@ -332,7 +336,8 @@ class BattleLogic:
         # --- Phase 2: 命中与保护判定 (Protection Check) ---
 
         # 检查防御方是否处于无敌/特殊保护状态
-        if defender.protection_status:
+        # 只有当技能目标是对手时，才检查保护状态（防止自己用增益技能被对手保护状态拦截）
+        if defender.protection_status and move.target_id in self.TARGETS_OPPONENT:
             if logger_obj.should_log_details():
                 logger.info(f"[DEBUG] 防御方处于保护状态: {defender.protection_status}")
 
@@ -364,8 +369,15 @@ class BattleLogic:
                     logger.info(f"[DEBUG] 攻击成功穿透保护")
 
         # B. 消耗 PP
-        if not is_struggle:
+        # 对于两回合技能的第二回合，PP已经在第一回合消耗过了，所以不再重复消耗
+        # 检查是否是两回合技能的第二回合执行（在Phase 1中会清除charging_move_id，所以在这里检查原始状态）
+        is_second_turn = hasattr(self, '_executing_second_turn') and self._executing_second_turn
+        if not is_struggle and not is_second_turn:
             self._deduct_pp(attacker, move)
+
+        # 重置标记
+        if hasattr(self, '_executing_second_turn'):
+            delattr(self, '_executing_second_turn')
 
         # D. 准备日志信息
         # 只有非蓄力技能或者是蓄力技能的第二回合才会走到这里
