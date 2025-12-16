@@ -153,7 +153,9 @@ class BattleLogic:
         }
 
         # 从配置加载技能配置
-        self.TWO_TURN_MOVES_CONFIG = battle_config.get_two_turn_moves_config()
+        # 【修复】将键转换为 int，防止 lookup 失败
+        raw_two_turn_config = battle_config.get_two_turn_moves_config()
+        self.TWO_TURN_MOVES_CONFIG = {int(k): v for k, v in raw_two_turn_config.items()} if raw_two_turn_config else {}
         self.PROTECTION_PENETRATION = battle_config.get_protection_penetration()
 
         # 在所有配置加载完成后创建挣扎技能
@@ -361,6 +363,10 @@ class BattleLogic:
                 if logger_obj.should_log_details():
                     logger.info(f"[DEBUG] 攻击成功穿透保护")
 
+        # B. 消耗 PP
+        if not is_struggle:
+            self._deduct_pp(attacker, move)
+
         # D. 准备日志信息
         # 只有非蓄力技能或者是蓄力技能的第二回合才会走到这里
         # 补一条日志：如果是蓄力技能释放
@@ -370,10 +376,6 @@ class BattleLogic:
              # 普通技能日志
              pp_str = self._get_pp_str(attacker, move)
              logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_str}！\n\n")
-
-        # B. 消耗 PP
-        if not is_struggle:
-            self._deduct_pp(attacker, move)
 
         # E. 计算结果 (Calculate) - 需要处理连续攻击逻辑
         # 此步骤只计算数据，不修改任何状态

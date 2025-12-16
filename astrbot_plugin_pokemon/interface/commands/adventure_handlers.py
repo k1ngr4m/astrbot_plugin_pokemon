@@ -278,16 +278,19 @@ class AdventureHandlers:
 
         # 根据玩家等级限制可捕捉的宝可梦等级
         user_level = user.level
-        max_catchable_level = 10  # 默认10级
 
-        if user_level >= 30:
-            max_catchable_level = 50
-        elif user_level >= 20:
-            max_catchable_level = 40
-        elif user_level >= 10:
-            max_catchable_level = 30
-        elif user_level >= 5:
-            max_catchable_level = 20
+        # 根据新的规则设置最大可捕捉等级限制
+        if user_level <= 10:
+            max_catchable_level = user_level + 5  # 新手期仅能捕捉略强于自身的宝可梦，避免碾压
+        elif 11 <= user_level <= 20:
+            max_catchable_level = user_level + 8  # 逐步放宽，但仍有等级压制
+        elif 21 <= user_level <= 30:
+            max_catchable_level = user_level + 10  # 20级后解锁更多空间，匹配玩家操作/阵容成长
+        elif 31 <= user_level <= 40:
+            max_catchable_level = user_level + 12  # 高等级小幅放宽，保留挑战
+        else:  # user_level >= 41
+        # 线性增长，允许捕捉比自己高15级的，直到达到系统总上限(如100)
+            max_catchable_level = min(user_level + 15, 100)
 
         if wild_pokemon.level > max_catchable_level:
             yield event.plain_result(f"❌ 您的等级({user_level})不足以捕捉此宝可梦({wild_pokemon.name} Lv.{wild_pokemon.level})。\n" +

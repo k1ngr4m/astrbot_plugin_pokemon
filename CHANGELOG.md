@@ -7,6 +7,7 @@
 - 修复PokeballStrategy.get_ultra_ball_multiplier() got an unexpected keyword argument 'user_id'
 - 修复stat状态显示的bug
 - 修复异常状态处理的bug
+- 修复两回合技能的处理逻辑
 
 ## [0.1.14] - 2025-12-15
 

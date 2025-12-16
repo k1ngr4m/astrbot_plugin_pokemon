@@ -56,11 +56,6 @@
       "msg_release": "从地下钻出来了！",
       "protect_type": "underground"
     },
-    "90": {
-      "msg_charge": "潜入了水下！",
-      "msg_release": "从水中浮上来了！",
-      "protect_type": "diving"
-    },
     "130": {
       "msg_charge": "把头缩进去，防御提高了！",
       "msg_release": "收回了缩进的头！",
