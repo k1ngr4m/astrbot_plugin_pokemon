@@ -52,7 +52,7 @@ class AdventureHandlers:
             lines.append(
                 f"{i}. {loc.name}\n"
                 f"   ID: {loc.id} | 等级: {loc.min_level}-{loc.max_level}\n"
-                f"{desc}"
+                # f"{desc}"
             )
         lines.append("💡 使用 冒险 <区域ID> 指令进入冒险！")
 
