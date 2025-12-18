@@ -242,6 +242,9 @@ class AbstractMoveRepository(ABC):
     @abstractmethod
     def get_moves_by_ids(self, move_ids: List[int]) -> Dict[int, Dict[str, Any]]: pass
 
+    @abstractmethod
+    def get_move_by_name(self, move_name: str) -> Dict[str, Any] | None: pass
+
 class AbstractBattleRepository(ABC):
     """战斗日志数据仓储接口"""
     # ==========增==========

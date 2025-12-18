@@ -65,3 +65,13 @@ class MoveService:
             技能能力变化数据列表
         """
         return self.move_repo.get_move_stat_changes_by_move_id(move_id)
+
+    def get_move_by_name(self, move_name: str) -> Optional[Dict[str, Any]]:
+        """
+        根据技能名称获取技能详细信息
+        Args:
+            move_name: 技能名称
+        Returns:
+            技能详细信息字典或None
+        """
+        return self.move_repo.get_move_by_name(move_name)

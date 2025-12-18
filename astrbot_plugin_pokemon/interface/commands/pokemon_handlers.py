@@ -234,7 +234,7 @@ class PokemonHandlers:
         yield event.plain_result(result_text)
 
     async def view_move_info(self, event: AstrMessageEvent):
-        """查看招式详细信息。用法：/查看招式 [招式ID]"""
+        """查看招式详细信息。用法：/查看招式 [招式ID或招式名称]"""
         user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = self.user_service.check_user_registered(user_id)
@@ -242,24 +242,30 @@ class PokemonHandlers:
             yield event.plain_result(check_res.message)
             return
 
-        # 解析招式ID
+        # 解析招式参数
         args = event.message_str.split()
         if len(args) < 2:
-            yield event.plain_result("❌ 请提供招式ID，例如：/查看招式 1")
+            yield event.plain_result("❌ 请提供招式ID或招式名称，例如：/查看招式 1 或 /查看招式 冲浪")
             return
 
+        query = args[1].strip()
+
+        # 先尝试按ID查询
+        move_info = None
         try:
-            move_id = int(args[1])
-            if move_id <= 0:
-                raise ValueError
+            move_id = int(query)
+            if move_id > 0:
+                move_info = self.move_service.get_move_by_id(move_id)
+                if move_info:
+                    move_id_for_stats = move_id  # 用于后续获取能力变化信息
         except ValueError:
-            yield event.plain_result("❌ 招式ID必须是正整数！")
-            return
+            # 如果不是数字，尝试按名称查询
+            move_info = self.move_service.get_move_by_name(query)
+            if move_info:
+                move_id_for_stats = move_info['id']  # 用于后续获取能力变化信息
 
-        # 获取招式详细信息
-        move_info = self.move_service.get_move_by_id(move_id)
         if not move_info:
-            yield event.plain_result(f"❌ 找不到ID为 {move_id} 的招式！")
+            yield event.plain_result(f"❌ 找不到ID或名称为 {query} 的招式！")
             return
 
         # 构建详细信息
@@ -274,34 +280,15 @@ class PokemonHandlers:
         damage_class = damage_class_map.get(move_info.get('damage_class_id', 1), '未知')
 
         message = [
-            f"📖 招式信息: {move_info['name_zh']} (ID: {move_id})\n\n",
+            f"📖 招式信息: {move_info['name_zh']} (ID: {move_info['id']})\n\n",
             f"类型: {type_name} | 类别: {damage_class}\n\n",
             f"威力: {power} | PP: {pp} | 命中: {accuracy}%\n\n",
             f"描述: {description}\n\n",
             ""
         ]
 
-        # 添加元数据信息
-        # meta_category_id = move_info.get('meta_category_id')
-        # meta_ailment_id = move_info.get('meta_ailment_id')
-        # if meta_category_id or meta_ailment_id:
-            # message.append("元数据信息:\n\n")
-            # if meta_category_id:
-                # message.append(f"  影响类别ID: {meta_category_id}\n\n")
-            # if meta_ailment_id:
-            #     message.append(f"  状态异常ID: {meta_ailment_id}\n\n")
-            # if move_info.get('ailment_chance'):
-            #     message.append(f"  状态异常几率: {move_info['ailment_chance']}%\n\n")
-            # if move_info.get('crit_rate'):
-            #     message.append(f"  暴击率: {move_info['crit_rate']}\n\n")
-            # if move_info.get('flinch_chance'):
-            #     message.append(f"  容易打退: {move_info['flinch_chance']}%\n\n")
-            # if move_info.get('stat_chance'):
-            #     message.append(f"  能力变化几率: {move_info['stat_chance']}%\n\n")
-            # message.append("")
-
         # 添加能力变化信息
-        stat_changes = self.move_service.get_move_stat_changes_by_move_id(move_id)
+        stat_changes = self.move_service.get_move_stat_changes_by_move_id(move_id_for_stats)
         if stat_changes:
             message.append("能力变化:\n\n")
             stat_map = {1: 'HP', 2: '攻击', 3: '防御', 4: '特攻', 5: '特防', 6: '速度'}
