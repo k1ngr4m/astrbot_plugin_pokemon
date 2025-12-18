@@ -173,10 +173,16 @@ class PokemonPlugin(Star):
         async for r in self.user_pokemon_handlers.view_user_pokemon(event):
             yield r
 
-    @filter.command("学习技能")
+    @filter.command("学习招式")
     async def learn_move(self, event: AstrMessageEvent):
-        """学习新技能。用法：/学习技能 [宝可梦ID] [技能ID] [槽位编号]"""
+        """学习新招式。用法：/学习招式 [宝可梦ID] [技能ID] [槽位编号]"""
         async for r in self.adventure_handlers.learn_move(event):
+            yield r
+
+    @filter.command("查看招式", alias={"招式信息", "技能信息", "move_info"})
+    async def view_move_info(self, event: AstrMessageEvent):
+        """查看招式详细信息。用法：/查看招式 [招式ID]"""
+        async for r in self.pokemon_handlers.view_move_info(event):
             yield r
 
     @filter.command("宝可梦进化")

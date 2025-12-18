@@ -131,10 +131,13 @@ class SqliteMoveRepository(AbstractMoveRepository):
                 """, (move_id,))
                 row = cursor.fetchone()
                 if row:
-                    # 获取招式类型名称
-                    cursor.execute("SELECT name_en FROM pokemon_types WHERE id = ?", (row[3],))  # type_id
+                    # 获取招式类型名称（优先中文，否则英文）
+                    cursor.execute("SELECT name_zh, name_en FROM pokemon_types WHERE id = ?", (row[3],))  # type_id
                     type_row = cursor.fetchone()
-                    type_name = type_row[0] if type_row else "normal"
+                    if type_row:
+                        type_name = type_row[0] if type_row[0] else type_row[1]  # 优先使用中文名
+                    else:
+                        type_name = "normal"
 
                     return {
                         "id": row[0],
@@ -295,10 +298,13 @@ class SqliteMoveRepository(AbstractMoveRepository):
                 # 构建结果字典，键为 move_id
                 result = {}
                 for row in rows:
-                    # 获取招式类型名称
-                    cursor.execute("SELECT name_en FROM pokemon_types WHERE id = ?", (row[3],))  # type_id
+                    # 获取招式类型名称（优先中文，否则英文）
+                    cursor.execute("SELECT name_zh, name_en FROM pokemon_types WHERE id = ?", (row[3],))  # type_id
                     type_row = cursor.fetchone()
-                    type_name = type_row[0] if type_row else "normal"
+                    if type_row:
+                        type_name = type_row[0] if type_row[0] else type_row[1]  # 优先使用中文名
+                    else:
+                        type_name = "normal"
 
                     result[row[0]] = {  # row[0] is move.id
                         "id": row[0],

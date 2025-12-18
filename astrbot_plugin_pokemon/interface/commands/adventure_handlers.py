@@ -427,7 +427,7 @@ class AdventureHandlers:
         elif len(args) >= 3:
             async for r in self._handle_learn_move_action(event, user_id, args): yield r
         else:
-            yield event.plain_result("❌ 格式错误！正确格式: /学习技能 [宝可梦ID] [技能ID] [槽位编号(可选)]")
+            yield event.plain_result("❌ 格式错误！正确格式: /学习招式 [宝可梦ID] [技能ID] [槽位编号(可选)]")
 
     # ----------------- 私有辅助方法 -----------------
 
@@ -496,9 +496,9 @@ class AdventureHandlers:
                         moves_with_ids = ", ".join(f"{m.get('name', '未知')}[{m.get('id')}]"
                                                    for m in move_res['new_moves'])
                         if move_res.get("requires_choice"):
-                            lines.append(f"\n\n  ⚡ 领悟新技能: {moves_with_ids} (技能槽已满，请使用 /学习技能)")
+                            lines.append(f"\n\n  ⚡ 领悟新招式: {moves_with_ids} (技能槽已满，请使用 /学习招式)")
                         else:
-                            lines.append(f"\n\n  ⚡ 学会新技能: {moves_with_ids}")
+                            lines.append(f"\n\n  ⚡ 学会新招式: {moves_with_ids}")
 
                     evolution_info = lvl_info.get("evolution_info")
                     if evolution_info['can_evolve']:
@@ -654,7 +654,7 @@ class AdventureHandlers:
             for i, mid in enumerate(current_moves_ids, 1):
                 lines.append(f"  技能{i}: {self.move_service.get_move_name_str(mid)}")
 
-            lines.append(f"\n💡 替换指令: /学习技能 {pokemon_id} {move_id} <槽位1-4>")
+            lines.append(f"\n💡 替换指令: /学习招式 {pokemon_id} {move_id} <槽位1-4>")
             yield event.plain_result("\n".join(lines))
             return
 

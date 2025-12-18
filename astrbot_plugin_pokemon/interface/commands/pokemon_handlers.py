@@ -16,6 +16,7 @@ class PokemonHandlers:
         self.user_service = plugin.user_service
         self.pokemon_service = container.pokemon_service
         self.user_pokemon_service = container.user_pokemon_service
+        self.move_service = container.move_service
         self.pokemon_repo = container.pokemon_repo
         self.data_dir = "data"
         self.tmp_dir = os.path.join(self.data_dir, "tmp")
@@ -231,3 +232,107 @@ class PokemonHandlers:
         # 情况 E: 默认显示第一页
         result_text = self.pokemon_service.get_pokedex_view(user_id, 1)
         yield event.plain_result(result_text)
+
+    async def view_move_info(self, event: AstrMessageEvent):
+        """查看招式详细信息。用法：/查看招式 [招式ID]"""
+        user_id = userid_to_base32(event.get_sender_id())
+        # 统一处理注册检查
+        check_res = self.user_service.check_user_registered(user_id)
+        if not check_res.success:
+            yield event.plain_result(check_res.message)
+            return
+
+        # 解析招式ID
+        args = event.message_str.split()
+        if len(args) < 2:
+            yield event.plain_result("❌ 请提供招式ID，例如：/查看招式 1")
+            return
+
+        try:
+            move_id = int(args[1])
+            if move_id <= 0:
+                raise ValueError
+        except ValueError:
+            yield event.plain_result("❌ 招式ID必须是正整数！")
+            return
+
+        # 获取招式详细信息
+        move_info = self.move_service.get_move_by_id(move_id)
+        if not move_info:
+            yield event.plain_result(f"❌ 找不到ID为 {move_id} 的招式！")
+            return
+
+        # 构建详细信息
+        type_name = move_info.get('type_name', 'unknown')
+        power = move_info.get('power', '—')
+        pp = move_info.get('pp', 1)
+        accuracy = move_info.get('accuracy', '—')
+        description = move_info.get('description', '暂无描述')
+
+        # 根据招式类型确定伤害类别
+        damage_class_map = {1: '变化', 2: '物理', 3: '特殊'}
+        damage_class = damage_class_map.get(move_info.get('damage_class_id', 1), '未知')
+
+        message = [
+            f"📖 招式信息: {move_info['name_zh']} (ID: {move_id})\n\n",
+            f"类型: {type_name} | 类别: {damage_class}\n\n",
+            f"威力: {power} | PP: {pp} | 命中: {accuracy}%\n\n",
+            f"描述: {description}\n\n",
+            ""
+        ]
+
+        # 添加元数据信息
+        # meta_category_id = move_info.get('meta_category_id')
+        # meta_ailment_id = move_info.get('meta_ailment_id')
+        # if meta_category_id or meta_ailment_id:
+            # message.append("元数据信息:\n\n")
+            # if meta_category_id:
+                # message.append(f"  影响类别ID: {meta_category_id}\n\n")
+            # if meta_ailment_id:
+            #     message.append(f"  状态异常ID: {meta_ailment_id}\n\n")
+            # if move_info.get('ailment_chance'):
+            #     message.append(f"  状态异常几率: {move_info['ailment_chance']}%\n\n")
+            # if move_info.get('crit_rate'):
+            #     message.append(f"  暴击率: {move_info['crit_rate']}\n\n")
+            # if move_info.get('flinch_chance'):
+            #     message.append(f"  容易打退: {move_info['flinch_chance']}%\n\n")
+            # if move_info.get('stat_chance'):
+            #     message.append(f"  能力变化几率: {move_info['stat_chance']}%\n\n")
+            # message.append("")
+
+        # 添加能力变化信息
+        stat_changes = self.move_service.get_move_stat_changes_by_move_id(move_id)
+        if stat_changes:
+            message.append("能力变化:\n\n")
+            stat_map = {1: 'HP', 2: '攻击', 3: '防御', 4: '特攻', 5: '特防', 6: '速度'}
+            for stat_change in stat_changes:
+                stat_id = stat_change['stat_id']
+                change = stat_change['change']
+                stat_name = stat_map.get(stat_id, '未知')
+                message.append(f"  {stat_name}: {'+' if change > 0 else ''}{change}\n\n")
+            message.append("")
+
+        # 添加连击/回合信息
+        # min_hits = move_info.get('min_hits')
+        # max_hits = move_info.get('max_hits')
+        # if min_hits and max_hits and min_hits != max_hits:
+        #     message.append(f"连击次数: {min_hits}-{max_hits}次\n\n")
+        # elif min_hits and max_hits and min_hits == max_hits and min_hits > 1:
+        #     message.append(f"连击次数: {min_hits}次\n\n")
+        #
+        # min_turns = move_info.get('min_turns')
+        # max_turns = move_info.get('max_turns')
+        # if min_turns and max_turns and min_turns != max_turns:
+        #     message.append(f"持续回合: {min_turns}-{max_turns}回合\n\n")
+        # elif min_turns and max_turns and min_turns == max_turns and min_turns > 1:
+        #     message.append(f"持续回合: {max_turns}回合\n\n")
+
+        # 添加吸血/回复信息
+        drain = move_info.get('drain', 0)
+        healing = move_info.get('healing', 0)
+        if drain != 0:
+            message.append(f"吸血率: {drain}%\n\n")
+        if healing != 0:
+            message.append(f"回复率: {healing}%\n\n")
+
+        yield event.plain_result("\n".join(message))

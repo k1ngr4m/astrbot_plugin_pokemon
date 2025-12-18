@@ -2,6 +2,9 @@
 
 ## [0.1.15] - 2025-12-16
 
+### ✨ 新功能 (Features)
+- 添加招式详情
+
 ### 🐛 修复 (Bug Fixes)
 - 修复宝可梦回复时状态效果的bug
 - 修复PokeballStrategy.get_ultra_ball_multiplier() got an unexpected keyword argument 'user_id'
