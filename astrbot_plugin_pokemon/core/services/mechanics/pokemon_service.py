@@ -2,6 +2,7 @@ import random
 from typing import Dict, Any, Optional, List
 
 from astrbot.api import logger
+from .exp_service import ExpService
 from ...models.common_models import BaseResult
 from ....infrastructure.repositories.abstract_repository import (
     AbstractPokemonRepository, AbstractMoveRepository, AbstractUserPokemonRepository)
@@ -25,13 +26,15 @@ class PokemonService:
             move_repo: AbstractMoveRepository,
             user_pokemon_repo: AbstractUserPokemonRepository,
             config: Dict[str, Any],
-            nature_service: NatureService = None
+            nature_service: NatureService = None,
+            exp_service: ExpService = None
     ):
         self.pokemon_repo = pokemon_repo
         self.move_repo = move_repo
         self.user_pokemon_repo = user_pokemon_repo
         self.config = config
         self.nature_service = nature_service
+        self.exp_service = exp_service
 
     @staticmethod
     # 静态方法：生成0-31的随机IV
@@ -66,7 +69,9 @@ class PokemonService:
         # 2. 生成基础信息
         gender = self.determine_pokemon_gender(pokemon_template.gender_rate)
         level = random.randint(min_level, max_level)
-        exp = 0
+        # exp = 0
+        growth_rate_id = pokemon_template.growth_rate_id if pokemon_template.growth_rate_id else 2
+        exp = self.exp_service.get_required_exp_for_level(level, growth_rate_id)
 
         # 获取招式
         move_list = self.move_repo.get_level_up_moves(species_id, level)

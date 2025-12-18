@@ -60,7 +60,8 @@ class GameContainer:
             move_repo=self.move_repo,
             user_pokemon_repo=self.user_pokemon_repo,
             config=self.config,
-            nature_service=self.nature_service
+            nature_service=self.nature_service,
+            exp_service=self.exp_service
         )
         self.user_service = UserService(
             user_repo=self.user_repo,

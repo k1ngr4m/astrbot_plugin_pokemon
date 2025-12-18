@@ -170,7 +170,7 @@ class ExpService:
         return ev_rewards
 
     # 检查宝可梦是否升级
-    def check_pokemon_level_up(self, current_level: int, current_exp: int, species_id: int) -> Dict[str, Any]:
+    def check_pokemon_level_up(self, current_level: int, total_exp: int, species_id: int) -> Dict[str, Any]:
         """
         检查宝可梦是否升级
         返回包含升级信息的字典
@@ -179,24 +179,21 @@ class ExpService:
         species_data = self.pokemon_repo.get_pokemon_by_id(species_id)
         growth_rate_id = species_data.growth_rate_id if species_data and species_data.growth_rate_id else 2  # 默认为medium
 
-        levels_gained = 0
         new_level = current_level
-        remaining_exp = current_exp
 
-        # 检查是否能升级多级
-        while new_level < 100 and remaining_exp >= self.get_required_exp_for_level(new_level + 1, growth_rate_id):
+        # 2. 只要总经验 >= 下一级门槛，就提升等级
+        while new_level < 100 and total_exp >= self.get_required_exp_for_level(new_level + 1, growth_rate_id):
             new_level += 1
-            levels_gained += 1
-            # 扣除升级所需的经验
-            remaining_exp = remaining_exp - self.get_exp_needed_for_next_level(new_level - 1, growth_rate_id)
 
-        new_level = min(100, new_level)
+        levels_gained = new_level - current_level
+
         return {
             "should_level_up": levels_gained > 0,
             "levels_gained": levels_gained,
             "new_level": new_level,
-            "new_exp": remaining_exp,
-            "required_exp_for_next": self.get_required_exp_for_level(new_level + 1, growth_rate_id) if new_level < 100 else 0
+            "new_exp": total_exp,
+            "required_exp_for_next": self.get_required_exp_for_level(new_level + 1,
+                                                                     growth_rate_id) if new_level < 100 else 0
         }
 
     # 战斗后更新宝可梦的经验值和等级（考虑EV值）
@@ -878,39 +875,27 @@ class ExpService:
 
     # 战斗后更新用户的经验值和等级（考虑EV值）
     def update_user_after_battle(self, user_id: str, exp_gained: int) -> Dict[str, Any]:
-        """
-        战斗后更新用户的经验值和等级
-        """
         user = self.user_repo.get_user_by_id(user_id)
         if not user:
             return {"success": False, "message": "用户不存在"}
 
-        # 计算新的总经验
         new_total_exp = user.exp + exp_gained
         current_level = user.level
 
-        # 检查用户可以升到多少级 (用户使用medium增长曲线)
         new_level = current_level
-        while new_level < 100 and new_total_exp >= self.get_required_exp_for_level(new_level + 1, 2):  # 用户使用medium增长曲线
+        # 只要总经验 >= 下一级门槛，就升级
+        while new_level < 100 and new_total_exp >= self.get_required_exp_for_level(new_level + 1, 2):
             new_level += 1
 
         levels_gained = new_level - current_level
 
-        # 计算剩余经验（升级后剩余的经验）
-        if new_level > current_level:
-            # 如果升级了，计算升级后的剩余经验
-            remaining_exp = new_total_exp - self.get_required_exp_for_level(new_level, 2)  # 用户使用medium增长曲线
-        else:
-            # 没有升级，保留原来的逻辑
-            remaining_exp = new_total_exp
-
-        # 更新用户数据
-        self.user_repo.update_user_exp(new_level, remaining_exp, user_id)
+        # 【修改处】不再计算 remaining_exp，直接存储 new_total_exp
+        self.user_repo.update_user_exp(new_level, new_total_exp, user_id)
 
         return {
             "success": True,
             "exp_gained": exp_gained,
             "levels_gained": max(0, levels_gained),
             "new_level": new_level,
-            "new_exp": remaining_exp
+            "new_exp": new_total_exp  # 返回总经验
         }
