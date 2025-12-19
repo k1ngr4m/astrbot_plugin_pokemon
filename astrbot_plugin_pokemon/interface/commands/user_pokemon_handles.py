@@ -117,8 +117,8 @@ class UserPokemonHandlers:
             # 提取公共格式化逻辑
             info = self._get_pokemon_basic_info(p)
             msg += f"{i}. {p.name} {info['gender']}\n"
-            msg += f"   ID: {p.id} | 等级: {p.level} | HP: {p.stats['hp']}\n"
-            msg += f"   属性: {info['types']} | 特性: {info['ability']} | 性格: {info['nature']}\n\n"
+            msg += f"---ID: {p.id}  |  等级: {p.level}  |  HP: {p.stats['hp']}\n\n"
+            msg += f"---属性: {info['types']}  |  特性: {info['ability']}  |  性格: {info['nature']}\n\n"
 
         msg += f"\n使用 /我的宝可梦 P[页数] 查看其他页\n或使用 /我的宝可梦 <ID> 查看详情。"
         return event.plain_result(msg)
@@ -134,8 +134,8 @@ class UserPokemonHandlers:
 
         # 组装基础信息
         msg = f"🔍 宝可梦详细信息：\n\n{p.name} {info['gender']}\n"
-        msg += f"属性: {info['types']} | 性格: {info['nature']} | 特性: {info['ability']}\n"
-        msg += f"等级: {p.level} | 经验: {p.exp}\n\n"
+        msg += f"属性: {info['types']}  |  性格: {info['nature']}  |  特性: {info['ability']}\n"
+        msg += f"等级: {p.level}  |  经验: {p.exp}\n\n"
 
         # 组装数值矩阵 (使用表格化排版对齐更美观)
         stats_map = [
@@ -147,12 +147,12 @@ class UserPokemonHandlers:
             ("速度", "speed", "speed_iv", "speed_ev")
         ]
 
-        msg += "💪 能力详情 (能力值 | IV | EV):\n"
+        msg += "💪 能力详情 (能力值 | IV | EV):\n\n"
         for label, s_key, iv_key, ev_key in stats_map:
             val = p.stats[s_key]
             iv = p.ivs[iv_key]
             ev = p.evs[ev_key]
-            msg += f"  {label}: {val:<3} | {iv:>2}/31 | {ev:<3}\n"
+            msg += f"  {label}: {val:<3} | {iv:>2}/31 | {ev:<3}\n\n"
 
         # 组装招式
         msg += "\n⚔️ 招式:\n"
