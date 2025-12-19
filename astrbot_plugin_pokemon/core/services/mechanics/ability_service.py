@@ -19,3 +19,7 @@ class AbilityService:
     def get_all_abilities(self) -> list[Dict[str, Any]]:
         """获取所有特性信息"""
         return self.ability_repo.get_all_abilities()
+
+    def get_ability_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """根据名称获取特性信息"""
+        return self.ability_repo.get_ability_by_name(name)

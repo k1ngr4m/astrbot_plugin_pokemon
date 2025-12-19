@@ -57,3 +57,17 @@ class SqliteAbilityRepository(AbstractAbilityRepository):
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM abilities WHERE isdel = 0 ORDER BY id ASC")
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_ability_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            # Try exact match first (case insensitive)
+            cursor.execute("SELECT * FROM abilities WHERE (name_zh = ? OR name_en = ?) AND isdel = 0", (name, name))
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+            
+            # Try partial match
+            cursor.execute("SELECT * FROM abilities WHERE (name_zh LIKE ? OR name_en LIKE ?) AND isdel = 0", (f"%{name}%", f"%{name}%"))
+            row = cursor.fetchone()
+            return dict(row) if row else None

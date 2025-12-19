@@ -17,6 +17,7 @@ class PokemonHandlers:
         self.pokemon_service = container.pokemon_service
         self.user_pokemon_service = container.user_pokemon_service
         self.move_service = container.move_service
+        self.ability_service = container.ability_service
         self.pokemon_repo = container.pokemon_repo
         self.data_dir = "data"
         self.tmp_dir = os.path.join(self.data_dir, "tmp")
@@ -234,7 +235,7 @@ class PokemonHandlers:
         yield event.plain_result(result_text)
 
     async def view_move_info(self, event: AstrMessageEvent):
-        """查看招式详细信息。用法：/查看招式 [招式ID或招式名称]"""
+        """查询招式详细信息。用法：/查询招式 [招式ID或招式名称]"""
         user_id = userid_to_base32(event.get_sender_id())
         # 统一处理注册检查
         check_res = self.user_service.check_user_registered(user_id)
@@ -245,7 +246,7 @@ class PokemonHandlers:
         # 解析招式参数
         args = event.message_str.split()
         if len(args) < 2:
-            yield event.plain_result("❌ 请提供招式ID或招式名称，例如：/查看招式 1 或 /查看招式 冲浪")
+            yield event.plain_result("❌ 请提供招式ID或招式名称，例如：/查询招式 1 或 /查询招式 冲浪")
             return
 
         query = args[1].strip()
@@ -321,5 +322,49 @@ class PokemonHandlers:
             message.append(f"吸血率: {drain}%\n\n")
         if healing != 0:
             message.append(f"回复率: {healing}%\n\n")
+
+        yield event.plain_result("\n".join(message))
+
+    async def view_ability_info(self, event: AstrMessageEvent):
+        """查看特性详细信息。用法：/查询特性 [特性名称]"""
+        user_id = userid_to_base32(event.get_sender_id())
+        # 统一处理注册检查
+        check_res = self.user_service.check_user_registered(user_id)
+        if not check_res.success:
+            yield event.plain_result(check_res.message)
+            return
+
+        # 解析参数
+        args = event.message_str.split()
+        if len(args) < 2:
+            yield event.plain_result("❌ 请提供特性名称，例如：/查询特性 猛火")
+            return
+
+        query = args[1].strip()
+
+        # 先尝试按ID查询 (虽然指令说是名称，但支持ID也不错)
+        ability_info = None
+        if query.isdigit():
+            ability_info = self.ability_service.get_ability_by_id(int(query))
+        
+        # 尝试按名称查询
+        if not ability_info:
+            ability_info = self.ability_service.get_ability_by_name(query)
+
+        if not ability_info:
+            yield event.plain_result(f"❌ 找不到名称为 {query} 的特性！")
+            return
+
+        # 构建详细信息
+        name_zh = ability_info.get('name_zh', '未知')
+        name_en = ability_info.get('name_en', 'Unknown')
+        desc = ability_info.get('description', '暂无描述')
+        gen = ability_info.get('generation_id', '?')
+
+        message = [
+            f"✨ 特性信息: {name_zh} ({name_en})\n",
+            f"ID: {ability_info['id']} | 世代: Gen {gen}\n",
+            f"描述: {desc}\n"
+        ]
 
         yield event.plain_result("\n".join(message))

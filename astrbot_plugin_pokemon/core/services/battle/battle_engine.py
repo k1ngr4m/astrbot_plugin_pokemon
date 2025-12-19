@@ -1232,6 +1232,9 @@ class BattleLogic:
         # 使用钩子触发回合结束逻辑
         # 传递 opponent 给 hook 以支持吸血类效果 (如寄生种子)
         state.hooks.trigger_event("turn_end", state, opponent, logger_obj)
+        
+        # 新增：触发全局场域钩子 (沙暴/冰雹扣血)
+        self.field_hooks.trigger_event("turn_end", state, opponent, logger_obj)
 
         # 确保 HP 不为负
         state.current_hp = max(0, state.current_hp)
@@ -1249,6 +1252,9 @@ class BattleLogic:
 
         # --- 新增：状态对数值的修正 (Via Hooks) ---
         mod = state.hooks.trigger_value("on_stat_calc", mod)
+        
+        # 新增：触发全局场域钩子 (用于沙暴特防加成等)
+        mod = self.field_hooks.trigger_value("on_stat_calc", mod, state)
 
         return mod
 

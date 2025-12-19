@@ -481,6 +481,10 @@ class AbstractAbilityRepository(ABC):
     @abstractmethod
     def get_all_abilities(self) -> List[Dict[str, Any]]: pass
 
+    # 根据名称获取特性
+    @abstractmethod
+    def get_ability_by_name(self, name: str) -> Optional[Dict[str, Any]]: pass
+
 
 class AbstractPokemonAbilityRepository(ABC):
     """宝可梦特性数据仓储接口（处理宝可梦与特性的关系）"""
