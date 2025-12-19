@@ -17,7 +17,7 @@ class AbilityPlugin(VolatileStatusPlugin):
         """在这里注册特性的钩子"""
         pass
     
-    def on_entry(self, opponent: 'BattleState', logger_obj: 'BattleLogger'):
+    def on_entry(self, opponent: 'BattleState', logger_obj: 'BattleLogger', logic: Any = None):
         """登场时触发的效果"""
         pass
 
@@ -55,7 +55,7 @@ class ImmunityAbility(AbilityPlugin):
         # 注册伤害计算钩子，优先级设为 5 (高优先级，优先判定免疫)
         self.owner.hooks.register("on_damage_calc", BattleHook(f"immune_{self.ability_id}", 5, self.check_immunity))
 
-    def check_immunity(self, damage_info: dict, attacker, defender, move):
+    def check_immunity(self, damage_info: dict, attacker, defender, move, logger_obj=None):
         """
         damage_info 结构包含: power, effectiveness, stab, crit_mod, is_immune
         """
@@ -67,6 +67,14 @@ class ImmunityAbility(AbilityPlugin):
         if move.type_name == self.target_type:
             damage_info['effectiveness'] = 0.0
             damage_info['is_immune'] = True
+            
+            # 增加日志反馈
+            # 避免循环引用，通过类名判断是否为 NoOpBattleLogger (AI模拟)
+            is_noop = logger_obj and logger_obj.__class__.__name__ == 'NoOpBattleLogger'
+            if logger_obj and not is_noop:
+                # 这里的 ability_name 可以通过 ID 从配置表获取，或在类中定义
+                # 暂时用通用描述
+                logger_obj.log(f"{defender.context.pokemon.name} 的特性使其免疫了 {move.move_name}！\n\n")
             
             # 如果定义了吸收逻辑，则执行
             if self.absorb_func:
@@ -87,7 +95,7 @@ class PinchAbility(AbilityPlugin):
         # 注册到伤害计算钩子，通常优先级设为 15 (在基础修正之后)
         self.owner.hooks.register("on_damage_calc", BattleHook(f"pinch_boost_{self.ability_id}", 15, self.damage_mod))
 
-    def damage_mod(self, damage_params: dict, attacker, defender, move):
+    def damage_mod(self, damage_params: dict, attacker, defender, move, logger_obj=None):
         """
         damage_params 结构包含: power, effectiveness, stab, crit_mod, is_immune
         """
@@ -103,6 +111,11 @@ class PinchAbility(AbilityPlugin):
             if move.type_name in self.boost_types:
                 # 3. 修正威力参数
                 damage_params['power'] = int(damage_params['power'] * self.multiplier)
+                
+                # 增加日志反馈
+                is_noop = logger_obj and logger_obj.__class__.__name__ == 'NoOpBattleLogger'
+                if logger_obj and not is_noop:
+                    logger_obj.log(f"{attacker.context.pokemon.name} 的特性使 {move.move_name} 的威力提升了！\n\n")
         
         return damage_params
 
@@ -169,9 +182,16 @@ class FlashFireAbility(ImmunityAbility):
 
 # --- 登场类实现 ---
 
+@AbilityRegistry.register(2) # 降雨 (Drizzle)
+class DrizzleAbility(AbilityPlugin):
+    def on_entry(self, opponent: 'BattleState', logger_obj: 'BattleLogger', logic: Any = None):
+        if logic:
+            from .weather_service import WeatherService
+            WeatherService.apply_rain(logic, logger_obj)
+
 @AbilityRegistry.register(22) # 威吓 (Intimidate)
 class IntimidateAbility(AbilityPlugin):
-    def on_entry(self, opponent: 'BattleState', logger_obj: 'BattleLogger'):
+    def on_entry(self, opponent: 'BattleState', logger_obj: 'BattleLogger', logic: Any = None):
         logger_obj.log(f"{self.owner.context.pokemon.name} 的威吓发动了！\n\n")
         current_stage = opponent.stat_levels.get(1, 0)
         if current_stage > -6:

@@ -100,10 +100,10 @@ class BattleState:
                 plugin.on_apply()
                 self.ability_plugin = plugin
 
-    def trigger_entry_effect(self, opponent: 'BattleState', logger_obj: 'BattleLogger'):
+    def trigger_entry_effect(self, opponent: 'BattleState', logger_obj: 'BattleLogger', logic: Any = None):
         """触发登场效果（如威吓）"""
         if self.ability_plugin and hasattr(self.ability_plugin, 'on_entry'):
-            self.ability_plugin.on_entry(opponent, logger_obj)
+            self.ability_plugin.on_entry(opponent, logger_obj, logic)
 
     def _setup_initial_hooks(self):
         """初始化钩子"""
@@ -230,6 +230,12 @@ class BattleLogic:
 
         # 在所有配置加载完成后创建挣扎技能
         self._struggle_move = self._create_struggle_move()
+        
+        # --- 新增：场域系统 ---
+        self.field_hooks = HookManager() # 全局场域钩子管理器
+        self.current_weather = None      # 当前天气 ID
+        self.weather_turns = 0           # 天气剩余回合
+        # -------------------
 
     def _is_type(self, type_raw: str, target_type_en: str) -> bool:
         """判断输入的类型是否属于目标类型（自动处理中英文映射）"""
@@ -247,17 +253,58 @@ class BattleLogic:
     def get_struggle_move(self) -> BattleMoveInfo:
         return self._struggle_move
 
+    # --- Weather Management ---
+    
+    def _clear_weather(self, logger_obj: BattleLogger):
+        """清理当前天气及其关联的所有全局钩子"""
+        if not self.current_weather:
+            return
+
+        # 定义天气结束时的提示语
+        weather_end_msgs = {
+            "rain": "雨停了。",
+            "sun": "阳光恢复了常态。",
+            "sandstorm": "沙暴平息了。",
+            "hail": "冰雹停止了。"
+        }
+        
+        msg = weather_end_msgs.get(self.current_weather, "天气恢复了正常。")
+        logger_obj.log(f"{msg}\n\n")
+
+        # 1. 注销全局钩子：必须使用注册时相同的 hook_name
+        self.field_hooks.unregister("on_damage_calc", "weather_damage_mod")
+        self.field_hooks.unregister("turn_end", "weather_residual_dmg") # 用于沙暴/冰雹扣血
+        self.field_hooks.unregister("on_stat_calc", "weather_stat_mod")   # 用于拨沙/叶绿素等特性
+        
+        # 2. 重置逻辑变量
+        self.current_weather = None
+        self.weather_turns = 0
+
+    def _update_weather_count(self, logger_obj: BattleLogger):
+        """在回合末尾更新天气剩余时长"""
+        if self.current_weather and self.weather_turns > 0:
+            self.weather_turns -= 1
+            
+            # 添加调试日志（可选）
+            if logger_obj.should_log_details():
+                from astrbot.api import logger
+                logger.info(f"[DEBUG] 天气 {self.current_weather} 剩余回合: {self.weather_turns}")
+                
+            # 当回合数归零，执行清理
+            if self.weather_turns == 0:
+                self._clear_weather(logger_obj)
+
     # --- 2. 公共接口 (对外逻辑) ---
 
     def handle_battle_start(self, user: BattleState, wild: BattleState, logger_obj: BattleLogger):
         """处理战斗初始化的各种效果"""
         # 按照速度顺序触发威吓，确保逻辑符合原版
         if user.context.pokemon.stats.speed >= wild.context.pokemon.stats.speed:
-            user.trigger_entry_effect(wild, logger_obj)
-            wild.trigger_entry_effect(user, logger_obj)
+            user.trigger_entry_effect(wild, logger_obj, self)
+            wild.trigger_entry_effect(user, logger_obj, self)
         else:
-            wild.trigger_entry_effect(user, logger_obj)
-            user.trigger_entry_effect(wild, logger_obj)
+            wild.trigger_entry_effect(user, logger_obj, self)
+            user.trigger_entry_effect(wild, logger_obj, self)
 
     def process_turn(self, user_state: BattleState, wild_state: BattleState, logger_obj: BattleLogger) -> bool:
         """处理一个完整回合。如果战斗结束返回 True。"""
@@ -284,6 +331,10 @@ class BattleLogic:
         if user_state.current_hp <= 0 or wild_state.current_hp <= 0:
             return True
         # ---------------------
+        
+        # --- 新增：天气回合更新 ---
+        self._update_weather_count(logger_obj)
+        # -----------------------
 
         return False
 
@@ -478,7 +529,7 @@ class BattleLogic:
             first_outcome = None  # 初始化first_outcome变量
 
             # 第一次攻击使用正常命中判定，后续攻击默认命中
-            first_outcome = self._calculate_move_outcome(attacker, defender, move, bypass_accuracy=False)
+            first_outcome = self._calculate_move_outcome(attacker, defender, move, bypass_accuracy=False, logger_obj=logger_obj)
 
             if first_outcome.missed:
                 # 如果第一次攻击未命中，整个连续攻击失败
@@ -490,7 +541,7 @@ class BattleLogic:
                 for hit_i in range(hits_to_perform):
                     # 对于连续攻击，只有第一次攻击需要进行命中判定，后续攻击默认命中
                     bypass_accuracy = (hit_i > 0)
-                    outcome = self._calculate_move_outcome(attacker, defender, move, bypass_accuracy=bypass_accuracy)
+                    outcome = self._calculate_move_outcome(attacker, defender, move, bypass_accuracy=bypass_accuracy, logger_obj=logger_obj)
 
                     # 如果第一次就miss了，不应该进入这个循环
                     if hit_i == 0 and outcome.missed:
@@ -553,7 +604,7 @@ class BattleLogic:
                             logger_obj.log("没有击中目标！\n\n")
         else:
             # 传统单次攻击逻辑
-            outcome = self._calculate_move_outcome(attacker, defender, move)
+            outcome = self._calculate_move_outcome(attacker, defender, move, logger_obj=logger_obj)
             if logger_obj.should_log_details():
                 logger.info(f"[DEBUG] 招式结果计算完成: 伤害={outcome.damage}, 命中={not outcome.missed}, 暴击={outcome.is_crit}, 效果={outcome.effectiveness}x")
 
@@ -683,7 +734,8 @@ class BattleLogic:
     # --- 4. 计算层 (业务逻辑) ---
 
     def _calculate_move_outcome(self, attacker: BattleState, defender: BattleState,
-                                move: BattleMoveInfo, bypass_accuracy: bool = False) -> MoveOutcome:
+                                move: BattleMoveInfo, bypass_accuracy: bool = False,
+                                logger_obj: Optional[BattleLogger] = None) -> MoveOutcome:
         """核心计算函数：计算伤害和生成特效"""
         outcome = MoveOutcome()
 
@@ -695,7 +747,7 @@ class BattleLogic:
 
         # 2. 基础伤害计算
         # 注意：即使是 Status Move (Power=0)，下面的公式计算出 damage=2，但后续 meta logic 会决定是否使用
-        base_dmg, eff, is_crit = self._calculate_base_damage_params(attacker, defender, move)
+        base_dmg, eff, is_crit = self._calculate_base_damage_params(attacker, defender, move, logger_obj)
         outcome.effectiveness = eff
         outcome.is_crit = is_crit
 
@@ -791,7 +843,7 @@ class BattleLogic:
 
     # --- 5. 辅助逻辑 (Helpers) ---
 
-    def _calculate_base_damage_params(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo):
+    def _calculate_base_damage_params(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo, logger_obj: Optional[BattleLogger] = None):
         """计算基础伤害所需的参数"""
         attacker_stats = self._get_modified_stats(attacker)
         defender_stats = self._get_modified_stats(defender)
@@ -822,8 +874,11 @@ class BattleLogic:
 
         # 3. 触发特性/道具钩子 (由攻击方和防御方分别触发)
         # 例如：攻击方的【猛火】修改 power，防御方的【飘浮】修改 effectiveness
-        damage_params = attacker.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move)
-        damage_params = defender.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move)
+        damage_params = attacker.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
+        damage_params = defender.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
+        
+        # 触发全局环境钩子（如天气对属性的修正）
+        damage_params = self.field_hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
 
         eff = damage_params['effectiveness']
         stab = damage_params['stab']
@@ -1247,17 +1302,37 @@ class BattleLogic:
             atk_def_ratio = self._get_atk_def_ratio(attacker_state, defender_state, move)
             level = attacker_state.context.pokemon.level
 
-            eff = self.calculate_type_effectiveness([move.type_name], defender_state.context.types)
-            stab = 1.5 if move.type_name in attacker_state.context.types else 1.0
+            # --- 新增：模拟特性/环境修正 ---
+            # 1. 初始化虚拟伤害参数
+            sim_params = {
+                'power': move.power,
+                'effectiveness': self.calculate_type_effectiveness([move.type_name], defender_state.context.types),
+                'stab': 1.5 if move.type_name in attacker_state.context.types else 1.0,
+                'crit_mod': 1.0, # AI 评估通常不考虑暴击
+                'is_immune': False
+            }
 
-            # 估算基础伤害 (不含随机数和暴击)
-            base_damage = ((2 * level / 5 + 2) * move.power * atk_def_ratio) / 50 + 2
-            expected_damage = base_damage * (move.accuracy / 100.0) * eff * stab
+            # 2. 模拟触发特性钩子 (猛火、蓄电等会在此修改参数)
+            # 使用 NoOpBattleLogger 确保 AI 模拟时不产生日志
+            noop_logger = NoOpBattleLogger()
+            
+            sim_params = attacker_state.hooks.trigger_value("on_damage_calc", sim_params, attacker_state, defender_state, move, noop_logger)
+            sim_params = defender_state.hooks.trigger_value("on_damage_calc", sim_params, attacker_state, defender_state, move, noop_logger)
+            
+            # 模拟触发全局环境钩子 (AI感知天气)
+            sim_params = self.field_hooks.trigger_value("on_damage_calc", sim_params, attacker_state, defender_state, move, noop_logger)
+
+            # 3. 检查免疫判定
+            if sim_params['is_immune'] or sim_params['effectiveness'] == 0:
+                return -100.0
+
+            # 4. 使用修正后的威力计算预期伤害
+            base_damage = ((2 * level / 5 + 2) * sim_params['power'] * atk_def_ratio) / 50 + 2
+            expected_damage = base_damage * (move.accuracy / 100.0) * sim_params['effectiveness'] * sim_params['stab']
 
             score += expected_damage
 
-            # [斩杀奖励]：如果预期伤害能击败对手，给予巨额加分
-            # 注意：这里使用 expected_damage 作为近似，实际扣血可能略有不同
+            # [斩杀奖励]
             if expected_damage >= defender_state.current_hp:
                 score += 1000.0
 
