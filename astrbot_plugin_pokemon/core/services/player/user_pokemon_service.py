@@ -158,6 +158,7 @@ class UserPokemonService:
                 evs = pokemon["evs"],
                 moves = pokemon["moves"],
                 nature_id=pokemon["nature_id"],
+                ability_id=pokemon.get("ability_id", 0),
             ))
 
         return BaseResult(
@@ -197,6 +198,7 @@ class UserPokemonService:
                 evs = pokemon.evs,
                 moves = pokemon.moves,
                 nature_id=pokemon.nature_id,
+                ability_id=pokemon.ability_id,
                 caught_time=pokemon.caught_time
             ))
 

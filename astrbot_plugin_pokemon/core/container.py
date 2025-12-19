@@ -1,7 +1,7 @@
 from ..core.services import (
     UserPokemonService, PokemonService, TeamService, AdventureService,
     ExpService, UserService, ItemService, ShopService, MoveService,
-    EvolutionService, NatureService, TrainerService
+    EvolutionService, NatureService, TrainerService, AbilityService
 )
 
 from ..infrastructure.repositories.sqlite_item_repo import SqliteItemRepository
@@ -100,6 +100,9 @@ class GameContainer:
             user_pokemon_repo=self.user_pokemon_repo,
             user_repo=self.user_repo,
             pokemon_service=self.pokemon_service
+        )
+        self.ability_service = AbilityService(
+            ability_repo=self.ability_repo
         )
         self.adventure_service = AdventureService(
             adventure_repo=self.adventure_repo,

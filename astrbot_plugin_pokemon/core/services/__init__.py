@@ -10,6 +10,7 @@ from .mechanics.pokemon_service import PokemonService
 from .mechanics.evolution_service import EvolutionService
 from .mechanics.nature_service import NatureService
 from .mechanics.exp_service import ExpService
+from .mechanics.ability_service import AbilityService
 from .world.adventure_service import AdventureService
 from .world.trainer_service import TrainerService
 from .world.shop_service import ShopService
