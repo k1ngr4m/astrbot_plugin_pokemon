@@ -6,6 +6,7 @@ from astrbot.api import logger
 from ...models.common_models import BaseResult
 from ....infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserPokemonRepository,
+    AbstractPokemonAbilityRepository,
 )
 
 from ....utils.utils import get_today, userid_to_base32
@@ -21,13 +22,40 @@ class UserPokemonService:
             pokemon_repo: AbstractPokemonRepository,
             item_repo: AbstractItemRepository,
             user_pokemon_repo: AbstractUserPokemonRepository,
+            pokemon_ability_repo: AbstractPokemonAbilityRepository,  # Changed: parameter name updated to match new repository
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.item_repo = item_repo
         self.user_pokemon_repo = user_pokemon_repo
+        self.pokemon_ability_repo = pokemon_ability_repo  # Changed: attribute name updated
         self.config = config
+
+    def _assign_random_ability(self, species_id: int) -> int:
+        """
+        为宝可梦随机分配一个非隐藏特性
+        Args:
+            species_id: 宝可梦种族ID
+        Returns:
+            int: 特性ID
+        """
+        # 获取该宝可梦的非隐藏特性
+        relations = self.pokemon_ability_repo.get_abilities_by_pokemon_id(species_id)
+        non_hidden_abilities = [rel for rel in relations if rel.get('is_hidden', 0) == 0 and rel.get('slot') in [1, 2]]
+
+        if non_hidden_abilities:
+            # 随机选择一个非隐藏特性
+            selected = random.choice(non_hidden_abilities)
+            return selected['ability_id']
+        else:
+            # 如果没有非隐藏特性，从所有特性中随机选择
+            if relations:
+                selected = random.choice(relations)
+                return selected['ability_id']
+
+        # 如果没有任何特性关联，返回0
+        return 0
 
     def init_select_pokemon(self, user_id: str, new_pokemon: PokemonDetail) -> BaseResult:
         """
@@ -39,6 +67,9 @@ class UserPokemonService:
         Returns:
             一个包含成功状态和消息的BaseResult对象。
         """
+        # 随机分配一个非隐藏特性
+        ability_id = self._assign_random_ability(new_pokemon.base_pokemon.id)
+
         user_pokemon_info = UserPokemonInfo(
             id = 0,
             species_id = new_pokemon.base_pokemon.id,
@@ -51,6 +82,7 @@ class UserPokemonService:
             evs = new_pokemon.evs,
             moves = new_pokemon.moves,
             nature_id = new_pokemon.nature_id,
+            ability_id=ability_id,
         )
         # 创建用户宝可梦记录，使用模板数据完善实例
         pokemon_new_id = self.user_pokemon_repo.create_user_pokemon(user_id, user_pokemon_info)
@@ -223,6 +255,10 @@ class UserPokemonService:
             BaseResult
         """
         try:
+            # 如果传入的宝可梦信息中没有特性ID，则随机分配一个
+            if pokemon_info.ability_id == 0:
+                pokemon_info.ability_id = self._assign_random_ability(pokemon_info.species_id)
+
             pid = self.user_pokemon_repo.create_user_pokemon(user_id, pokemon_info)
             # 记录到图鉴历史
             self.user_pokemon_repo.record_pokedex_capture(user_id, pokemon_info.species_id)
@@ -239,11 +275,14 @@ class UserPokemonService:
 
     def _create_and_save_caught_pokemon(self, user_id: str, wild: WildPokemonInfo) -> Any | None:
         """创建并保存捕捉到的宝可梦 (封装Repo操作)"""
+        # 随机分配一个非隐藏特性
+        ability_id = self._assign_random_ability(wild.species_id)
+
         info = UserPokemonInfo(
             id=0, species_id=wild.species_id, name=wild.name,
             level=wild.level, exp=wild.exp, gender=wild.gender,
             stats=wild.stats, ivs=wild.ivs, evs=wild.evs, moves=wild.moves
-            , nature_id=wild.nature_id
+            , nature_id=wild.nature_id, ability_id=ability_id
         )
         pid = self.user_pokemon_repo.create_user_pokemon(user_id, info)
         # 记录到图鉴历史

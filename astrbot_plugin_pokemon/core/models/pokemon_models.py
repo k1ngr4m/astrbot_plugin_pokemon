@@ -154,6 +154,7 @@ class UserPokemonInfo:
     current_pp2: int = 0  # 当前技能2 PP
     current_pp3: int = 0  # 当前技能3 PP
     current_pp4: int = 0  # 当前技能4 PP
+    ability_id: int = 0  # 特性ID
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -183,6 +184,13 @@ class UserPokemonInfo:
             "moves": get_dict(self.moves),
             "caught_time": self.caught_time,
             "nature_id": self.nature_id,
+            "happiness": self.happiness,
+            "current_hp": self.current_hp,
+            "current_pp1": self.current_pp1,
+            "current_pp2": self.current_pp2,
+            "current_pp3": self.current_pp3,
+            "current_pp4": self.current_pp4,
+            "ability_id": self.ability_id,
         }
 
 @dataclass
@@ -198,6 +206,7 @@ class WildPokemonInfo:
     evs: PokemonEVs
     moves: PokemonMoves
     nature_id: int = 1  # 默认性格ID为1，即勤奋
+    ability_id: int = 0  # 特性ID
 
     def to_dict(self):
         def get_dict(obj):
@@ -223,6 +232,7 @@ class WildPokemonInfo:
             "evs": get_dict(self.evs),
             "moves": get_dict(self.moves),
             "nature_id": self.nature_id,
+            "ability_id": self.ability_id,
         }
 
     def model_dump_json(self):

@@ -7,7 +7,7 @@ from ...core.models.pokemon_models import PokemonAbility
 
 
 class SqliteAbilityRepository(AbstractAbilityRepository):
-    """宝可梦特性模板仓储的SQLite实现"""
+    """宝可梦特性定义模板仓储的SQLite实现"""
 
     def __init__(self, db_path: str):
         self.db_path = db_path

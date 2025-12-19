@@ -17,7 +17,7 @@ from ..infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
 from ..infrastructure.repositories.sqlite_user_pokemon_repo import SqliteUserPokemonRepository
 from ..infrastructure.repositories.sqlite_trainer_repo import SqliteTrainerRepository
 from ..infrastructure.repositories.sqlite_ability_repo import SqliteAbilityRepository
-from ..infrastructure.repositories.sqlite_pokemon_ability_relation_repo import SqlitePokemonAbilityRelationRepository
+from ..infrastructure.repositories.sqlite_pokemon_ability_repo import SqlitePokemonAbilityRepository
 
 
 class GameContainer:
@@ -41,8 +41,8 @@ class GameContainer:
         self.user_item_repo = SqliteUserItemRepository(self.db_path)
         self.nature_repo = SqliteNatureRepository(self.db_path)
         self.trainer_repo = SqliteTrainerRepository(self.db_path)  # 添加训练家仓库
-        self.ability_repo = SqliteAbilityRepository(self.db_path)  # 添加特性仓库
-        self.pokemon_ability_relation_repo = SqlitePokemonAbilityRelationRepository(self.db_path)  # 添加宝可梦特性关联仓库
+        self.ability_repo = SqliteAbilityRepository(self.db_path)  # 添加特性定义仓库
+        self.pokemon_ability_repo = SqlitePokemonAbilityRepository(self.db_path)  # 添加宝可梦特性关联仓库
 
 
 
@@ -83,6 +83,7 @@ class GameContainer:
             pokemon_repo=self.pokemon_repo,
             user_pokemon_repo=self.user_pokemon_repo,
             item_repo=self.item_repo,
+            pokemon_ability_repo=self.pokemon_ability_repo,  # 注意：这里参数名未变，但传入的是重命名后的仓库
             config=self.config
         )
         self.team_service = TeamService(
@@ -110,6 +111,7 @@ class GameContainer:
             user_pokemon_repo=self.user_pokemon_repo,
             user_item_repo=self.user_item_repo,
             pokemon_service=self.pokemon_service,
+            pokemon_ability_repo=self.pokemon_ability_repo,
             exp_service=self.exp_service,
             config=self.config
         )

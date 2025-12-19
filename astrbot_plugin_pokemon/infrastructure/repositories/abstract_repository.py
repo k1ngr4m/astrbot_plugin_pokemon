@@ -462,7 +462,7 @@ class AbstractTrainerRepository(ABC):
 
 
 class AbstractAbilityRepository(ABC):
-    """宝可梦特性数据仓储接口"""
+    """宝可梦特性定义数据仓储接口"""
     # ==========增==========
     # 添加特性模板
     @abstractmethod
@@ -482,8 +482,8 @@ class AbstractAbilityRepository(ABC):
     def get_all_abilities(self) -> List[Dict[str, Any]]: pass
 
 
-class AbstractPokemonAbilityRelationRepository(ABC):
-    """宝可梦特性关联数据仓储接口"""
+class AbstractPokemonAbilityRepository(ABC):
+    """宝可梦特性数据仓储接口（处理宝可梦与特性的关系）"""
     # ==========增==========
     # 添加宝可梦特性关联模板
     @abstractmethod

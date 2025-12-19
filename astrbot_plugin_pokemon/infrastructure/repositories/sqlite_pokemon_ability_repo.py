@@ -2,11 +2,11 @@ import sqlite3
 import threading
 from typing import Optional, List, Dict, Any
 
-from .abstract_repository import AbstractPokemonAbilityRelationRepository
+from .abstract_repository import AbstractPokemonAbilityRepository
 from ...core.models.pokemon_models import PokemonAbilityRelation
 
 
-class SqlitePokemonAbilityRelationRepository(AbstractPokemonAbilityRelationRepository):
+class SqlitePokemonAbilityRepository(AbstractPokemonAbilityRepository):
     """宝可梦特性关联仓储的SQLite实现"""
 
     def __init__(self, db_path: str):

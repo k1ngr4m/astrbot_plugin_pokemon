@@ -16,7 +16,8 @@ from ...models.trainer_models import BattleTrainer
 from ...models.user_models import UserTeam, UserItems
 from ....infrastructure.repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository,
-    AbstractUserPokemonRepository, AbstractBattleRepository, AbstractUserItemRepository, AbstractMoveRepository
+    AbstractUserPokemonRepository, AbstractBattleRepository, AbstractUserItemRepository, AbstractMoveRepository,
+    AbstractPokemonAbilityRepository
 )
 from ...models.adventure_models import AdventureResult, LocationInfo, BattleResult, BattleMoveInfo, BattleContext
 from ..battle.battle_engine import BattleLogic, BattleState, ListBattleLogger, NoOpBattleLogger
@@ -41,6 +42,7 @@ class AdventureService:
             battle_repo: AbstractBattleRepository,
             user_item_repo: AbstractUserItemRepository,
             move_repo: AbstractMoveRepository,
+            pokemon_ability_repo: AbstractPokemonAbilityRepository,
             exp_service: ExpService,
             config: Dict[str, Any],
     ):
@@ -55,6 +57,7 @@ class AdventureService:
         self.config = config
         self.move_repo = move_repo
         self.battle_repo = battle_repo
+        self.pokemon_ability_repo = pokemon_ability_repo
         self.trainer_service = None
         self.battle_logic = BattleLogic(move_repo=self.move_repo)
 
@@ -150,6 +153,9 @@ class AdventureService:
 
         wild_pokemon = wild_res.data
         # 构建 info 对象
+        # 随机分配一个非隐藏特性
+        ability_id = self._assign_random_ability_to_wild(wild_pokemon.base_pokemon.id)
+
         wild_pokemon_info = WildPokemonInfo(
             id=0,
             species_id=wild_pokemon.base_pokemon.id,
@@ -165,6 +171,7 @@ class AdventureService:
                 move3_id=wild_pokemon.moves.move3_id, move4_id=wild_pokemon.moves.move4_id,
             ),
             nature_id=wild_pokemon.nature_id,
+            ability_id=ability_id,
         )
 
         wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
@@ -174,6 +181,31 @@ class AdventureService:
             location_id=location.id,
             encounter_rate=selected_ap.encounter_rate,
         )
+
+    def _assign_random_ability_to_wild(self, species_id: int) -> int:
+        """
+        为野生宝可梦随机分配一个非隐藏特性
+        Args:
+            species_id: 宝可梦种族ID
+        Returns:
+            int: 特性ID
+        """
+        # 获取该宝可梦的非隐藏特性
+        relations = self.pokemon_ability_repo.get_abilities_by_pokemon_id(species_id)
+        non_hidden_abilities = [rel for rel in relations if rel.get('is_hidden', 0) == 0 and rel.get('slot') in [1, 2]]
+
+        if non_hidden_abilities:
+            # 随机选择一个非隐藏特性
+            selected = random.choice(non_hidden_abilities)
+            return selected['ability_id']
+        else:
+            # 如果没有非隐藏特性，从所有特性中随机选择
+            if relations:
+                selected = random.choice(relations)
+                return selected['ability_id']
+
+        # 如果没有任何特性关联，返回0
+        return 0
 
         # 检查该宝可梦物种是否已被用户捕捉
         pokedex_result = self.user_pokemon_repo.get_user_pokedex_ids(user_id)

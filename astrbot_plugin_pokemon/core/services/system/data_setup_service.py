@@ -6,7 +6,7 @@ from ....infrastructure.repositories.abstract_repository import (
     AbstractShopRepository,
     AbstractMoveRepository, AbstractItemRepository,
     AbstractNatureRepository, AbstractTrainerRepository,
-    AbstractAbilityRepository, AbstractPokemonAbilityRelationRepository,
+    AbstractAbilityRepository, AbstractPokemonAbilityRepository,
 )
 from astrbot.api import logger
 
@@ -23,7 +23,7 @@ class DataSetupService:
                  nature_repo: AbstractNatureRepository,
                  trainer_repo: AbstractTrainerRepository,
                  ability_repo: AbstractAbilityRepository,
-                 pokemon_ability_relation_repo: AbstractPokemonAbilityRelationRepository,
+                 pokemon_ability_repo: AbstractPokemonAbilityRepository,
                  data_path: str = None
                  ):
         self.pokemon_repo = pokemon_repo
@@ -33,8 +33,8 @@ class DataSetupService:
         self.item_repo = item_repo
         self.nature_repo = nature_repo
         self.trainer_repo = trainer_repo
-        self.ability_repo = ability_repo
-        self.pokemon_ability_relation_repo = pokemon_ability_relation_repo
+        self.ability_repo = ability_repo  # Ability definition repository
+        self.pokemon_ability_repo = pokemon_ability_repo  # Pokemon-ability relation repository
 
         # 如果未指定路径，则使用相对于插件根目录的路径
         if data_path is None:
@@ -562,7 +562,7 @@ class DataSetupService:
             # 16. 填充 Pokemon Abilities 关联数据
             # Check if there are any existing pokemon_ability relations by checking if the table is empty
             # Since we added the get_all_pokemon_ability_relations method, we can check if there are any records
-            if not self.pokemon_ability_relation_repo.get_all_pokemon_ability_relations():
+            if not self.pokemon_ability_repo.get_all_pokemon_ability_relations():
                 logger.info("正在初始化宝可梦特性关联数据...")
                 df = self._read_csv_data("pokemon_abilities.csv")
                 if not df.empty:
@@ -578,11 +578,11 @@ class DataSetupService:
                         for row in df.to_dict('records')
                     ]
 
-                    if hasattr(self.pokemon_ability_relation_repo, 'add_pokemon_ability_relation_templates_batch'):
-                        self.pokemon_ability_relation_repo.add_pokemon_ability_relation_templates_batch(relation_data_list)
+                    if hasattr(self.pokemon_ability_repo, 'add_pokemon_ability_relation_templates_batch'):
+                        self.pokemon_ability_repo.add_pokemon_ability_relation_templates_batch(relation_data_list)
                     else:
                         for data in relation_data_list:
-                            self.pokemon_ability_relation_repo.add_pokemon_ability_relation_template(data)
+                            self.pokemon_ability_repo.add_pokemon_ability_relation_template(data)
 
                     logger.info(f"宝可梦特性关联数据初始化完成，共加载 {len(relation_data_list)} 条数据")
 
