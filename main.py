@@ -124,7 +124,8 @@ class PokemonPlugin(Star):
                 self.move_repo,
                 self.item_repo,
                 self.nature_repo,
-                self.trainer_repo  # 添加训练家仓库
+                self.trainer_repo,  # 添加训练家仓库
+                self.container.ability_repo  # 添加特性仓库
             )
             data_setup_service.setup_initial_data()
             logger.info(f"[{self.plugin_id}] 初始数据检查/写入完成。")

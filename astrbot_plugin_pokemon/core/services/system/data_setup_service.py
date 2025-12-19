@@ -6,6 +6,7 @@ from ....infrastructure.repositories.abstract_repository import (
     AbstractShopRepository,
     AbstractMoveRepository, AbstractItemRepository,
     AbstractNatureRepository, AbstractTrainerRepository,
+    AbstractAbilityRepository,
 )
 from astrbot.api import logger
 
@@ -21,6 +22,7 @@ class DataSetupService:
                  item_repo: AbstractItemRepository,
                  nature_repo: AbstractNatureRepository,
                  trainer_repo: AbstractTrainerRepository,
+                 ability_repo: AbstractAbilityRepository,
                  data_path: str = None
                  ):
         self.pokemon_repo = pokemon_repo
@@ -30,6 +32,7 @@ class DataSetupService:
         self.item_repo = item_repo
         self.nature_repo = nature_repo
         self.trainer_repo = trainer_repo
+        self.ability_repo = ability_repo
 
         # 如果未指定路径，则使用相对于插件根目录的路径
         if data_path is None:
@@ -526,6 +529,32 @@ class DataSetupService:
                     
                     logger.info("招式元数据初始化完成")
 
+            # 15. 填充 Abilities 数据
+            if not self.ability_repo.get_ability_by_id(1):
+                logger.info("正在初始化特性数据...")
+                df = self._read_csv_data("abilities.csv")
+                if not df.empty:
+                    df = df.where(pd.notnull(df), None)
+
+                    ability_data_list = [
+                        {
+                            "id": int(row['id']),
+                            "name_en": str(row['name_en']) if pd.notna(row['name_en']) else "",
+                            "name_zh": str(row['name_zh']) if pd.notna(row['name_zh']) else "",
+                            "generation_id": int(row['generation_id']) if pd.notna(row['generation_id']) else 0,
+                            "is_main_series": int(row['is_main_series']) if pd.notna(row['is_main_series']) else 0,
+                            "description": str(row['description']) if pd.notna(row['description']) else ""
+                        }
+                        for row in df.to_dict('records')
+                    ]
+
+                    if hasattr(self.ability_repo, 'add_pokemon_ability_templates_batch'):
+                        self.ability_repo.add_pokemon_ability_templates_batch(ability_data_list)
+                    else:
+                        for data in ability_data_list:
+                            self.ability_repo.add_pokemon_ability_template(data)
+
+                    logger.info(f"特性数据初始化完成，共加载 {len(ability_data_list)} 条数据")
 
         except Exception as e:
             logger.error(f"初始化数据时发生全局错误: {e}")

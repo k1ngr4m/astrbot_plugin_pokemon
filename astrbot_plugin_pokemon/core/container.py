@@ -16,6 +16,7 @@ from ..infrastructure.repositories.sqlite_shop_repo import SqliteShopRepository
 from ..infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
 from ..infrastructure.repositories.sqlite_user_pokemon_repo import SqliteUserPokemonRepository
 from ..infrastructure.repositories.sqlite_trainer_repo import SqliteTrainerRepository
+from ..infrastructure.repositories.sqlite_ability_repo import SqliteAbilityRepository
 
 
 class GameContainer:
@@ -39,6 +40,7 @@ class GameContainer:
         self.user_item_repo = SqliteUserItemRepository(self.db_path)
         self.nature_repo = SqliteNatureRepository(self.db_path)
         self.trainer_repo = SqliteTrainerRepository(self.db_path)  # 添加训练家仓库
+        self.ability_repo = SqliteAbilityRepository(self.db_path)  # 添加特性仓库
 
 
 

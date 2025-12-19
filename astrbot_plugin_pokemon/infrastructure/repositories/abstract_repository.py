@@ -459,3 +459,24 @@ class AbstractTrainerRepository(ABC):
 
     @abstractmethod
     def has_user_fought_trainer(self, user_id: str, trainer_id: int) -> bool: pass
+
+
+class AbstractAbilityRepository(ABC):
+    """宝可梦特性数据仓储接口"""
+    # ==========增==========
+    # 添加特性模板
+    @abstractmethod
+    def add_pokemon_ability_template(self, ability_data: Dict[str, Any]) -> None: pass
+
+    # 批量添加特性模板
+    @abstractmethod
+    def add_pokemon_ability_templates_batch(self, ability_data_list: List[Dict[str, Any]]) -> None: pass
+
+    # ==========查==========
+    # 根据ID获取特性
+    @abstractmethod
+    def get_ability_by_id(self, ability_id: int) -> Optional[Dict[str, Any]]: pass
+
+    # 获取所有特性
+    @abstractmethod
+    def get_all_abilities(self) -> List[Dict[str, Any]]: pass

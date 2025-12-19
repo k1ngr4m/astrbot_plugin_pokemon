@@ -577,3 +577,26 @@ class PokemonEvolutionInfo:
             "needs_overworld_rain": self.needs_overworld_rain,
             "isdel": self.isdel,
         }
+
+
+@dataclass
+class PokemonAbility:
+    """宝可梦特性定义"""
+    id: int
+    name_en: str
+    name_zh: str
+    generation_id: int
+    is_main_series: int
+    description: str
+    isdel: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "name_en": self.name_en,
+            "name_zh": self.name_zh,
+            "generation_id": self.generation_id,
+            "is_main_series": self.is_main_series,
+            "description": self.description,
+            "isdel": self.isdel,
+        }
