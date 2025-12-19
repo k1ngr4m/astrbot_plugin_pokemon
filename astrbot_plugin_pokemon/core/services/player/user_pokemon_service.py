@@ -275,14 +275,11 @@ class UserPokemonService:
 
     def _create_and_save_caught_pokemon(self, user_id: str, wild: WildPokemonInfo) -> Any | None:
         """创建并保存捕捉到的宝可梦 (封装Repo操作)"""
-        # 随机分配一个非隐藏特性
-        ability_id = self._assign_random_ability(wild.species_id)
-
         info = UserPokemonInfo(
             id=0, species_id=wild.species_id, name=wild.name,
             level=wild.level, exp=wild.exp, gender=wild.gender,
             stats=wild.stats, ivs=wild.ivs, evs=wild.evs, moves=wild.moves
-            , nature_id=wild.nature_id, ability_id=ability_id
+            , nature_id=wild.nature_id, ability_id=wild.ability_id
         )
         pid = self.user_pokemon_repo.create_user_pokemon(user_id, info)
         # 记录到图鉴历史

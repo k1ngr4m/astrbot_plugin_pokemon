@@ -90,7 +90,7 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                       :hp_ev, :attack_ev, :defense_ev, :sp_attack_ev, :sp_defense_ev, :speed_ev, \
                       :hp, :attack, :defense, :sp_attack, :sp_defense, :speed, \
                       :move1_id, :move2_id, :move3_id, :move4_id, :nature_id, \
-                      :happiness, :current_hp, :current_pp1, :current_pp2, :current_pp3, :current_pp4) \
+                      :happiness, :current_hp, :current_pp1, :current_pp2, :current_pp3, :current_pp4, :ability_id) \
               """
 
         # 展平参数字典，使用命名占位符防止位置错误

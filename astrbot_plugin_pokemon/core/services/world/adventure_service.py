@@ -182,6 +182,23 @@ class AdventureService:
             encounter_rate=selected_ap.encounter_rate,
         )
 
+        # 检查该宝可梦物种是否已被用户捕捉
+        pokedex_result = self.user_pokemon_repo.get_user_pokedex_ids(user_id)
+        is_pokemon_caught = False
+        if pokedex_result and wild_pokemon_info.species_id in pokedex_result.get("caught", set()):
+            is_pokemon_caught = True
+
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.ADVENTURE_SUCCESS.value,
+            data=AdventureResult(
+                wild_pokemon=wild_pokemon_info,
+                location=LocationInfo(id=location.id, name=location.name),
+                trainer=None,
+                is_pokemon_caught=is_pokemon_caught
+            )
+        )
+
     def _assign_random_ability_to_wild(self, species_id: int) -> int:
         """
         为野生宝可梦随机分配一个非隐藏特性
@@ -206,23 +223,6 @@ class AdventureService:
 
         # 如果没有任何特性关联，返回0
         return 0
-
-        # 检查该宝可梦物种是否已被用户捕捉
-        pokedex_result = self.user_pokemon_repo.get_user_pokedex_ids(user_id)
-        is_pokemon_caught = False
-        if pokedex_result and wild_pokemon_info.species_id in pokedex_result.get("caught", set()):
-            is_pokemon_caught = True
-
-        return BaseResult(
-            success=True,
-            message=AnswerEnum.ADVENTURE_SUCCESS.value,
-            data=AdventureResult(
-                wild_pokemon=wild_pokemon_info,
-                location=LocationInfo(id=location.id, name=location.name),
-                trainer=None,
-                is_pokemon_caught=is_pokemon_caught
-            )
-        )
 
     def adventure_in_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo) -> BaseResult:
         """处理用户与野生宝可梦战斗的结果"""
