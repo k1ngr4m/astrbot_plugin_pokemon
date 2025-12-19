@@ -619,6 +619,9 @@ class AdventureService:
         user_state = BattleState.from_context(user_ctx)
         wild_state = BattleState.from_context(wild_ctx)
 
+        # 触发登场特性 (按速度顺序)
+        self.battle_logic.handle_battle_start(user_state, wild_state, logger_obj)
+
         turn = 0
         max_turns = 50
         winner = None

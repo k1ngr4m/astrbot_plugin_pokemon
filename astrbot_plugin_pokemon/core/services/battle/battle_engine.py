@@ -7,7 +7,9 @@ from ...models.adventure_models import BattleContext, BattleMoveInfo
 from .stat_modifier_service import StatModifierService, StatID
 from .battle_config import battle_config
 from .hook_manager import HookManager, BattleHook
+from .hook_manager import HookManager, BattleHook
 from .status_plugins import StatusRegistry
+from .ability_plugins import AbilityRegistry
 
 
 # --- 基础协议与数据类 ---
@@ -65,6 +67,11 @@ class BattleState:
     
     # 运行中的插件实例：{ status_id: PluginInstance }
     active_plugins: Dict[int, Any] = field(default_factory=dict)
+    
+    # --- 新增：特性支持 ---
+    ability_id: Optional[int] = None
+    ability_plugin: Optional[Any] = None
+    # -----------------------
     # -----------------------
 
     @classmethod
@@ -78,10 +85,25 @@ class BattleState:
             status_turns=context.status_turns,
             volatile_statuses=context.volatile_statuses.copy() if context.volatile_statuses else {},
             charging_move_id=context.charging_move_id,
-            protection_status=context.protection_status
+            protection_status=context.protection_status,
+            ability_id=getattr(context.pokemon, 'ability_id', None)
         )
         state._setup_initial_hooks()
+        state._init_ability() # 初始化特性
         return state
+
+    def _init_ability(self):
+        """初始化特性插件"""
+        if self.ability_id:
+            plugin = AbilityRegistry.create_plugin(self.ability_id, self)
+            if plugin:
+                plugin.on_apply()
+                self.ability_plugin = plugin
+
+    def trigger_entry_effect(self, opponent: 'BattleState', logger_obj: 'BattleLogger'):
+        """触发登场效果（如威吓）"""
+        if self.ability_plugin and hasattr(self.ability_plugin, 'on_entry'):
+            self.ability_plugin.on_entry(opponent, logger_obj)
 
     def _setup_initial_hooks(self):
         """初始化钩子"""
@@ -226,6 +248,16 @@ class BattleLogic:
         return self._struggle_move
 
     # --- 2. 公共接口 (对外逻辑) ---
+
+    def handle_battle_start(self, user: BattleState, wild: BattleState, logger_obj: BattleLogger):
+        """处理战斗初始化的各种效果"""
+        # 按照速度顺序触发威吓，确保逻辑符合原版
+        if user.context.pokemon.stats.speed >= wild.context.pokemon.stats.speed:
+            user.trigger_entry_effect(wild, logger_obj)
+            wild.trigger_entry_effect(user, logger_obj)
+        else:
+            wild.trigger_entry_effect(user, logger_obj)
+            user.trigger_entry_effect(wild, logger_obj)
 
     def process_turn(self, user_state: BattleState, wild_state: BattleState, logger_obj: BattleLogger) -> bool:
         """处理一个完整回合。如果战斗结束返回 True。"""
@@ -779,14 +811,34 @@ class BattleLogic:
         crit_mod = 1.5 if is_crit else 1.0
         rand_mod = random.uniform(0.85, 1.0)
 
-        # 基础公式
+        # 2. 构造计算上下文，以便钩子修改
+        damage_params = {
+            'power': move.power,
+            'effectiveness': eff,
+            'stab': stab,
+            'crit_mod': crit_mod,
+            'is_immune': False
+        }
+
+        # 3. 触发特性/道具钩子 (由攻击方和防御方分别触发)
+        # 例如：攻击方的【猛火】修改 power，防御方的【飘浮】修改 effectiveness
+        damage_params = attacker.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move)
+        damage_params = defender.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move)
+
+        eff = damage_params['effectiveness']
+        stab = damage_params['stab']
+        crit_mod = damage_params['crit_mod']
+
+        if eff == 0 or damage_params['is_immune']:
+            return 0, 0.0, False
+
+        # 4. 执行最终公式
         # ((2*Lv/5 + 2) * Power * A/D) / 50 + 2
-        base_raw = ((2 * level / 5 + 2) * move.power * (atk / max(1, defense))) / 50 + 2
+        base_raw = ((2 * level / 5 + 2) * damage_params['power'] * (atk / max(1, defense))) / 50 + 2
+        
         final_dmg = base_raw * eff * stab * crit_mod * rand_mod
 
-        if eff == 0: return 0, 0.0, False  # 免疫
-
-        return final_dmg, eff, is_crit
+        return final_dmg, eff, (crit_mod > 1.0)
 
     def _calculate_hits_to_perform(self, move: BattleMoveInfo) -> int:
         """
