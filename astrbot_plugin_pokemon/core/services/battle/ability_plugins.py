@@ -74,76 +74,6 @@ class ImmunityAbility(AbilityPlugin):
             
         return damage_info
 
-# ==========================================
-# 2. 数据驱动 (Data-Driven Configuration)
-# ==========================================
-
-# 配置表：ID -> {属性, 倍率, 名称}
-STAT_MOD_CONFIG = {
-    37: {"stat": "attack", "mult": 2.0, "name": "huge-power"},   # 大力士
-    # 146: {"stat": "speed", "mult": 2.0, "name": "sand-rush"}, # 拨沙 (示例)
-}
-
-def _create_stat_mod_ability(ability_id: int, config: dict):
-    """动态创建数值修正特性类"""
-    stat_name = config['stat']
-    multiplier = config['mult']
-    
-    class DynamicStatAbility(AbilityPlugin):
-        def on_apply(self):
-            self.owner.hooks.register("on_stat_calc", BattleHook(f"{config['name']}_boost", 10, self.stat_mod))
-
-        def stat_mod(self, stats):
-            current_val = getattr(stats, stat_name)
-            setattr(stats, stat_name, int(current_val * multiplier))
-            return stats
-
-    AbilityRegistry.register(ability_id)(DynamicStatAbility)
-
-for aid, cfg in STAT_MOD_CONFIG.items():
-    _create_stat_mod_ability(aid, cfg)
-
-
-# ==========================================
-# 3. 手动实现 / 特定模板实现 (Manual)
-# ==========================================
-
-# 1. 飘浮 (Levitate) - ID: 26
-@AbilityRegistry.register(26)
-class LevitateAbility(ImmunityAbility):
-    def __init__(self, owner):
-        super().__init__(owner, target_type='ground', msg="由于飘浮特性，地面系招式无效！")
-
-# 2. 蓄电 (Volt Absorb) - ID: 10 (免疫并回血)
-@AbilityRegistry.register(10)
-class VoltAbsorbAbility(ImmunityAbility):
-    def __init__(self, owner):
-        def _volt_absorb_logic(ability_instance, dmg_info, atk, dfd, move):
-            # 触发回血逻辑 (1/4 最大 HP)
-            max_hp = ability_instance.owner.context.pokemon.stats.hp
-            heal_amt = max_hp // 4
-            ability_instance.owner.current_hp = min(max_hp, ability_instance.owner.current_hp + heal_amt)
-            
-        super().__init__(owner, target_type='electric', absorb_func=_volt_absorb_logic)
-
-# 3. 引火 (Flash Fire) - ID: 18
-@AbilityRegistry.register(18)
-class FlashFireAbility(ImmunityAbility):
-    def __init__(self, owner):
-        super().__init__(owner, target_type='fire')
-
-
-@AbilityRegistry.register(22) # 威吓 (Intimidate)
-class IntimidateAbility(AbilityPlugin):
-    def on_entry(self, opponent: 'BattleState', logger_obj: 'BattleLogger'):
-        logger_obj.log(f"{self.owner.context.pokemon.name} 的威吓发动了！\n\n")
-        current_stage = opponent.stat_levels.get(1, 0)
-        if current_stage > -6:
-            opponent.stat_levels[1] = current_stage - 1
-            logger_obj.log(f"{opponent.context.pokemon.name} 的攻击降低了！\n\n")
-        else:
-            logger_obj.log(f"{opponent.context.pokemon.name} 的攻击无法再降低了！\n\n")
-
 class PinchAbility(AbilityPlugin):
     """
     低 HP 触发威力提升的通用模板 (如猛火、激流、茂盛)
@@ -180,14 +110,94 @@ class PinchAbility(AbilityPlugin):
 # 2. 数据驱动 (Data-Driven Configuration)
 # ==========================================
 
-# ... (Previous Data Driven Config code remains, assuming it's above this section or unrelated to replacement area) ...
-# Actually, the file structure has Templates section first. I will append PinchAbility to Templates section.
-# But replacing `BlazeAbility` at the end of the file implies I should putting all manual/template implementations there?
-# The user wants structure: 1. Templates 2. Data-Driven 3. Implementations.
-# I'll just append PinchAbility to Templates and replace BlazeAbility with new style.
+# 配置表：ID -> {属性, 倍率, 名称}
+STAT_MOD_CONFIG = {
+    37: {"stat": "attack", "mult": 2.0, "name": "huge-power"},   # 大力士
+    # 146: {"stat": "speed", "mult": 2.0, "name": "sand-rush"}, # 拨沙 (示例)
+}
 
-# Wait, the replace block needs to be continuous or I should use multi_replace.
-# PinchAbility should go under ImmunityAbility.
-# Then BlazeAbility replacement.
-# Let's use multi_replace to be safe and clean.
+def _create_stat_mod_ability(ability_id: int, config: dict):
+    """动态创建数值修正特性类"""
+    stat_name = config['stat']
+    multiplier = config['mult']
+    
+    class DynamicStatAbility(AbilityPlugin):
+        def on_apply(self):
+            self.owner.hooks.register("on_stat_calc", BattleHook(f"{config['name']}_boost", 10, self.stat_mod))
 
+        def stat_mod(self, stats):
+            current_val = getattr(stats, stat_name)
+            setattr(stats, stat_name, int(current_val * multiplier))
+            return stats
+
+    AbilityRegistry.register(ability_id)(DynamicStatAbility)
+
+for aid, cfg in STAT_MOD_CONFIG.items():
+    _create_stat_mod_ability(aid, cfg)
+
+
+# ==========================================
+# 3. 手动实现 / 特定模板实现 (Manual)
+# ==========================================
+
+# --- 免疫类实现 ---
+
+# 1. 飘浮 (Levitate) - ID: 26
+@AbilityRegistry.register(26)
+class LevitateAbility(ImmunityAbility):
+    def __init__(self, owner):
+        super().__init__(owner, target_type='ground', msg="由于飘浮特性，地面系招式无效！")
+
+# 2. 蓄电 (Volt Absorb) - ID: 10 (免疫并回血)
+@AbilityRegistry.register(10)
+class VoltAbsorbAbility(ImmunityAbility):
+    def __init__(self, owner):
+        def _volt_absorb_logic(ability_instance, dmg_info, atk, dfd, move):
+            # 触发回血逻辑 (1/4 最大 HP)
+            max_hp = ability_instance.owner.context.pokemon.stats.hp
+            heal_amt = max_hp // 4
+            ability_instance.owner.current_hp = min(max_hp, ability_instance.owner.current_hp + heal_amt)
+            
+        super().__init__(owner, target_type='electric', absorb_func=_volt_absorb_logic)
+
+# 3. 引火 (Flash Fire) - ID: 18
+@AbilityRegistry.register(18)
+class FlashFireAbility(ImmunityAbility):
+    def __init__(self, owner):
+        super().__init__(owner, target_type='fire')
+
+
+# --- 登场类实现 ---
+
+@AbilityRegistry.register(22) # 威吓 (Intimidate)
+class IntimidateAbility(AbilityPlugin):
+    def on_entry(self, opponent: 'BattleState', logger_obj: 'BattleLogger'):
+        logger_obj.log(f"{self.owner.context.pokemon.name} 的威吓发动了！\n\n")
+        current_stage = opponent.stat_levels.get(1, 0)
+        if current_stage > -6:
+            opponent.stat_levels[1] = current_stage - 1
+            logger_obj.log(f"{opponent.context.pokemon.name} 的攻击降低了！\n\n")
+        else:
+            logger_obj.log(f"{opponent.context.pokemon.name} 的攻击无法再降低了！\n\n")
+
+# --- 危机类实现 (Pinch) ---
+
+@AbilityRegistry.register(65) # 茂盛 (Overgrow)
+class OvergrowAbility(PinchAbility):
+    def __init__(self, owner):
+        super().__init__(owner, boost_types=['grass', '草'])
+
+@AbilityRegistry.register(66) # 猛火 (Blaze)
+class BlazeAbility(PinchAbility):
+    def __init__(self, owner):
+        super().__init__(owner, boost_types=['fire', '火'])
+
+@AbilityRegistry.register(67) # 激流 (Torrent)
+class TorrentAbility(PinchAbility):
+    def __init__(self, owner):
+        super().__init__(owner, boost_types=['water', '水'])
+
+@AbilityRegistry.register(68) # 虫之预感 (Swarm)
+class SwarmAbility(PinchAbility):
+    def __init__(self, owner):
+        super().__init__(owner, boost_types=['bug', '虫'])
