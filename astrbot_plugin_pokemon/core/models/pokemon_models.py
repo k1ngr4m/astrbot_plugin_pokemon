@@ -600,3 +600,22 @@ class PokemonAbility:
             "description": self.description,
             "isdel": self.isdel,
         }
+
+
+@dataclass
+class PokemonAbilityRelation:
+    """宝可梦特性关联定义"""
+    pokemon_id: int
+    ability_id: int
+    is_hidden: int
+    slot: int
+    isdel: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "pokemon_id": self.pokemon_id,
+            "ability_id": self.ability_id,
+            "is_hidden": self.is_hidden,
+            "slot": self.slot,
+            "isdel": self.isdel,
+        }

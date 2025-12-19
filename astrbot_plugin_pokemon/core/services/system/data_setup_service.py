@@ -6,7 +6,7 @@ from ....infrastructure.repositories.abstract_repository import (
     AbstractShopRepository,
     AbstractMoveRepository, AbstractItemRepository,
     AbstractNatureRepository, AbstractTrainerRepository,
-    AbstractAbilityRepository,
+    AbstractAbilityRepository, AbstractPokemonAbilityRelationRepository,
 )
 from astrbot.api import logger
 
@@ -23,6 +23,7 @@ class DataSetupService:
                  nature_repo: AbstractNatureRepository,
                  trainer_repo: AbstractTrainerRepository,
                  ability_repo: AbstractAbilityRepository,
+                 pokemon_ability_relation_repo: AbstractPokemonAbilityRelationRepository,
                  data_path: str = None
                  ):
         self.pokemon_repo = pokemon_repo
@@ -33,10 +34,12 @@ class DataSetupService:
         self.nature_repo = nature_repo
         self.trainer_repo = trainer_repo
         self.ability_repo = ability_repo
+        self.pokemon_ability_relation_repo = pokemon_ability_relation_repo
 
         # 如果未指定路径，则使用相对于插件根目录的路径
         if data_path is None:
-            plugin_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            # 从当前文件路径向上五级到达插件根目录
+            plugin_root_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
             self.data_path = os.path.join(plugin_root_dir, "assets", "data", "v3")
         else:
             self.data_path = data_path
@@ -555,6 +558,33 @@ class DataSetupService:
                             self.ability_repo.add_pokemon_ability_template(data)
 
                     logger.info(f"特性数据初始化完成，共加载 {len(ability_data_list)} 条数据")
+
+            # 16. 填充 Pokemon Abilities 关联数据
+            # Check if there are any existing pokemon_ability relations by checking if the table is empty
+            # Since we added the get_all_pokemon_ability_relations method, we can check if there are any records
+            if not self.pokemon_ability_relation_repo.get_all_pokemon_ability_relations():
+                logger.info("正在初始化宝可梦特性关联数据...")
+                df = self._read_csv_data("pokemon_abilities.csv")
+                if not df.empty:
+                    df = df.where(pd.notnull(df), None)
+
+                    relation_data_list = [
+                        {
+                            "pokemon_id": int(row['pokemon_id']) if pd.notna(row['pokemon_id']) else 0,
+                            "ability_id": int(row['ability_id']) if pd.notna(row['ability_id']) else 0,
+                            "is_hidden": int(row['is_hidden']) if pd.notna(row['is_hidden']) else 0,
+                            "slot": int(row['slot']) if pd.notna(row['slot']) else 0
+                        }
+                        for row in df.to_dict('records')
+                    ]
+
+                    if hasattr(self.pokemon_ability_relation_repo, 'add_pokemon_ability_relation_templates_batch'):
+                        self.pokemon_ability_relation_repo.add_pokemon_ability_relation_templates_batch(relation_data_list)
+                    else:
+                        for data in relation_data_list:
+                            self.pokemon_ability_relation_repo.add_pokemon_ability_relation_template(data)
+
+                    logger.info(f"宝可梦特性关联数据初始化完成，共加载 {len(relation_data_list)} 条数据")
 
         except Exception as e:
             logger.error(f"初始化数据时发生全局错误: {e}")

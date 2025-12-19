@@ -480,3 +480,28 @@ class AbstractAbilityRepository(ABC):
     # 获取所有特性
     @abstractmethod
     def get_all_abilities(self) -> List[Dict[str, Any]]: pass
+
+
+class AbstractPokemonAbilityRelationRepository(ABC):
+    """宝可梦特性关联数据仓储接口"""
+    # ==========增==========
+    # 添加宝可梦特性关联模板
+    @abstractmethod
+    def add_pokemon_ability_relation_template(self, relation_data: Dict[str, Any]) -> None: pass
+
+    # 批量添加宝可梦特性关联模板
+    @abstractmethod
+    def add_pokemon_ability_relation_templates_batch(self, relation_data_list: List[Dict[str, Any]]) -> None: pass
+
+    # ==========查==========
+    # 根据宝可梦ID获取特性关联
+    @abstractmethod
+    def get_abilities_by_pokemon_id(self, pokemon_id: int) -> List[Dict[str, Any]]: pass
+
+    # 根据宝可梦ID和特性ID获取关联
+    @abstractmethod
+    def get_ability_relation_by_pokemon_and_ability_id(self, pokemon_id: int, ability_id: int) -> Optional[Dict[str, Any]]: pass
+
+    # 获取所有宝可梦特性关联
+    @abstractmethod
+    def get_all_pokemon_ability_relations(self) -> List[Dict[str, Any]]: pass

@@ -17,6 +17,7 @@ from ..infrastructure.repositories.sqlite_move_repo import SqliteMoveRepository
 from ..infrastructure.repositories.sqlite_user_pokemon_repo import SqliteUserPokemonRepository
 from ..infrastructure.repositories.sqlite_trainer_repo import SqliteTrainerRepository
 from ..infrastructure.repositories.sqlite_ability_repo import SqliteAbilityRepository
+from ..infrastructure.repositories.sqlite_pokemon_ability_relation_repo import SqlitePokemonAbilityRelationRepository
 
 
 class GameContainer:
@@ -41,6 +42,7 @@ class GameContainer:
         self.nature_repo = SqliteNatureRepository(self.db_path)
         self.trainer_repo = SqliteTrainerRepository(self.db_path)  # 添加训练家仓库
         self.ability_repo = SqliteAbilityRepository(self.db_path)  # 添加特性仓库
+        self.pokemon_ability_relation_repo = SqlitePokemonAbilityRelationRepository(self.db_path)  # 添加宝可梦特性关联仓库
 
 
 

@@ -95,6 +95,7 @@ class PokemonPlugin(Star):
         self.battle_repo = self.container.battle_repo
         self.nature_repo = self.container.nature_repo
         self.trainer_repo = self.container.trainer_repo  # 添加训练家仓库
+        self.pokemon_ability_relation_repo = self.container.pokemon_ability_relation_repo  # 添加宝可梦特性关联仓库
 
     async def initialize(self):
         """
@@ -125,7 +126,8 @@ class PokemonPlugin(Star):
                 self.item_repo,
                 self.nature_repo,
                 self.trainer_repo,  # 添加训练家仓库
-                self.container.ability_repo  # 添加特性仓库
+                self.container.ability_repo,  # 添加特性仓库
+                self.container.pokemon_ability_relation_repo  # 添加宝可梦特性关联仓库
             )
             data_setup_service.setup_initial_data()
             logger.info(f"[{self.plugin_id}] 初始数据检查/写入完成。")

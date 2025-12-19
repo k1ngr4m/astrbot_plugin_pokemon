@@ -10,7 +10,7 @@ def up(cursor) -> None:
     """
     # 创建表
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pokemon_abilities (
+        CREATE TABLE IF NOT EXISTS abilities (
             id INTEGER PRIMARY KEY,
             name_en TEXT NOT NULL,
             name_zh TEXT,
@@ -26,10 +26,10 @@ def up(cursor) -> None:
     # 创建更新updated_at时间戳的触发器
     cursor.execute("""
         CREATE TRIGGER IF NOT EXISTS update_pokemon_abilities_updated_at
-        AFTER UPDATE ON pokemon_abilities
+        AFTER UPDATE ON abilities
         FOR EACH ROW
         BEGIN
-            UPDATE pokemon_abilities
+            UPDATE abilities
             SET updated_at = CURRENT_TIMESTAMP
             WHERE id = OLD.id;
         END;
@@ -39,5 +39,5 @@ def down(cursor) -> None:
     """
     回滚迁移 - 删除pokemon_abilities表
     """
-    cursor.execute("DROP TABLE IF EXISTS pokemon_abilities")
+    cursor.execute("DROP TABLE IF EXISTS abilities")
     cursor.execute("DROP TRIGGER IF EXISTS update_pokemon_abilities_updated_at")

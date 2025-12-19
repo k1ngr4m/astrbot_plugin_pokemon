@@ -26,7 +26,7 @@ class SqliteAbilityRepository(AbstractAbilityRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT OR IGNORE INTO pokemon_abilities
+                INSERT OR IGNORE INTO abilities
                 (id, name_en, name_zh, generation_id, is_main_series, description)
                 VALUES (:id, :name_en, :name_zh, :generation_id, :is_main_series, :description)
             """, {**ability_data})
@@ -39,7 +39,7 @@ class SqliteAbilityRepository(AbstractAbilityRepository):
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.executemany("""
-                INSERT OR IGNORE INTO pokemon_abilities
+                INSERT OR IGNORE INTO abilities
                 (id, name_en, name_zh, generation_id, is_main_series, description)
                 VALUES (:id, :name_en, :name_zh, :generation_id, :is_main_series, :description)
             """, ability_data_list)
@@ -48,12 +48,12 @@ class SqliteAbilityRepository(AbstractAbilityRepository):
     def get_ability_by_id(self, ability_id: int) -> Optional[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM pokemon_abilities WHERE id = ? AND isdel = 0", (ability_id,))
+            cursor.execute("SELECT * FROM abilities WHERE id = ? AND isdel = 0", (ability_id,))
             row = cursor.fetchone()
             return dict(row) if row else None
 
     def get_all_abilities(self) -> List[Dict[str, Any]]:
         with self._get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT * FROM pokemon_abilities WHERE isdel = 0 ORDER BY id ASC")
+            cursor.execute("SELECT * FROM abilities WHERE isdel = 0 ORDER BY id ASC")
             return [dict(row) for row in cursor.fetchall()]
