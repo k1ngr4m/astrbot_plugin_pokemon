@@ -143,112 +143,90 @@ class BattleDrawer:
     def _draw_skirmish_card(self, draw, overlay, sk, layout, pad, log_data):
         y, h = int(layout["y"]), int(layout["h"])
         rect = (pad, y, self.width - pad, y + h)
-        
-        # Draw Shadow & BG
-        self._draw_shadow(overlay, rect, self.cfg["card_radius"]) # Pass overlay to shadow helper if it supports image
-        # Wait, _draw_shadow takes (image, xy, radius). I passed overlay. Correct.
+
+        # 绘制阴影与背景
+        self._draw_shadow(overlay, rect, self.cfg["card_radius"])
         draw_rounded_rectangle(draw, rect, self.cfg["card_radius"], fill=self.cfg["colors"]["card_bg"])
-        
-        # --- Top Info (Refactored from old draw) ---
+
         card_y = y
-        
-        # Left: User Pokemon
+        ly = ry = card_y + 20
+        title_font = self.fonts["card_title"]
+        normal_font = self.fonts["normal"]
+
+        # --- 左侧：我方 (User) ---
+        lx = pad + 20
         u_name = sk.get('pokemon_name', '未知')
-        u_lv = sk.get('level', 1)
         user_species_id = sk.get('user_species_id') or sk.get('species_name')
         user_types = sk.get('user_types', [])
-        
-        u_color = COLOR_TEXT_DARK
-        if user_types: u_color = self._get_type_color(user_types[0])
-        
-        lx = pad + 20
-        ly = card_y + 20
-        
-        # Sprite
+
         if user_species_id and isinstance(user_species_id, int):
             sprite = self._load_pokemon_sprite(user_species_id)
             overlay.paste(sprite, (lx, ly), sprite)
-            lx += 110
-            
-        # Name & Badge
-        title_font = self.fonts["card_title"]
-        draw.text((lx, ly + 20), f"{u_name}", fill=COLOR_TEXT_DARK, font=title_font)
+            lx += 110 # 精灵图占位
+
+        # 统一使用 'ls' (左侧基线锚点)
+        draw.text((lx, ly + 40), f"{u_name}", fill=COLOR_TEXT_DARK, font=title_font, anchor="ls")
         name_w = title_font.getlength(u_name)
-        
+
         badge_text = self._en_to_zh(user_types[0]) if user_types else "一般"
-        self._draw_type_badge(draw, int(lx + name_w + 10), int(ly + 24), badge_text, u_color)
-        
-        # Level
-        draw.text((lx, ly + 55), f"Lv.{u_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"])
-        
-        # HP Bar
-        u_cur_hp = sk.get('current_hp', 0)
-        u_max_hp = sk.get('max_hp', 100)
-        self._draw_hp_bar(draw, lx, ly + 85, 160, u_cur_hp, u_max_hp)
-        
-        # VS Badge
-        mx = self.width // 2
-        my = card_y + 140 // 2 # base_h // 2
+        u_color = self._get_type_color(user_types[0]) if user_types else COLOR_TEXT_DARK
+        self._draw_type_badge(draw, int(lx + name_w + 10), int(ly + 22), badge_text, u_color)
+
+        draw.text((lx, ly + 65), f"Lv.{sk.get('level', 1)}", fill=self.cfg["colors"]["text_sub"], font=normal_font, anchor="ls")
+        self._draw_hp_bar(draw, lx, ly + 85, 160, sk.get('current_hp', 0), sk.get('max_hp', 100))
+
+        # --- VS 徽章 (居中) ---
+        mx, my = self.width // 2, card_y + 70
         draw.ellipse((mx - 25, my - 25, mx + 25, my + 25), fill=(240, 240, 240))
         draw.text((mx, my), "VS", fill=(180, 180, 180), font=self.fonts["title"], anchor="mm")
-        
-        # Right: Opponent
+
+        # --- 右侧：敌方 (Opponent) ---
+        rx = self.width - pad - 20
         op_name = sk.get('trainer_pokemon_name') or log_data.get('target_name')
-        op_lv = sk.get('trainer_pokemon_level') or sk.get('target_level') or log_data.get('target_level')
         target_species_id = sk.get('target_species_id')
         target_types = sk.get('target_types', [])
-        
-        op_color = COLOR_TEXT_DARK
-        if target_types: op_color = self._get_type_color(target_types[0])
-        
-        rx = self.width - pad - 20
-        ry = card_y + 20
-        
-        # Sprite (Right)
+
         if target_species_id and isinstance(target_species_id, int):
             sprite = self._load_pokemon_sprite(target_species_id)
             overlay.paste(sprite, (rx - 100, ry), sprite)
-            rx -= 110
-            
-        # Name
-        draw.text((rx, ry + 20), f"{op_name}", fill=COLOR_TEXT_DARK, font=title_font, anchor="rs")
+            rx -= 110 # 精灵图占位
+
+        # 统一使用 'rs' (右侧基线锚点)
+        draw.text((rx, ry + 40), f"{op_name}", fill=COLOR_TEXT_DARK, font=title_font, anchor="rs")
         op_name_w = title_font.getlength(f"{op_name}")
-        
-        # Badge
+
         op_badge_text = self._en_to_zh(target_types[0]) if target_types else "一般"
-        small_font = self.fonts["small"]
-        badge_w = small_font.getlength(op_badge_text) + 16
-        self._draw_type_badge(draw, int(rx - op_name_w - 10 - badge_w), int(ry + 24), op_badge_text, op_color)
-        
-        # Level
+        op_color = self._get_type_color(target_types[0]) if target_types else COLOR_TEXT_DARK
+        badge_w = self.fonts["small"].getlength(op_badge_text) + 16
+        # 修正徽章 Y 坐标，与左侧保持一致 (22)
+        self._draw_type_badge(draw, int(rx - op_name_w - 10 - badge_w), int(ry + 22), op_badge_text, op_color)
+
+        op_lv = sk.get('trainer_pokemon_level') or sk.get('target_level')
         if op_lv:
-             draw.text((rx, ry + 55), f"Lv.{op_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"], anchor="rs")
-             
-        # HP Bar (Right)
-        t_cur_hp = sk.get('target_current_hp', 0)
-        t_max_hp = sk.get('target_max_hp', 100)
-        self._draw_hp_bar(draw, rx - 160, ry + 85, 160, t_cur_hp, t_max_hp, is_right=True)
-        
+             draw.text((rx, ry + 65), f"Lv.{op_lv}", fill=self.cfg["colors"]["text_sub"], font=normal_font, anchor="rs")
+
+        self._draw_hp_bar(draw, rx - 160, ry + 85, 160, sk.get('target_current_hp', 0), sk.get('target_max_hp', 100), is_right=True)
+
         # Result & Win Rate
         res_text = "胜利" if sk.get('result') == 'win' else "失败"
         res_col = COLOR_SUCCESS if sk.get('result') == 'win' else COLOR_ERROR
         wr = sk.get('win_rate', 0)
-        
+
         if wr >= 100: wr_col = (255, 215, 0)
         elif wr >= 50: wr_col = (0, 100, 0)
         else: wr_col = COLOR_ERROR
-        
+
         bx = mx
         by = my - 40
         draw.text((bx, by), res_text, fill=res_col, font=self.fonts["result_win"], anchor="mm")
         draw.text((mx, my + 40), f"胜率: {wr}%", fill=wr_col, font=self.fonts["subtitle"], anchor="mm")
-        
+
         # --- 详细过程区域 (Bottom Details - Fixed Logic) ---
         if layout["details"]:
-            curr_dy = y + 130 
+            curr_dy = y + 130
             draw.line((pad+20, curr_dy, self.width-pad-20, curr_dy), fill=(235, 235, 235), width=1)
             curr_dy += 20
-            
+
             for line in layout["details"]:
                 line_str = str(line).strip()
                 if not line_str: continue
