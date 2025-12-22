@@ -175,23 +175,30 @@ class UserPokemonDetailDrawer(BaseDrawer):
         super().__init__(DETAIL_CONFIG)
 
     def draw(self, p: Dict[str, Any]) -> Image.Image:
-        # Layout Pre-calc
-        total_h = 750 # Estimated
-        
-        image = create_vertical_gradient(self.width, total_h, *self.cfg["bg_colors"])
-        overlay = Image.new("RGBA", image.size, (0,0,0,0))
-        draw = ImageDraw.Draw(overlay)
-        
         pad = self.cfg["padding"]
-        cx = self.width // 2
-        
-        # 1. Header (Sprite + Info)
-        sx, sy = pad + 20, pad + 20
-        sprite = self._load_pokemon_sprite(p.get('sprite_id', 1), size=(180, 180))
-        overlay.paste(sprite, (sx, sy), sprite)
-        
-        ix = sx + 200
-        iy = sy + 20
+        # --- 【优化】将起始 y 坐标上移，减少顶部空白 ---
+        sy = pad
+        sprite_size = 180
+
+        # 为了计算动态高度，我们先预估位置
+        # 计算 Moves 列表结束的位置
+        moves_count = len(p.get('moves', []))
+        moves_rows = math.ceil(moves_count / 2)
+        # 预估高度 = 头部(200) + 属性表(300) + 技能标题(60) + 技能行(rows * 60) + 底部边距
+        dynamic_h = sy + 200 + 300 + 60 + (moves_rows * 70) + pad
+        total_h = max(700, int(dynamic_h))  # 最小保证 700
+
+        image = create_vertical_gradient(self.width, total_h, *self.cfg["bg_colors"])
+        overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+
+        # 1. Header
+        sprite = self._load_pokemon_sprite(p.get('sprite_id', 1), size=(sprite_size, sprite_size))
+        overlay.paste(sprite, (pad, sy), sprite)
+
+        ix = pad + sprite_size + 20
+        # --- 【优化】文字信息也随之上移 ---
+        iy = sy + 10
         
         # Name
         draw.text((ix, iy), p.get('name', ''), fill=COLOR_TITLE, font=self.fonts["title"])
@@ -216,10 +223,10 @@ class UserPokemonDetailDrawer(BaseDrawer):
             draw.text((ix, curr_y), r, fill=COLOR_TEXT_GRAY, font=self.fonts["normal"])
             curr_y += 28
 
-        # 动态计算分割线位置，防止重叠
-        line_y = max(sy + 185, curr_y + 20)
-        draw.line((pad, line_y, self.width-pad, line_y), fill=(220, 220, 220), width=2)
-        
+        # 分割线动态位置
+        line_y = max(sy + sprite_size + 10, curr_y + 20)
+        draw.line((pad, line_y, self.width - pad, line_y), fill=(220, 220, 220), width=2)
+
         # Optional: Background Tint based on Primary Type
         if p.get('types'):
             primary_type = p.get('types')[0]
