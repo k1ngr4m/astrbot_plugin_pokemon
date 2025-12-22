@@ -721,8 +721,17 @@ class BattleLogic:
             # logger_obj.log(f"{attacker.context.pokemon.name} 倒下了！\n\n") # 交给外部或最后统一显示
             return True
         if defender.current_hp <= 0:
-            if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 防御方 {defender.context.pokemon.name} HP归零，战斗结束")
+            if logger_obj and logger_obj.should_log_details():
+                logger_obj.log_debug(f"[DEBUG] 防御方 {defender.context.pokemon.name} HP归零")
+            
+            # 1. 触发防御方的 on_faint (处理气势披带等 - 暂未实现具体逻辑，仅触发)
+            defender.hooks.trigger_event("on_faint", defender, attacker, logger_obj)
+            
+            # 2. 触发攻击方的 on_opponent_faint (处理自信过度等)
+            # 仅当攻击方还活着时触发
+            if attacker.current_hp > 0:
+                attacker.hooks.trigger_event("on_opponent_faint", attacker, defender, logger_obj)
+            
             logger_obj.log(f"{defender.context.pokemon.name} 倒下了！\n\n")
             return True
 

@@ -21,7 +21,8 @@ class HookManager:
             "on_damage_calc": [],   # 伤害计算中 (属性修正、威力修正)
             "after_damage": [],     # 造成伤害后 (反伤、吸血)
             "turn_end": [],         # 回合结束时 (中毒扣血、道具回复)
-            "on_faint": []          # 濒死时 (气势披带判断)
+            "on_faint": [],          # 自身濒死时
+            "on_opponent_faint": []  # 新增：击败对手时
         }
 
     def register(self, event: str, hook: BattleHook):

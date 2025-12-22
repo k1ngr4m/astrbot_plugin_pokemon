@@ -299,6 +299,75 @@ class GaleWingsAbility(AbilityPlugin):
         return move.type_name in ['flying', '飞行']
 
 
+# 5. 自信过度 (Moxie) - ID: 153
+@AbilityRegistry.register(153) 
+class MoxieAbility(AbilityPlugin):
+    def on_apply(self):
+        # 注册击败对手时的事件钩子
+        hook = BattleHook("moxie_trigger", 10, self.on_kill)
+        hook.source_plugin = self
+        self.owner.hooks.register("on_opponent_faint", hook)
+
+    def on_kill(self, attacker, defender, logger_obj):
+        """当击败对手时触发"""
+        # 获取当前物理攻击等级 (1)
+        curr_lvl = attacker.stat_levels.get(1, 0)
+        if curr_lvl < 6:
+            attacker.stat_levels[1] = curr_lvl + 1
+            logger_obj.log(f"{attacker.context.pokemon.name} 充满了自信！攻击力提升了！\n\n")
+
+# 6. 异兽提升 (Beast Boost) - ID: 224
+@AbilityRegistry.register(224)
+class BeastBoostAbility(AbilityPlugin):
+    def on_apply(self):
+        hook = BattleHook("beast_boost_trigger", 10, self.on_kill)
+        hook.source_plugin = self
+        self.owner.hooks.register("on_opponent_faint", hook)
+
+    def on_kill(self, attacker, defender, logger_obj):
+        # 1. 获取当前所有实战数值 (攻击、防御、特攻、特防、速度)
+        stats = self.owner.context.pokemon.stats # 注意：应该从 context 取基础值，或者 get_modified_stats?
+        # 异兽提升通常计算的是“实战数值”（含能力等级、道具等修正，但不含麻痹等状态降低？）
+        # 官方规则：判定的是“能力变化后的最大值”。
+        # 这里简化处理：直接读取 BattleState 计算后的数值（如果不方便就取基础值）
+        # self.owner 是 BattleState，有 hooks 和 context
+        # 为了准确，应该调用 stats_helper 计算当前面板。但 BattleEngine 在外部。
+        # 这里简化：使用基础种族值+个体努力值+能力等级计算 (stat_levels 已在 state 中)
+        # 为避免复杂依赖，暂时只比较 raw stats (不含等级)，或简单取基础 stats。
+        # 用户需求中示例直接使用了 stats，这里沿用，但尽可能精确如果能获取。
+        
+        # 修正：直接读取 context.pokemon.stats 是基础值。
+        # 若要精确，需结合 stat_levels。
+        # 简单实现：仅比较面板数值 (context.pokemon.stats) 加上等级修正？
+        # BattleLogic 不在这里，无法调用 _get_modified_stats。
+        # 妥协：仅比较 context.pokemon.stats (假设性格努力值已计算在内)。
+        
+        stats = attacker.context.pokemon.stats
+        stat_values = {
+            1: stats.attack,
+            2: stats.defense,
+            3: stats.sp_attack,
+            4: stats.sp_defense,
+            5: stats.speed
+        }
+        
+        # 2. 找出最高项 (取 ID 最小的最高项)
+        # sort by value desc, then by id asc
+        sorted_stats = sorted(stat_values.items(), key=lambda x: (-x[1], x[0]))
+        best_stat_id = sorted_stats[0][0]
+        
+        stat_names = {1: "攻击", 2: "防御", 3: "特攻", 4: "特防", 5: "速度"}
+        stat_name = stat_names.get(best_stat_id, "属性")
+        
+        # 3. 提升该等级
+        curr_lvl = attacker.stat_levels.get(best_stat_id, 0)
+        if curr_lvl < 6:
+            attacker.stat_levels[best_stat_id] = curr_lvl + 1
+            logger_obj.log(f"{attacker.context.pokemon.name} 的异兽提升发动了！{stat_name}提升了！\n\n")
+
+
+
+
 # 2. 蓄电 (Volt Absorb) - ID: 10 (免疫并回血)
 @AbilityRegistry.register(10)
 class VoltAbsorbAbility(ImmunityAbility):
