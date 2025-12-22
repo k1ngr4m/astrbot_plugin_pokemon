@@ -100,7 +100,7 @@ class TeamDrawer:
 
         # Footer
         fy = total_h - 40
-        draw.text((cx, fy), "⭐ 标记的为队长 | 使用 /设置队伍 <ID> 设置队伍",
+        draw.text((cx, fy), "使用 /设置队伍 <ID> 设置队伍",
                   fill=COLOR_TEXT_GRAY, font=self.fonts["small"], anchor="mm")
 
         image.paste(overlay, (0,0), overlay)
