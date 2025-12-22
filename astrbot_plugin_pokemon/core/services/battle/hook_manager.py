@@ -15,6 +15,7 @@ class HookManager:
     def __init__(self):
         # 存储格式：{ "event_name": [BattleHook, ...] }
         self._hooks: Dict[str, List[BattleHook]] = {
+            "on_priority_calc": [], # 新增：优先度计算
             "before_move": [],      # 招式发动前 (可取消行动)
             "on_stat_calc": [],     # 能力值计算 (修正攻击/速度等)
             "on_damage_calc": [],   # 伤害计算中 (属性修正、威力修正)

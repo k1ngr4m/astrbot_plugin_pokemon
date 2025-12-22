@@ -256,6 +256,49 @@ class LevitateAbility(ImmunityAbility):
         super().__init__(owner, target_type='ground', msg="由于飘浮特性，地面系招式无效！")
 
 
+# 3. 恶作剧之心 (Prankster) - ID: 158
+@AbilityRegistry.register(158)
+class PranksterAbility(AbilityPlugin):
+    def on_apply(self):
+        # 注册优先级计算钩子
+        hook = BattleHook("prankster_prio", 10, self.priority_mod)
+        hook.source_plugin = self
+        self.owner.hooks.register("on_priority_calc", hook)
+
+    def priority_mod(self, current_priority, attacker, move):
+        """如果是变化招式，优先级 +1"""
+        # 判定变化招式
+        # damage_class_id: 1=Status, 2=Physical, 3=Special
+        if move.damage_class_id == 1:
+            return current_priority + 1
+        return current_priority
+
+
+# 4. 疾风之翼 (Gale Wings) - ID: 177
+@AbilityRegistry.register(177)
+class GaleWingsAbility(AbilityPlugin):
+    def on_apply(self):
+        hook = BattleHook("gale_wings_prio", 10, self.priority_mod)
+        hook.source_plugin = self
+        self.owner.hooks.register("on_priority_calc", hook)
+
+    def priority_mod(self, current_priority, attacker, move):
+        # 检查是否满血且为飞行系招式
+        # 注意：这里需要考虑是否应该用 max_hp, 有些实现可能用百分比
+        # Gen 7+: 只有满血才有效
+        max_hp = attacker.context.pokemon.stats.hp
+        is_full_hp = attacker.current_hp >= max_hp 
+        is_flying_move = self.check_flying_move(move)
+        
+        if is_full_hp and is_flying_move:
+            return current_priority + 1
+        return current_priority
+
+    def check_flying_move(self, move):
+        # 简单检查属性名称，兼容中文
+        return move.type_name in ['flying', '飞行']
+
+
 # 2. 蓄电 (Volt Absorb) - ID: 10 (免疫并回血)
 @AbilityRegistry.register(10)
 class VoltAbsorbAbility(ImmunityAbility):

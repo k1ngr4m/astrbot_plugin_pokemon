@@ -1258,8 +1258,24 @@ class BattleLogic:
                     logger_obj.log(f"{target_unit.context.pokemon.name}的{stat_name}{action_desc}了！\n\n")
     # --- 6. 工具与计算辅助 ---
 
+    def _get_effective_priority(self, attacker: BattleState, move: BattleMoveInfo) -> int:
+        """计算考虑特性修正后的实际优先度"""
+        base_priority = move.priority
+        
+        # 触发优先级修正钩子
+        # 传入当前的优先度、使用者状态和招式信息
+        effective_priority = attacker.hooks.trigger_value(
+            "on_priority_calc", base_priority, attacker, move
+        )
+        return effective_priority
+
     def _is_user_first(self, user_state, wild_state, u_move, w_move) -> bool:
-        if u_move.priority != w_move.priority: return u_move.priority > w_move.priority
+        # 1. 获取经特性修正后的实际优先度
+        u_prio = self._get_effective_priority(user_state, u_move)
+        w_prio = self._get_effective_priority(wild_state, w_move)
+        
+        if u_prio != w_prio: return u_prio > w_prio
+        
         u_spd = self._get_modified_stats(user_state).speed
         w_spd = self._get_modified_stats(wild_state).speed
         if u_spd != w_spd: return u_spd > w_spd
