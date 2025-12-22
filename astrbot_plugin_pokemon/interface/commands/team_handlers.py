@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, List
 from ...core.models.pokemon_models import UserPokemonInfo
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
+from .draw.team_drawer import draw_team_list
+import os
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
@@ -15,6 +17,10 @@ class TeamHandlers:
         self.user_service = container.user_service
         self.team_service = container.team_service
         self.user_pokemon_service = container.user_pokemon_service
+        self.pokemon_service = container.pokemon_service
+        self.nature_service = container.nature_service
+        self.ability_service = container.ability_service
+        self.tmp_dir = container.tmp_dir
 
     async def set_team(self, event: AstrMessageEvent):
         """设置队伍中的宝可梦"""
@@ -70,27 +76,47 @@ class TeamHandlers:
 
         team: List[UserPokemonInfo] = result.data
 
-        # 显示队伍信息
-        message = "🏆 当前队伍配置：\n\n"
-        # 显示队伍列表
-        if team:
-            message += f"\n队伍成员 ({len(team)}/6)：\n"
-            for i, pokemon_data in enumerate(team, 1):
-                # 从pokemon_data中提取信息
-                id = pokemon_data.id
-                name = pokemon_data.name
-                level = pokemon_data.level
-                hp = pokemon_data.stats.hp
-                current_hp = pokemon_data.current_hp
+        # 构建绘图数据
+        draw_data = {
+            "list": []
+        }
 
-                # 标记出战宝可梦（第一个是出战的）
-                marker = " ⭐" if i == 1 else ""
-                message += f"  {i}. {name}{marker}\n"
-                message += f"     ID: {id} | 等级: {level} | HP: {current_hp}\n"
-        else:
-            message += "\n队伍成员 (0/6)：暂无\n"
+        for i, p in enumerate(team):
+            # 从pokemon_service获取类型信息
+            raw_types = self.plugin.pokemon_service.get_pokemon_types(p.species_id)
+            types_str = '/'.join(dict.fromkeys(raw_types)) if raw_types else "未知"
 
-        yield event.plain_result(message)
+            # 性别图标
+            gender_icon = {"M": "♂️", "F": "♀️", "N": "⚲"}.get(p.gender, "")
+
+            # 性格
+            nature_name = self.nature_service.get_nature_name_by_id(p.nature_id)
+
+            # 特性
+            ability_name = "未知"
+            if p.ability_id and p.ability_id > 0:
+                a_info = self.ability_service.get_ability_by_id(p.ability_id)
+                if a_info:
+                    ability_name = a_info.get('name_zh', a_info.get('name_en', '未知'))
+
+            draw_data["list"].append({
+                "id": p.id,
+                "sprite_id": p.species_id,
+                "name": p.name,
+                "level": p.level,
+                "gender": gender_icon,
+                "nature": nature_name,
+                "ability": ability_name,
+                "current_hp": p.current_hp,
+                "max_hp": p.stats.hp,
+                "types": raw_types if raw_types else []
+            })
+
+        # 生成图片
+        img = draw_team_list(draw_data)
+        save_path = os.path.join(self.tmp_dir, f"team_list_{user_id}.png")
+        img.save(save_path)
+        yield event.image_result(save_path)
 
     async def heal_team(self, event: AstrMessageEvent):
         """恢复队伍中所有宝可梦的生命值和状态"""
