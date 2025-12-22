@@ -28,16 +28,22 @@ def test_rich_battle_log():
                 'level': 50,
                 'user_species_id': 25,
                 'user_types': ['电'], # Should color name Yellow (Chinese Key Test)
+                'current_hp': 80,
+                'max_hp': 100,
                 
                 'trainer_pokemon_name': 'Starmie',
                 'trainer_pokemon_level': 52,
                 'target_species_id': 121,
                 'target_types': ['水', '超能力'], # Should color name Blue (Water)
+                'target_current_hp': 20,
+                'target_max_hp': 120,
                 
                 'result': 'win',
                 'win_rate': 60.0,
                 
                 'details': [
+                    # Turn Header
+                    "--- 第 1 回合 ---",
                     # Rich Text Line 1: Move Usage
                     [
                         {'text': 'Pikachu', 'color': 'type_electric'},
@@ -48,6 +54,10 @@ def test_rich_battle_log():
                     # Rich Text Line 2: Effectiveness (Red)
                     [
                         {'text': "It's super effective!", 'color': 'red'}
+                    ],
+                    # Rich Text Line 2b: Chinese Effectiveness (Test Highlight)
+                    [
+                        {'text': "效果绝佳！", 'color': 'red'}
                     ],
                     # Rich Text Line 3: Damage (Crit/Super - Red)
                     [

@@ -348,6 +348,10 @@ class AdventureService:
                     "target_species_id": opponent_ctx.pokemon.species_id, # 新增目标ID
                     "target_types": opponent_ctx.types, # 新增类型
                     "target_level": opponent_ctx.pokemon.level, # 新增目标等级
+                    "current_hp": user_ctx.current_hp,
+                    "max_hp": user_ctx.pokemon.stats.hp,
+                    "target_current_hp": opponent_ctx.current_hp,
+                    "target_max_hp": opponent_ctx.pokemon.stats.hp,
                     "win_rate": u_win_rate,
                     "result": battle_outcome,
                     "details": log_data
@@ -364,6 +368,10 @@ class AdventureService:
                     "trainer_pokemon_level": opponent_ctx.pokemon.level,
                     "target_species_id": opponent_ctx.pokemon.species_id, # 新增目标ID
                     "target_types": opponent_ctx.types, # 新增类型
+                    "current_hp": user_ctx.current_hp,
+                    "max_hp": user_ctx.pokemon.stats.hp,
+                    "target_current_hp": opponent_ctx.current_hp,
+                    "target_max_hp": opponent_ctx.pokemon.stats.hp,
                     "win_rate": u_win_rate,
                     "result": battle_outcome,
                     "details": log_data
@@ -614,8 +622,8 @@ class AdventureService:
     def execute_real_battle(self, user_ctx: BattleContext, wild_ctx: BattleContext) -> tuple[str, Any, int, int]:
         """执行实战，生成详细日志"""
         logger_obj = ListBattleLogger(log_details=True)  # 真实战斗时启用详细日志
-        logger_obj.log(f"战斗开始！{user_ctx.pokemon.name} (Lv.{user_ctx.pokemon.level}) VS {wild_ctx.pokemon.name} (Lv.{wild_ctx.pokemon.level})\n\n")
-        logger_obj.log(f"{user_ctx.pokemon.name} HP: {user_ctx.current_hp}, {wild_ctx.pokemon.name} HP: {wild_ctx.current_hp}\n\n")
+        logger_obj.log(f"战斗开始！{user_ctx.pokemon.name} (Lv.{user_ctx.pokemon.level}) VS {wild_ctx.pokemon.name} (Lv.{wild_ctx.pokemon.level})\n")
+        logger_obj.log(f"{user_ctx.pokemon.name} HP: {user_ctx.current_hp}, {wild_ctx.pokemon.name} HP: {wild_ctx.current_hp}\n")
 
         # Create BattleState linked to the contexts
         # Note: In real battle, we want to update the context's HP and PP as well?
