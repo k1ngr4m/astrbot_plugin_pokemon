@@ -722,7 +722,7 @@ class BattleLogic:
             return True
         if defender.current_hp <= 0:
             if logger_obj and logger_obj.should_log_details():
-                logger_obj.log_debug(f"[DEBUG] 防御方 {defender.context.pokemon.name} HP归零")
+                logger.info(f"[DEBUG] 防御方 {defender.context.pokemon.name} HP归零")
             
             # 1. 触发防御方的 on_faint (处理气势披带等 - 暂未实现具体逻辑，仅触发)
             defender.hooks.trigger_event("on_faint", defender, attacker, logger_obj)

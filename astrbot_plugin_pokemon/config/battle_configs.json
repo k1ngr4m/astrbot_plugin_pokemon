@@ -42,11 +42,6 @@
       "msg_release": "从天空中下来了！",
       "protect_type": "flying"
     },
-    "84": {
-      "msg_charge": "飞到了天上！",
-      "msg_release": "从天空中下来了！",
-      "protect_type": "flying"
-    },
     "76": {
       "msg_charge": "收集满满的日光！",
       "msg_release": "发射了光束！"
