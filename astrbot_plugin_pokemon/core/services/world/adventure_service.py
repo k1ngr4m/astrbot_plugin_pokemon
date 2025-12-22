@@ -345,6 +345,7 @@ class AdventureService:
                     "user_species_id": user_ctx.pokemon.species_id, # 新增明确字段
                     "level": user_ctx.pokemon.level,
                     "target_species_id": opponent_ctx.pokemon.species_id, # 新增目标ID
+                    "target_level": opponent_ctx.pokemon.level, # 新增目标等级
                     "win_rate": u_win_rate,
                     "result": battle_outcome,
                     "details": log_data

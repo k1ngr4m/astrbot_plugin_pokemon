@@ -185,9 +185,8 @@ class BattleDrawer:
             my = card_y + layout["base_h"] // 2
             draw.text((mx, my), "VS", fill=(200, 200, 200), font=self.fonts["title"], anchor="mm")
             
-            # Right: Opponent
             op_name = sk.get('trainer_pokemon_name') or log_data.get('target_name')
-            op_lv = sk.get('trainer_pokemon_level') or log_data.get('target_level')
+            op_lv = sk.get('trainer_pokemon_level') or sk.get('target_level') or log_data.get('target_level')
             target_species_id = sk.get('target_species_id')
 
             rx = self.width - pad - 20
