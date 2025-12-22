@@ -305,51 +305,12 @@ class BattleDrawer:
         
         return rect_w
 
-    def _draw_hp_bar(self, draw: ImageDraw.Draw, x: int, y: int, width: int, current_hp: int, max_hp: int, is_right: bool = False):
-        """绘制带高光反闪的血量条"""
-        if max_hp <= 0: max_hp = 1
-        ratio = max(0, min(1, current_hp / max_hp))
-        h = 10
-        
-        # 背景
-        draw_rounded_rectangle(draw, (x, y, x + width, y + h), corner_radius=5, fill=(220, 220, 220))
-        
-        # 颜色逻辑：>50%绿, >20%黄, 其余红
-        if ratio > 0.5: bar_col = (76, 175, 80)
-        elif ratio > 0.2: bar_col = (255, 193, 7)
-        else: bar_col = (244, 67, 54)
-        
-        if ratio > 0:
-            bar_w = int(width * ratio)
-            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + h), corner_radius=5, fill=bar_col)
-            # 反闪高光
-            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + 3), corner_radius=2, fill=(255, 255, 255, 120))
-            
-        # HP文字
-        hp_text = f"{current_hp}/{max_hp}"
-        tx = x + width if is_right else x
-        anchor = "ra" if is_right else "la"
-        draw.text((tx, y + h + 4), hp_text, fill=self.cfg["colors"]["text_sub"], font=self.fonts["small"], anchor=anchor)
-
-    def _draw_type_badge(self, draw: ImageDraw.Draw, x: int, y: int, type_text: str, color: Tuple[int, int, int]):
-        """绘制属性徽章"""
-        font = self.fonts["small"]
-        text_w = font.getlength(type_text)
-        text_h = 14
-        pad_x = 8
-        pad_y = 2
-        
-        rect_w = int(text_w + pad_x * 2)
-        rect_h = int(text_h + pad_y * 2)
-        
-        draw_rounded_rectangle(draw, (x, y, x + rect_w, y + rect_h), corner_radius=10, fill=color)
-        draw.text((x + pad_x, y + pad_y), type_text, fill=(255, 255, 255), font=font)
-        return rect_w
 
     def _draw_turn_badge(self, draw, x, y, text):
-        """绘制回合标签"""
+        """绘制回合标签，位置略微向左偏移以对齐整体"""
         txt = text.replace("-", "").strip()
         w = self.fonts["small"].getlength(txt)
+        # 使用传入的 x (即 pad + 30)，使背景框边缘稍微突出
         draw_rounded_rectangle(draw, (int(x), int(y), int(x + w + 20), int(y + 22)), corner_radius=10, fill=self.cfg["colors"]["turn_bg"])
         draw.text((x + 10, y + 2), txt, fill=(120, 120, 120), font=self.fonts["small"])
 
@@ -372,43 +333,47 @@ class BattleDrawer:
         return TYPE_COLORS.get(type_zh, COLOR_TEXT_DARK)
 
     def _draw_rich_text_line(self, draw, x, y, content):
-        """修复版：移除加粗，改用底色和颜色突出，并清理手动缩进"""
+        """完全修复版：使用固定间距确保绝对对齐"""
+        # 1. 提取并深度清理内容
         raw_text = "".join([s.get('text','') for s in content]) if isinstance(content, list) else str(content)
-        # 清理前缀
-        full_text = raw_text.strip().lstrip("·").strip()
-        
-        # 1. 效果绝佳高亮（底色方案，不遮挡文字）
+        # 移除所有可能的手动前缀：点号、空格、连字符等
+        full_text = raw_text.strip().lstrip("·•- ").strip()
+
+        # 2. 效果绝佳高亮（底色方案）
         if any(k in full_text for k in ["效果绝佳", "击中要害"]):
             text_w = self.fonts["small"].getlength(full_text)
-            draw_rounded_rectangle(draw, (int(x-5), int(y-2), int(x+text_w+35), int(y+18)), corner_radius=4, fill=(255, 0, 0, 25))
+            draw_rounded_rectangle(draw, (int(x-5), int(y-2), int(x+text_w+45), int(y+18)), corner_radius=4, fill=(255, 0, 0, 25))
 
-        # 2. 图标识别
-        icon = "• "
-        if any(k in full_text for k in ["used", "使用了"]): icon = "⚔️ "
-        elif any(k in full_text for k in ["restored", "回复"]): icon = "💚 "
-        elif any(k in full_text for k in ["paralyzed", "burned", "poisoned", "asleep", "frozen", "confused", "麻痹", "灼伤", "中毒", "睡眠", "冰冻", "混乱", "陷入"]): icon = "⚠️ "
-        elif any(k in full_text for k in ["fainted", "倒下", "defeated"]): icon = "💀 "
+        # 3. 图标识别逻辑
+        icon = "•"
+        if any(k in full_text for k in ["used", "使用了"]): icon = "⚔️"
+        elif any(k in full_text for k in ["restored", "回复"]): icon = "💚"
+        elif any(k in full_text for k in ["paralyzed", "burned", "poisoned", "asleep", "frozen", "confused", "麻痹", "灼伤", "中毒", "睡眠", "冰冻", "混乱", "陷入"]): icon = "⚠️"
+        elif any(k in full_text for k in ["fainted", "倒下", "defeated"]): icon = "💀"
 
-        curr_x = x
-        draw.text((curr_x, y), icon, fill=self.cfg["colors"]["text_sub"], font=self.fonts["small"])
-        curr_x += self.fonts["small"].getlength(icon)
+        # 4. 绘制图标
+        draw.text((x, y), icon, fill=self.cfg["colors"]["text_sub"], font=self.fonts["small"])
 
-        # 3. 分段渲染
+        # --- 修复关键点：设定固定的文字起始坐标 ---
+        # 无论图标占用多少像素，文字都从 x + 35 处开始
+        TEXT_START_OFFSET = 35
+        curr_x = x + TEXT_START_OFFSET
+
+        # 5. 分段渲染逻辑
         if isinstance(content, list):
             is_first = True
             for seg in content:
                 txt = seg.get('text', '')
                 if is_first:
-                    # Clean first segment
-                    txt = txt.lstrip().lstrip("·").lstrip()
-                    if not txt: continue # Skip if empty after clean
+                    # 对第一段文字进行同样的清理
+                    txt = txt.strip().lstrip("·•- ").strip()
+                    if not txt: continue
                     is_first = False
-                
+
                 color = self._get_color(seg.get('color', 'default'))
                 draw.text((curr_x, y), txt, fill=color, font=self.fonts["small"])
                 curr_x += self.fonts["small"].getlength(txt)
         else:
-            # Clean string
             draw.text((curr_x, y), full_text, fill=self.cfg["colors"]["text_main"], font=self.fonts["small"])
             
     def _get_color(self, color_key: str) -> Tuple[int, int, int]:
