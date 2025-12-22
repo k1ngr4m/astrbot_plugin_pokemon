@@ -17,6 +17,8 @@ from .ability_plugins import AbilityRegistry
 class BattleLogger(Protocol):
     def log(self, message: str): ...
 
+    def log_rich(self, segments: list): ...
+
     def should_log_details(self) -> bool: ...
 
 
@@ -25,13 +27,23 @@ class ListBattleLogger:
         self.logs = []
         self._log_details = log_details
 
+
     def log(self, message: str): self.logs.append(message)
+    
+    def log_rich(self, segments: list):
+        """
+        Structured log for rich text rendering.
+        segments: List[Dict] -> [{'text': 'pikachu', 'color': 'electric', 'type': 'electric'}]
+        """
+        self.logs.append(segments)
 
     def should_log_details(self) -> bool: return self._log_details
 
 
 class NoOpBattleLogger:
     def log(self, message: str): pass
+
+    def log_rich(self, segments: list): pass
 
     def should_log_details(self) -> bool: return False
 
@@ -511,7 +523,18 @@ class BattleLogic:
         elif not move_config:
              # 普通技能日志
              pp_str = self._get_pp_str(attacker, move)
-             logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_str}！\n\n")
+             
+             # Rich Log
+             attacker_type = attacker.context.types[0] if attacker.context.types else 'normal'
+             move_type = move.type_name
+             
+             logger_obj.log_rich([
+                {'text': f"{attacker.context.pokemon.name}", 'color': f"type_{attacker_type}"},
+                {'text': " 使用了 ", 'color': 'default'},
+                {'text': f"{move.move_name}", 'color': f"type_{move_type}"},
+                {'text': f"{pp_str}！\n\n", 'color': 'default'}
+             ])
+             # logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}{pp_str}！\n\n")
 
         # E. 计算结果 (Calculate) - 需要处理连续攻击逻辑
         # 此步骤只计算数据，不修改任何状态
@@ -576,23 +599,29 @@ class BattleLogic:
                     # 记录最后一次攻击的暴击和效果状态
                     if logger_obj.should_log_details():
                         logger.info(f"[DEBUG] 连续攻击总共造成 {total_damage_dealt} 点伤害")
-                    logger_obj.log(f"击中了 {hits_landed} 次！造成总计 {total_damage_dealt} 点伤害。\n\n")
+                    # Rich Log for Multi-Hit
+                    dmg_color = 'red' if (outcome and (outcome.is_crit or outcome.effectiveness > 1.0)) else 'default'
+                    logger_obj.log_rich([
+                        {'text': f"击中了 {hits_landed} 次！造成总计 ", 'color': 'default'},
+                        {'text': f"{total_damage_dealt}", 'color': dmg_color},
+                        {'text': " 点伤害。\n\n", 'color': 'default'}
+                    ])
 
                     # 显示暴击和效果拔群提示（基于最后一次攻击）
                     if outcome and outcome.is_crit:
-                        logger_obj.log("击中要害！\n\n")
+                        logger_obj.log_rich([{'text': "击中要害！\n\n", 'color': 'red'}])
                         if logger_obj.should_log_details():
                             logger.info("[DEBUG] 触发暴击")
                     if outcome and outcome.effectiveness > 1.0:
-                        logger_obj.log("效果绝佳！\n\n")
+                        logger_obj.log_rich([{'text': "效果绝佳！\n\n", 'color': 'red'}])
                         if logger_obj.should_log_details():
                             logger.info("[DEBUG] 效果绝佳")
                     elif outcome and outcome.effectiveness == 0.0:
-                        logger_obj.log("似乎没有效果！\n\n")
+                        logger_obj.log_rich([{'text': "似乎没有效果！\n\n", 'color': 'blue'}])
                         if logger_obj.should_log_details():
                             logger.info("[DEBUG] 技能对目标无效")
                     elif outcome and outcome.effectiveness < 1.0:
-                        logger_obj.log("效果不佳！\n\n")
+                        logger_obj.log_rich([{'text': "效果不佳！\n\n", 'color': 'blue'}])
                         if logger_obj.should_log_details():
                             logger.info("[DEBUG] 效果不佳")
                 else:
@@ -625,23 +654,29 @@ class BattleLogic:
                 defender.current_hp -= outcome.damage
                 if is_struggle:
                     logger_obj.log(f"{attacker.context.pokemon.name} 使用了挣扎！（PP耗尽）\n\n")
-                logger_obj.log(f"造成 {outcome.damage} 点伤害。\n\n")
+                # Rich Log for Single Hit
+                dmg_color = 'red' if (outcome.is_crit or outcome.effectiveness > 1.0) else 'default'
+                logger_obj.log_rich([
+                    {'text': "造成 ", 'color': 'default'},
+                    {'text': f"{outcome.damage}", 'color': dmg_color},
+                    {'text': " 点伤害。\n\n", 'color': 'default'}
+                ])
 
                 # 效果拔群等提示
                 if outcome.is_crit:
-                    logger_obj.log("击中要害！\n\n")
+                    logger_obj.log_rich([{'text': "击中要害！\n\n", 'color': 'red'}])
                     if logger_obj.should_log_details():
                         logger.info("[DEBUG] 触发暴击")
                 if outcome.effectiveness > 1.0:
-                    logger_obj.log("效果绝佳！\n\n")
+                    logger_obj.log_rich([{'text': "效果绝佳！\n\n", 'color': 'red'}])
                     if logger_obj.should_log_details():
                         logger.info("[DEBUG] 效果绝佳")
                 elif outcome.effectiveness == 0.0:
-                    logger_obj.log("似乎没有效果！\n\n")
+                    logger_obj.log_rich([{'text': "似乎没有效果！\n\n", 'color': 'blue'}])
                     if logger_obj.should_log_details():
                         logger.info("[DEBUG] 技能对目标无效")
                 elif outcome.effectiveness < 1.0:
-                    logger_obj.log("效果不佳！\n\n")
+                    logger_obj.log_rich([{'text': "效果不佳！\n\n", 'color': 'blue'}])
                     if logger_obj.should_log_details():
                         logger.info("[DEBUG] 效果不佳")
 

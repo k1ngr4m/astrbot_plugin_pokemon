@@ -343,8 +343,10 @@ class AdventureService:
                     "pokemon_name": user_ctx.pokemon.name,
                     "species_name": user_ctx.pokemon.species_id, # 保留旧字段兼容
                     "user_species_id": user_ctx.pokemon.species_id, # 新增明确字段
+                    "user_types": user_ctx.types, # 新增类型
                     "level": user_ctx.pokemon.level,
                     "target_species_id": opponent_ctx.pokemon.species_id, # 新增目标ID
+                    "target_types": opponent_ctx.types, # 新增类型
                     "target_level": opponent_ctx.pokemon.level, # 新增目标等级
                     "win_rate": u_win_rate,
                     "result": battle_outcome,
@@ -356,10 +358,12 @@ class AdventureService:
                     "pokemon_name": user_ctx.pokemon.name,
                     "species_name": user_ctx.pokemon.species_id, # 保留旧字段兼容
                     "user_species_id": user_ctx.pokemon.species_id, # 新增明确字段
+                    "user_types": user_ctx.types, # 新增类型
                     "level": user_ctx.pokemon.level,
                     "trainer_pokemon_name": opponent_ctx.pokemon.name,
                     "trainer_pokemon_level": opponent_ctx.pokemon.level,
                     "target_species_id": opponent_ctx.pokemon.species_id, # 新增目标ID
+                    "target_types": opponent_ctx.types, # 新增类型
                     "win_rate": u_win_rate,
                     "result": battle_outcome,
                     "details": log_data
