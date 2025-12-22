@@ -622,8 +622,8 @@ class AdventureService:
     def execute_real_battle(self, user_ctx: BattleContext, wild_ctx: BattleContext) -> tuple[str, Any, int, int]:
         """执行实战，生成详细日志"""
         logger_obj = ListBattleLogger(log_details=True)  # 真实战斗时启用详细日志
-        logger_obj.log(f"战斗开始！{user_ctx.pokemon.name} (Lv.{user_ctx.pokemon.level}) VS {wild_ctx.pokemon.name} (Lv.{wild_ctx.pokemon.level})\n")
-        logger_obj.log(f"{user_ctx.pokemon.name} HP: {user_ctx.current_hp}, {wild_ctx.pokemon.name} HP: {wild_ctx.current_hp}\n")
+        logger_obj.log(f"战斗开始！{user_ctx.pokemon.name} (Lv.{user_ctx.pokemon.level}) VS {wild_ctx.pokemon.name} (Lv.{wild_ctx.pokemon.level})\n\n")
+        logger_obj.log(f"{user_ctx.pokemon.name} HP: {user_ctx.current_hp}, {wild_ctx.pokemon.name} HP: {wild_ctx.current_hp}\n\n")
 
         # Create BattleState linked to the contexts
         # Note: In real battle, we want to update the context's HP and PP as well?

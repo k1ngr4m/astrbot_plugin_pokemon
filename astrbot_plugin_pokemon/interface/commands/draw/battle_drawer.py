@@ -108,21 +108,30 @@ class BattleDrawer:
         detail_line_height = 25
         detail_pad = 20
         
+        line_height = 25
+        base_card_height = 140
+        
         for sk in skirmishes:
              details = sk.get('details', [])
-             # 计算详情区域高度
-             details_height = len(details) * detail_line_height
-             if details_height > 0:
-                 details_height += detail_pad * 2 # 上下内边距
+             # 精确计算详情区高度
+             details_h = 0
+             for line in details:
+                 if "第" in str(line) and "回合" in str(line):
+                     details_h += line_height + 15
+                 else:
+                     details_h += line_height + 5
              
-             total_card_h = base_card_height + details_height
+             if details_h > 0:
+                 details_h += 30
+             
+             total_card_h = base_card_height + details_h
              
              skirmish_layouts.append({
                  "y": current_y,
                  "height": total_card_h,
                  "base_h": base_card_height,
                  "details": details,
-                 "details_h": details_height
+                 "details_h": details_h
              })
              
              current_y += total_card_h + 20 # 卡片间距
@@ -286,14 +295,13 @@ class BattleDrawer:
                     line_str = str(line) # In case line is list
                     turn_match = re.search(r"--- 第 (\d+) 回合 ---", line_str)
                     if turn_match:
-                        curr_dy += 15 # Add padding before header
                         turn_num = int(turn_match.group(1))
                         self._draw_turn_header(draw, pad + 30, curr_dy, turn_num)
+                        curr_dy += 40 # line_height (25) + 15
                     else:
                         # Rich Text
                         self._draw_rich_text_line(draw, pad + 30, curr_dy, line, self.fonts["small"])
-                    curr_dy += detail_line_height
-                    curr_dy += detail_line_height
+                        curr_dy += 30 # line_height (25) + 5
 
         image.paste(overlay, (0,0), overlay)
         return image
@@ -403,20 +411,18 @@ class BattleDrawer:
         elif isinstance(content, list):
             full_text = "".join([seg.get('text', '') for seg in content])
         
-        # Highlighting "Super Effective"
+        # Highlighting "Super Effective" (Optimized)
         if "效果绝佳" in full_text:
-            # Draw highlight background
-            # Approx width: entire card width minus padding? Or just text width?
-            # Using text width is safer.
-            text_w = font.getlength(full_text) + 20 # +Icon space
-            draw.rectangle((x - 2, y, x + text_w, y + 16), fill=(255, 0, 0, 20)) # Very Light Red
+             text_w = font.getlength(full_text) + 30
+             # Use corner_radius instead of radius
+             draw_rounded_rectangle(draw, (int(x - 5), int(y - 2), int(x + text_w), int(y + 18)), corner_radius=3, fill=(255, 0, 0, 15))
 
         icon = "•"
-        if any(k in full_text for k in ["used", "使用了", "attacked"]):
+        if any(k in full_text for k in ["used", "使用了", "attacked", "攻击"]):
             icon = "⚔️"
         elif any(k in full_text for k in ["restored", "回复", "health"]):
             icon = "💚"
-        elif any(k in full_text for k in ["paralyzed", "burned", "poisoned", "asleep", "frozen", "confused", "麻痹", "灼伤", "中毒", "睡眠", "冰冻", "混乱"]):
+        elif any(k in full_text for k in ["paralyzed", "burned", "poisoned", "asleep", "frozen", "confused", "麻痹", "灼伤", "中毒", "睡眠", "冰冻", "混乱", "陷入"]):
             icon = "⚠️"
         elif any(k in full_text for k in ["fainted", "倒下", "defeated"]):
             icon = "💀"
@@ -435,8 +441,7 @@ class BattleDrawer:
                 text = segment.get('text', '')
                 color_key = segment.get('color', 'default')
                 
-                # Bolding Move Names (User Request: "colored move segments")
-                stroke_width = 0
+                # Removed stroke_width to fix blur
                 
                 # 解析颜色
                 if color_key == 'default':
@@ -444,8 +449,6 @@ class BattleDrawer:
                 elif color_key.startswith('type_'):
                     type_en = color_key.replace('type_', '')
                     fill_color = self._get_type_color(type_en)
-                    # Bold usage of Moves
-                    stroke_width = 1 
                 elif color_key == 'red' or color_key == 'hp':
                     fill_color = COLOR_ERROR
                 elif color_key == 'green':
@@ -455,7 +458,7 @@ class BattleDrawer:
                 else:
                     fill_color = self.cfg["colors"]["text_main"]
                 
-                draw.text((current_x, y), text, fill=fill_color, font=font, stroke_width=stroke_width)
+                draw.text((current_x, y), text, fill=fill_color, font=font)
                 current_x += font.getlength(text)
 
 def draw_battle_log(log_data: Dict[str, Any]) -> Image.Image:
