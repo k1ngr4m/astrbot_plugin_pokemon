@@ -323,7 +323,7 @@ class BattleDrawer:
             bar_w = int(width * ratio)
             draw_rounded_rectangle(draw, (x, y, x + bar_w, y + h), corner_radius=5, fill=bar_col)
             # 反闪高光
-            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + 3), corner_radius=2, fill=(255, 255, 255, 100))
+            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + 3), corner_radius=2, fill=(255, 255, 255, 120))
             
         # HP文字
         hp_text = f"{current_hp}/{max_hp}"
@@ -378,9 +378,9 @@ class BattleDrawer:
         full_text = raw_text.strip().lstrip("·").strip()
         
         # 1. 效果绝佳高亮（底色方案，不遮挡文字）
-        if "效果绝佳" in full_text:
+        if any(k in full_text for k in ["效果绝佳", "击中要害"]):
             text_w = self.fonts["small"].getlength(full_text)
-            draw_rounded_rectangle(draw, (int(x-5), int(y-2), int(x+text_w+10), int(y+18)), corner_radius=4, fill=(255, 0, 0, 15))
+            draw_rounded_rectangle(draw, (int(x-5), int(y-2), int(x+text_w+35), int(y+18)), corner_radius=4, fill=(255, 0, 0, 25))
 
         # 2. 图标识别
         icon = "• "
