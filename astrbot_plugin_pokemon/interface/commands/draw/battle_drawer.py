@@ -165,12 +165,14 @@ class BattleDrawer:
             # Left: User Pokemon
             u_name = sk.get('pokemon_name', '未知')
             u_lv = sk.get('level', 1)
-            user_species_id = sk.get('species_id', 0)
+            # 优先使用新字段，兼容旧字段
+            user_species_id = sk.get('user_species_id') or sk.get('species_name')
             
             lx = pad + 20
             ly = card_y + 20
             
-            if user_species_id:
+            # 绘制我方精灵
+            if user_species_id and isinstance(user_species_id, int):
                 sprite = self._load_pokemon_sprite(user_species_id)
                 overlay.paste(sprite, (lx, ly), sprite)
                 lx += 110 # Shift text right
@@ -186,11 +188,22 @@ class BattleDrawer:
             # Right: Opponent
             op_name = sk.get('trainer_pokemon_name') or log_data.get('target_name')
             op_lv = sk.get('trainer_pokemon_level') or log_data.get('target_level')
-            
+            target_species_id = sk.get('target_species_id')
+
             rx = self.width - pad - 20
-            draw.text((rx, ly + 20), f"{op_name}", fill=COLOR_TEXT_DARK, font=self.fonts["card_title"], anchor="rs")
+            ry = card_y + 20
+            
+            # 绘制对方精灵 (从右向左布局)
+            if target_species_id and isinstance(target_species_id, int):
+                sprite = self._load_pokemon_sprite(target_species_id)
+                # 翻转对方精灵图以面向左 (可选，根据需求)
+                # sprite = sprite.transpose(Image.FLIP_LEFT_RIGHT) 
+                overlay.paste(sprite, (rx - 100, ry), sprite) # 100 is sprite width
+                rx -= 110 # Shift text left
+            
+            draw.text((rx, ry + 20), f"{op_name}", fill=COLOR_TEXT_DARK, font=self.fonts["card_title"], anchor="rs")
             if op_lv:
-                 draw.text((rx, ly + 50), f"Lv.{op_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"], anchor="rs")
+                 draw.text((rx, ry + 50), f"Lv.{op_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"], anchor="rs")
 
             # Result Badge
             res_text = "胜利" if sk.get('result') == 'win' else "失败"

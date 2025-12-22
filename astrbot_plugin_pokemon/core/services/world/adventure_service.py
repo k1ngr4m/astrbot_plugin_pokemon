@@ -341,8 +341,10 @@ class AdventureService:
                 battle_log.append({
                     "pokemon_id": user_ctx.pokemon.id,
                     "pokemon_name": user_ctx.pokemon.name,
-                    "species_name": user_ctx.pokemon.species_id,
+                    "species_name": user_ctx.pokemon.species_id, # 保留旧字段兼容
+                    "user_species_id": user_ctx.pokemon.species_id, # 新增明确字段
                     "level": user_ctx.pokemon.level,
+                    "target_species_id": opponent_ctx.pokemon.species_id, # 新增目标ID
                     "win_rate": u_win_rate,
                     "result": battle_outcome,
                     "details": log_data
@@ -351,10 +353,12 @@ class AdventureService:
                 battle_log.append({
                     "pokemon_id": user_ctx.pokemon.id,
                     "pokemon_name": user_ctx.pokemon.name,
-                    "species_name": user_ctx.pokemon.species_id,
+                    "species_name": user_ctx.pokemon.species_id, # 保留旧字段兼容
+                    "user_species_id": user_ctx.pokemon.species_id, # 新增明确字段
                     "level": user_ctx.pokemon.level,
                     "trainer_pokemon_name": opponent_ctx.pokemon.name,
                     "trainer_pokemon_level": opponent_ctx.pokemon.level,
+                    "target_species_id": opponent_ctx.pokemon.species_id, # 新增目标ID
                     "win_rate": u_win_rate,
                     "result": battle_outcome,
                     "details": log_data
