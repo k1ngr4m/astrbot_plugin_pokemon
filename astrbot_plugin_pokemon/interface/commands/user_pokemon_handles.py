@@ -129,11 +129,10 @@ class UserPokemonHandlers:
                 "name": p.name,
                 "level": p.level,
                 "gender": info['gender'], # 传递图标或文字
-                "hp": p.current_hp if hasattr(p, 'current_hp') else p.stats['hp'],
-                "max_hp": p.stats['hp'],
+                "current_hp": p.current_hp,
+                "max_hp": p.stats.hp,
                 "types": info['types'].split('/') if info['types'] != "未知" else []
             })
-            
         # 生成图片
         img = draw_user_pokemon_list(draw_data)
         save_path = os.path.join(self.tmp_dir, f"user_pokemon_list_{user_id}_{page}.png")

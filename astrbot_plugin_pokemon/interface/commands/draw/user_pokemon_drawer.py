@@ -96,7 +96,7 @@ class UserPokemonListDrawer(BaseDrawer):
         # Grid
         pad = self.cfg["padding"]
         col_w = (self.width - pad * 2 - self.cfg["col_gap"]) // 2
-        start_y = header_h + pad
+        start_y = header_h + pad + 10 # Slight visual tweak
         
         for i, p in enumerate(pokemon_list):
             row = i // 2
@@ -138,9 +138,9 @@ class UserPokemonListDrawer(BaseDrawer):
         
         # Level
         draw.text((ix, iy + 35), f"Lv.{p.get('level', 1)}", fill=COLOR_TEXT_GRAY, font=self.fonts["normal"])
-        
+
         # HP Text (Simple)
-        cur, max_hp = p.get('hp', 0), p.get('max_hp', 0)
+        cur, max_hp = p.get('current_hp', 0), p.get('max_hp', 0)
         draw.text((ix + 80, iy + 35), f"HP {cur}/{max_hp}", fill=COLOR_SUCCESS, font=self.fonts["normal"])
         
         # ID Badge (Top Right)
@@ -150,7 +150,7 @@ class UserPokemonListDrawer(BaseDrawer):
         draw.text((x+w-10-iw/2, y+20), id_txt, fill=COLOR_TEXT_GRAY, font=self.fonts["small"], anchor="mm")
         
         # Types (Bottom)
-        ty = y + 65
+        ty = y + 68
         ctx = ix
         for t in p.get('types', []):
             tw = self._draw_type_badge(draw, ctx, ty, t)
@@ -181,7 +181,17 @@ class UserPokemonDetailDrawer(BaseDrawer):
         
         # Name
         draw.text((ix, iy), p.get('name', ''), fill=COLOR_TITLE, font=self.fonts["title"])
-        draw.text((ix, iy + 45), f"Lv.{p.get('level')}   {p.get('gender')}", fill=COLOR_TEXT_DARK, font=self.fonts["card_title"])
+        
+        # Lv + Gender
+        info_text = f"Lv.{p.get('level')}   {p.get('gender')}"
+        draw.text((ix, iy + 45), info_text, fill=COLOR_TEXT_DARK, font=self.fonts["card_title"])
+        
+        # Type Badges (Inline)
+        tx = ix + self.fonts["card_title"].getlength(info_text) + 20
+        ty = iy + 48  # Align with baseline area
+        for t in p.get('types', []):
+            w = self._draw_type_badge(draw, tx, ty, t)
+            tx += w + 8
         
         # Attrs
         rows = [
@@ -194,15 +204,8 @@ class UserPokemonDetailDrawer(BaseDrawer):
             draw.text((ix, curr_y), r, fill=COLOR_TEXT_GRAY, font=self.fonts["normal"])
             curr_y += 25
             
-        # Types
-        tx = ix
-        ty = curr_y + 10
-        for t in p.get('types', []):
-            w = self._draw_type_badge(draw, tx, ty, t)
-            tx += w + 10
-
-        # Separator
-        line_y = sy + 200
+        # Separator (Dynamic)
+        line_y = max(sy + 185, curr_y + 15)
         draw.line((pad, line_y, self.width-pad, line_y), fill=(220, 220, 220), width=2)
         
         # 2. Stats Table (IV/EV)

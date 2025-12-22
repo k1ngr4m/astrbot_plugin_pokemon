@@ -199,7 +199,13 @@ class UserPokemonService:
                 moves = pokemon.moves,
                 nature_id=pokemon.nature_id,
                 ability_id=pokemon.ability_id,
-                caught_time=pokemon.caught_time
+                caught_time=pokemon.caught_time,
+                happiness=pokemon.happiness,
+                current_hp=pokemon.current_hp,
+                current_pp1=pokemon.current_pp1,
+                current_pp2=pokemon.current_pp2,
+                current_pp3=pokemon.current_pp3,
+                current_pp4=pokemon.current_pp4
             ))
 
         # 计算总页数
