@@ -247,13 +247,52 @@ for aid, cfg in STAT_MOD_CONFIG.items():
 # 3. 手动实现 / 特定模板实现 (Manual)
 # ==========================================
 
-# --- 免疫类实现 ---
-
 # 1. 飘浮 (Levitate) - ID: 26
 @AbilityRegistry.register(26)
 class LevitateAbility(ImmunityAbility):
     def __init__(self, owner):
         super().__init__(owner, target_type='ground', msg="由于飘浮特性，地面系招式无效！")
+
+
+# 9. 粗糙皮肤 (Rough Skin) - ID: 24
+@AbilityRegistry.register(24)
+class RoughSkinAbility(AbilityPlugin):
+    def on_apply(self):
+        # 注册受击后的事件钩子
+        hook = BattleHook("rough_skin_dmg", 10, self.on_hit)
+        hook.source_plugin = self
+        self.owner.hooks.register("after_damage", hook)
+
+    def on_hit(self, owner, attacker, move, damage, logger_obj):
+        # 仅在招式为接触类时触发
+        if getattr(move, 'is_contact', False):
+            # 扣除 1/8 最大 HP
+            # 这里 attacker.context.pokemon.stats.hp 是最大HP基础值，或者是current battle stat max hp?
+            # 应该用 max_hp derived from context usually.
+            max_hp = attacker.context.pokemon.stats.hp
+            recoil = max(1, max_hp // 8)
+            
+            attacker.current_hp = max(0, attacker.current_hp - recoil)
+            logger_obj.log(f"{attacker.context.pokemon.name} 碰到了 {owner.context.pokemon.name} 的粗糙皮肤，受到了伤害！\n\n")
+
+# 10. 静电 (Static) - ID: 9
+@AbilityRegistry.register(9)
+class StaticAbility(AbilityPlugin):
+    def on_apply(self):
+        hook = BattleHook("static_trigger", 10, self.on_hit)
+        hook.source_plugin = self
+        self.owner.hooks.register("after_damage", hook)
+
+    def on_hit(self, owner, attacker, move, damage, logger_obj):
+        import random
+        # 接触类招式判定 且 30% 几率
+        if getattr(move, 'is_contact', False) and random.random() < 0.3:
+            # 使用现有的状态系统施加麻痹 (Status ID: 1, 假设1是麻痹，根据 battle_engine/context)
+            # 检查 attacker 状态
+            if attacker.non_volatile_status is None:
+                attacker.non_volatile_status = 1 # 1: 麻痹
+                logger_obj.log(f"{attacker.context.pokemon.name} 因 {owner.context.pokemon.name} 的静电特性麻痹了！\n\n")
+
 
 
 # 3. 恶作剧之心 (Prankster) - ID: 158
@@ -364,6 +403,51 @@ class BeastBoostAbility(AbilityPlugin):
         if curr_lvl < 6:
             attacker.stat_levels[best_stat_id] = curr_lvl + 1
             logger_obj.log(f"{attacker.context.pokemon.name} 的异兽提升发动了！{stat_name}提升了！\n\n")
+
+
+# 7. 碎裂铠甲 (Weak Armor) - ID: 144
+@AbilityRegistry.register(144)
+class WeakArmorAbility(AbilityPlugin):
+    def on_apply(self):
+        # 注册受击后的事件钩子
+        hook = BattleHook("weak_armor_trigger", 10, self.on_hit)
+        hook.source_plugin = self
+        self.owner.hooks.register("after_damage", hook)
+
+    def on_hit(self, owner, attacker, move, damage_dealt, logger_obj):
+        """受击后的回调"""
+        # 1. 判断是否为物理攻击 (damage_class_id == 2)
+        if move.damage_class_id == 2:
+            logger_obj.log(f"{owner.context.pokemon.name} 的碎裂铠甲发动了！\n\n")
+            
+            # 2. 物理防御降低 1 级
+            def_lvl = owner.stat_levels.get(2, 0)
+            if def_lvl > -6:
+                owner.stat_levels[2] = def_lvl - 1
+                logger_obj.log(f"{owner.context.pokemon.name} 的防御降低了！\n\n")
+            
+            # 3. 速度提升 2 级
+            spd_lvl = owner.stat_levels.get(5, 0)
+            if spd_lvl < 6:
+                owner.stat_levels[5] = min(6, spd_lvl + 2)
+                logger_obj.log(f"{owner.context.pokemon.name} 的速度大幅提升了！\n\n")
+
+# 8. 正义之心 (Justified) - ID: 154
+@AbilityRegistry.register(154)
+class JustifiedAbility(AbilityPlugin):
+    def on_apply(self):
+        hook = BattleHook("justified_trigger", 10, self.on_hit)
+        hook.source_plugin = self
+        self.owner.hooks.register("after_damage", hook)
+
+    def on_hit(self, owner, attacker, move, damage_dealt, logger_obj):
+        # 检查是否受到恶属性招式攻击
+        if move.type_name in ['dark', '恶']:
+            curr_atk = owner.stat_levels.get(1, 0)
+            if curr_atk < 6:
+                owner.stat_levels[1] = curr_atk + 1
+                logger_obj.log(f"{owner.context.pokemon.name} 的正义之心发动了！攻击力提升！\n\n")
+
 
 
 

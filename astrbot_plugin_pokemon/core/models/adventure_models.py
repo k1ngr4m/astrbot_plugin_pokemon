@@ -34,6 +34,8 @@ class BattleMoveInfo:
     # 新增：连续攻击字段
     min_hits: int = 1  # 最少攻击次数
     max_hits: int = 1  # 最多攻击次数
+    # 新增：接触类招式标记
+    is_contact: bool = False  # 是否为接触类招式
 
 
 
