@@ -119,8 +119,8 @@ def draw_rounded_rectangle(draw: ImageDraw.Draw, xy, corner_radius, fill=None, o
     if fill:
         # 使用 4 倍大小绘制 mask 以实现抗锯齿
         mask_scale = 4
-        mask_w = (x2 - x1) * mask_scale
-        mask_h = (y2 - y1) * mask_scale
+        mask_w = int((x2 - x1) * mask_scale)
+        mask_h = int((y2 - y1) * mask_scale)
         radius = corner_radius * mask_scale
 
         mask = Image.new('L', (mask_w, mask_h), 0)
@@ -128,14 +128,14 @@ def draw_rounded_rectangle(draw: ImageDraw.Draw, xy, corner_radius, fill=None, o
         mask_draw.rounded_rectangle((0, 0, mask_w, mask_h), radius=radius, fill=255)
 
         # 缩小 mask
-        mask = mask.resize((x2 - x1, y2 - y1), Image.Resampling.LANCZOS)
+        mask = mask.resize((int(x2 - x1), int(y2 - y1)), Image.Resampling.LANCZOS)
 
         # 创建填充层
-        fill_layer = Image.new('RGBA', (x2 - x1, y2 - y1), fill)
+        fill_layer = Image.new('RGBA', (int(x2 - x1), int(y2 - y1)), fill)
 
         # 应用 mask 到目标 draw 对象的图片上
         # 注意：这里假设 draw 对象是依附于一个 RGBA 图片的
-        draw._image.paste(fill_layer, (x1, y1), mask)
+        draw._image.paste(fill_layer, (int(x1), int(y1)), mask)
 
     # 绘制边框 (Pillow 原生支持，抗锯齿效果尚可)
     if outline:

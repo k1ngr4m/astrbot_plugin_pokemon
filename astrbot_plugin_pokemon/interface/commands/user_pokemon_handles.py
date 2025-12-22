@@ -5,6 +5,8 @@ from ...core.models.pokemon_models import UserPokemonInfo
 from ...core.models.user_models import User
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
+from .draw.user_pokemon_drawer import draw_user_pokemon_list, draw_user_pokemon_detail
+import os
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
@@ -18,6 +20,7 @@ class UserPokemonHandlers:
         self.user_pokemon_service = container.user_pokemon_service
         self.nature_service = container.nature_service
         self.ability_service = container.ability_service
+        self.tmp_dir = container.tmp_dir
 
     async def init_select(self, event: AstrMessageEvent):
         """初始化选择宝可梦"""
@@ -100,7 +103,7 @@ class UserPokemonHandlers:
 
     async def _handle_list_view(self, event, user_id, page):
         """处理列表分页逻辑"""
-        page_size = 20
+        page_size = 10  # 图片模式改为每页10个更合适
         res = self.user_pokemon_service.get_user_pokemon_paged(user_id, page=page, page_size=page_size)
         if not res.success:
             return event.plain_result(res.message)
@@ -109,19 +112,33 @@ class UserPokemonHandlers:
         pokemon_list = data.get("pokemon_list", [])
         if not pokemon_list:
             return event.plain_result(AnswerEnum.USER_POKEMONS_NOT_FOUND.value)
-
-        msg = f"🌟 您拥有 {data['total_count']} 只宝可梦 (第 {data['page']}/{data['total_pages']} 页)：\n\n"
-        start_idx = (data['page'] - 1) * page_size + 1
-
-        for i, p in enumerate(pokemon_list, start_idx):
-            # 提取公共格式化逻辑
+            
+        # 构建绘图数据
+        draw_data = {
+            "total_count": data['total_count'],
+            "page": data['page'],
+            "total_pages": data['total_pages'],
+            "list": []
+        }
+        
+        for p in pokemon_list:
             info = self._get_pokemon_basic_info(p)
-            msg += f"{i}. {p.name} {info['gender']}\n"
-            msg += f"---ID: {p.id}  |  等级: {p.level}  |  HP: {p.stats['hp']}\n\n"
-            msg += f"---属性: {info['types']}  |  特性: {info['ability']}  |  性格: {info['nature']}\n\n"
-
-        msg += f"\n使用 /我的宝可梦 P[页数] 查看其他页\n或使用 /我的宝可梦 <ID> 查看详情。"
-        return event.plain_result(msg)
+            draw_data["list"].append({
+                "id": p.id,
+                "sprite_id": p.species_id,
+                "name": p.name,
+                "level": p.level,
+                "gender": info['gender'], # 传递图标或文字
+                "hp": p.current_hp if hasattr(p, 'current_hp') else p.stats['hp'],
+                "max_hp": p.stats['hp'],
+                "types": info['types'].split('/') if info['types'] != "未知" else []
+            })
+            
+        # 生成图片
+        img = draw_user_pokemon_list(draw_data)
+        save_path = os.path.join(self.tmp_dir, f"user_pokemon_list_{user_id}_{page}.png")
+        img.save(save_path)
+        return event.image_result(save_path)
 
     async def _handle_detail_view(self, event, user_id, pokemon_id):
         """处理单只宝可梦详情逻辑"""
@@ -132,12 +149,25 @@ class UserPokemonHandlers:
         p: UserPokemonInfo = res.data
         info = self._get_pokemon_basic_info(p)
 
-        # 组装基础信息
-        msg = f"🔍 宝可梦详细信息：\n\n{p.name} {info['gender']}\n"
-        msg += f"属性: {info['types']}  |  性格: {info['nature']}  |  特性: {info['ability']}\n"
-        msg += f"等级: {p.level}  |  经验: {p.exp}\n\n"
+        # 招式数据
+        moves_data = []
+        for i in range(1, 5):
+             mid = getattr(p.moves, f"move{i}_id", None)
+             if mid:
+                 m = self.plugin.move_repo.get_move_by_id(mid)
+                 moves_data.append({
+                     "name": m['name_zh'] if m else f"未知[{mid}]",
+                     "type": m['type_name'] if m else "一般",
+                     "pp": getattr(p, f"current_pp{i}", getattr(p.moves, f"move{i}_pp", 0)), 
+                     # 注意：UserPokemonInfo 有 current_ppX 字段，如果没数据可能需要 fallback
+                     # 模型里 UserPokemonInfo 定义了 current_ppX。
+                     # PokemonMoves 里只有 id? 检查了模型，UserPokemonInfo 才有 current_pp。
+                     # 不过 UserPokemonInfo.moves 是 PokemonMoves 对象，PokemonMoves 对象没有 pp 字段（只有ID）。
+                     # Move Repo m['pp'] 是 max_pp.
+                     "max_pp": m['pp'] if m else 0
+                 })
 
-        # 组装数值矩阵 (使用表格化排版对齐更美观)
+        # 能力值数据
         stats_map = [
             ("HP", "hp", "hp_iv", "hp_ev"),
             ("攻击", "attack", "attack_iv", "attack_ev"),
@@ -146,26 +176,35 @@ class UserPokemonHandlers:
             ("特防", "sp_defense", "sp_defense_iv", "sp_defense_ev"),
             ("速度", "speed", "speed_iv", "speed_ev")
         ]
-
-        msg += "💪 能力详情 (能力值 | IV | EV):\n\n"
+        
+        stats_detail = []
         for label, s_key, iv_key, ev_key in stats_map:
-            val = p.stats[s_key]
-            iv = p.ivs[iv_key]
-            ev = p.evs[ev_key]
-            msg += f"  {label}: {val:<3} | {iv:>2}/31 | {ev:<3}\n\n"
+            stats_detail.append({
+                "label": label,
+                "val": p.stats[s_key],
+                "iv": p.ivs[iv_key],
+                "ev": p.evs[ev_key]
+            })
 
-        # 组装招式
-        msg += "\n⚔️ 招式:\n"
-        for i in range(1, 5):
-            move_id = getattr(p.moves, f'move{i}_id', None)
-            name = "(空)"
-            if move_id:
-                m_info = self.plugin.move_repo.get_move_by_id(move_id)
-                name = m_info['name_zh'] if m_info else f"未知[{move_id}]"
-            msg += f"  {i}. {name}\n"
-
-        msg += f"\n📅 捕获时间: {p.caught_time}"
-        return event.plain_result(msg)
+        detail_data = {
+             "id": p.id,
+             "sprite_id": p.species_id,
+             "name": p.name,
+             "level": p.level,
+             "gender": info['gender'],
+             "nature": info['nature'],
+             "ability": info['ability'],
+             "exp": p.exp,
+             "caught_time": p.caught_time, # str
+             "types": info['types'].split('/') if info['types'] != "未知" else [],
+             "stats_detail": stats_detail,
+             "moves": moves_data
+        }
+        
+        img = draw_user_pokemon_detail(detail_data)
+        save_path = os.path.join(self.tmp_dir, f"user_pokemon_detail_{user_id}_{pokemon_id}.png")
+        img.save(save_path)
+        return event.image_result(save_path)
 
     def _get_pokemon_basic_info(self, p):
         """辅助方法：统一获取宝可梦的基础显示文本"""
