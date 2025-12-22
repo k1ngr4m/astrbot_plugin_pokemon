@@ -129,6 +129,8 @@ class UserPokemonHandlers:
                 "name": p.name,
                 "level": p.level,
                 "gender": info['gender'], # 传递图标或文字
+                "nature": info['nature'],
+                "ability": info['ability'],
                 "current_hp": p.current_hp,
                 "max_hp": p.stats.hp,
                 "types": info['types'].split('/') if info['types'] != "未知" else []

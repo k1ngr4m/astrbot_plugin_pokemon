@@ -14,7 +14,7 @@ from .gradient_utils import create_vertical_gradient
 LIST_CONFIG = {
     "width": 800,
     "padding": 30,
-    "card_h": 100,
+    "card_h": 125, # Increased height to fit Nature/Ability
     "cols": 2,
     "col_gap": 20,
     "row_gap": 15,
@@ -137,12 +137,18 @@ class UserPokemonListDrawer(BaseDrawer):
         draw.text((ix + nw + 5, iy + 2), gender, fill=g_col, font=self.fonts["subtitle"])
         
         # Level
-        draw.text((ix, iy + 35), f"Lv.{p.get('level', 1)}", fill=COLOR_TEXT_GRAY, font=self.fonts["normal"])
-
+        draw.text((ix, iy + 30), f"Lv.{p.get('level', 1)}", fill=COLOR_TEXT_GRAY, font=self.fonts["normal"])
+        
         # HP Text (Simple)
         cur, max_hp = p.get('current_hp', 0), p.get('max_hp', 0)
-        draw.text((ix + 80, iy + 35), f"HP {cur}/{max_hp}", fill=COLOR_SUCCESS, font=self.fonts["normal"])
+        draw.text((ix + 70, iy + 30), f"HP {cur}/{max_hp}", fill=COLOR_SUCCESS, font=self.fonts["normal"])
         
+        # Nature & Ability (New Line)
+        nature = p.get('nature', '未知')
+        ability = p.get('ability', '未知')
+        na_text = f"{nature} · {ability}"
+        draw.text((ix, iy + 55), na_text, fill=COLOR_TEXT_DARK, font=self.fonts["small"])
+
         # ID Badge (Top Right)
         id_txt = f"#{p.get('id', 0)}"
         iw = self.fonts["small"].getlength(id_txt) + 10
@@ -150,7 +156,7 @@ class UserPokemonListDrawer(BaseDrawer):
         draw.text((x+w-10-iw/2, y+20), id_txt, fill=COLOR_TEXT_GRAY, font=self.fonts["small"], anchor="mm")
         
         # Types (Bottom)
-        ty = y + 68
+        ty = y + 90 # Adjusted for new height
         ctx = ix
         for t in p.get('types', []):
             tw = self._draw_type_badge(draw, ctx, ty, t)
