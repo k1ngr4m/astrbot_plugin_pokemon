@@ -110,11 +110,17 @@ class BattleDrawer:
             details = sk.get('details', [])
             details_h = 0
             for line in details:
-                # 给回合标题更多间距
-                details_h += (line_h + 15) if "回合" in str(line) else (line_h + 4)
+                line_str = str(line).strip()
+                if not line_str: continue # Ignore empty lines
+                
+                # Turn Header Logic
+                if "第" in line_str and "回合" in line_str:
+                    details_h += (line_h + 15) 
+                else:
+                    details_h += (line_h + 4)
             
-            # 基础高度(140) + 日志高度 + 底部留白(20)
-            card_h = 140 + details_h + 20
+            # Base (140) + Details + Buffer (30)
+            card_h = 140 + details_h + 30
             layouts.append({"y": current_y, "h": card_h, "details": details})
             current_y += card_h + 20
             
@@ -244,7 +250,9 @@ class BattleDrawer:
             curr_dy += 20
             
             for line in layout["details"]:
-                line_str = str(line)
+                line_str = str(line).strip()
+                if not line_str: continue
+
                 if "第" in line_str and "回合" in line_str:
                     self._draw_turn_badge(draw, pad + 30, curr_dy, line_str)
                     curr_dy += self.cfg["line_height"] + 15
@@ -364,8 +372,10 @@ class BattleDrawer:
         return TYPE_COLORS.get(type_zh, COLOR_TEXT_DARK)
 
     def _draw_rich_text_line(self, draw, x, y, content):
-        """修复版：移除加粗，改用底色和颜色突出"""
-        full_text = "".join([s.get('text','') for s in content]) if isinstance(content, list) else str(content)
+        """修复版：移除加粗，改用底色和颜色突出，并清理手动缩进"""
+        raw_text = "".join([s.get('text','') for s in content]) if isinstance(content, list) else str(content)
+        # 清理前缀
+        full_text = raw_text.strip().lstrip("·").strip()
         
         # 1. 效果绝佳高亮（底色方案，不遮挡文字）
         if "效果绝佳" in full_text:
@@ -385,12 +395,20 @@ class BattleDrawer:
 
         # 3. 分段渲染
         if isinstance(content, list):
+            is_first = True
             for seg in content:
                 txt = seg.get('text', '')
+                if is_first:
+                    # Clean first segment
+                    txt = txt.lstrip().lstrip("·").lstrip()
+                    if not txt: continue # Skip if empty after clean
+                    is_first = False
+                
                 color = self._get_color(seg.get('color', 'default'))
                 draw.text((curr_x, y), txt, fill=color, font=self.fonts["small"])
                 curr_x += self.fonts["small"].getlength(txt)
         else:
+            # Clean string
             draw.text((curr_x, y), full_text, fill=self.cfg["colors"]["text_main"], font=self.fonts["small"])
             
     def _get_color(self, color_key: str) -> Tuple[int, int, int]:
