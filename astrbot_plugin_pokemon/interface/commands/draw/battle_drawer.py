@@ -14,17 +14,20 @@ from .styles import (
 from .gradient_utils import create_vertical_gradient
 
 # --- 配置常量 ---
+# --- 配置常量 ---
 BATTLE_LOG_CONFIG = {
     "width": 800,
     "padding": 30,
     "card_radius": 15,
     "sprite_size": (100, 100),
+    "line_height": 28,  # 统一行高
     "colors": {
-        "bg_win": (230, 255, 230), # 浅绿
-        "bg_loss": (255, 230, 230), # 浅红
-        "card_bg": (255, 255, 255, 230),
+        "bg_win": (230, 255, 230), 
+        "bg_loss": (255, 230, 230),
+        "card_bg": (255, 255, 255, 245),
         "text_main": (50, 50, 50),
-        "text_sub": (100, 100, 100),
+        "text_sub": (120, 120, 120),
+        "turn_bg": (240, 240, 240)
     }
 }
 
@@ -41,8 +44,9 @@ class BattleDrawer:
             "subtitle": load_font(20),
             "card_title": load_font(24),
             "normal": load_font(18),
-            "small": load_font(14),
-            "result_win": load_font(24),
+            "small": load_font(15),  # 提升 1px 增加可读性
+            "result_badge": load_font(22),
+            "result_win": load_font(24), # Keep these for backward compat if needed or just use result_badge
             "result_loss": load_font(24),
         }
 
@@ -94,258 +98,185 @@ class BattleDrawer:
             ]
         }
         """
-        # 1. 计算高度 & 布局预处理
+        # 1. 高度预计算引擎
         pad = self.cfg["padding"]
-        header_height = 150
-        
+        line_h = self.cfg["line_height"]
         skirmishes = log_data.get('log_data', [])
         
-        # 预计算每张卡片的高度
-        skirmish_layouts = []
-        current_y = header_height + pad
-        
-        base_card_height = 140
-        detail_line_height = 25
-        detail_pad = 20
-        
-        line_height = 25
-        base_card_height = 140
+        current_y = 150 + pad
+        layouts = []
         
         for sk in skirmishes:
-             details = sk.get('details', [])
-             # 精确计算详情区高度
-             details_h = 0
-             for line in details:
-                 if "第" in str(line) and "回合" in str(line):
-                     details_h += line_height + 15
-                 else:
-                     details_h += line_height + 5
-             
-             if details_h > 0:
-                 details_h += 30
-             
-             total_card_h = base_card_height + details_h
-             
-             skirmish_layouts.append({
-                 "y": current_y,
-                 "height": total_card_h,
-                 "base_h": base_card_height,
-                 "details": details,
-                 "details_h": details_h
-             })
-             
-             current_y += total_card_h + 20 # 卡片间距
-
-        total_height = current_y + pad
-        
-        # 2. 背景
-        is_win = log_data.get('result') == 'success'
-        bg_col_top = (230, 248, 255) if is_win else (255, 235, 235)
-        bg_col_bot = (255, 255, 255)
-        
-        image = create_vertical_gradient(self.width, total_height, bg_col_top, bg_col_bot)
-        
+            details = sk.get('details', [])
+            details_h = 0
+            for line in details:
+                # 给回合标题更多间距
+                details_h += (line_h + 15) if "回合" in str(line) else (line_h + 4)
+            
+            # 基础高度(140) + 日志高度 + 底部留白(20)
+            card_h = 140 + details_h + 20
+            layouts.append({"y": current_y, "h": card_h, "details": details})
+            current_y += card_h + 20
+            
+        # 2. 背景与标题
+        image = create_vertical_gradient(self.width, current_y + pad, self.cfg["colors"]["bg_win"], (255, 255, 255))
         overlay = Image.new('RGBA', image.size, (0,0,0,0))
         draw = ImageDraw.Draw(overlay)
         
-        # 3. 标题头
-        cx = self.width // 2
-        cy = pad + 40
-        title_text = f"战斗日志 #{log_data.get('id')}"
-        draw.text((cx, cy), title_text, fill=COLOR_TITLE, font=self.fonts["title"], anchor="mm")
-        
-        date_text = log_data.get('created_at', '')
-        draw.text((cx, cy + 40), date_text, fill=self.cfg["colors"]["text_sub"], font=self.fonts["subtitle"], anchor="mm")
+        # 标题绘制
+        self._draw_header(draw, log_data, pad)
 
-        # 4. 对局列表渲染
+        # 3. 卡片绘制
         for i, sk in enumerate(skirmishes):
-            layout = skirmish_layouts[i]
-            card_y = layout["y"]
-            card_h = layout["height"]
-            
-            rect = (pad, card_y, self.width - pad, card_y + card_h)
-            
-            # 卡片背景 & 阴影
-            self._draw_shadow(image, rect, self.cfg["card_radius"])
-            draw_rounded_rectangle(draw, rect, self.cfg["card_radius"], fill=self.cfg["colors"]["card_bg"])
-            
-            # --- 基础信息区域 (Top) ---
-            
-            # Left: User Pokemon
-            u_name = sk.get('pokemon_name', '未知')
-            u_lv = sk.get('level', 1)
-            user_species_id = sk.get('user_species_id') or sk.get('species_name')
-            user_types = sk.get('user_types', [])
-            
-            # Determine Header Color based on primary type
-            u_color = COLOR_TEXT_DARK
-            user_type_str = "一般"
-            if user_types and len(user_types) > 0:
-                user_type_str = self._en_to_zh(user_types[0])
-                u_color = self._get_type_color(user_types[0])
-            
-            lx = pad + 20
-            ly = card_y + 20
-            
-            # 绘制我方精灵
-            if user_species_id and isinstance(user_species_id, int):
-                sprite = self._load_pokemon_sprite(user_species_id)
-                overlay.paste(sprite, (lx, ly), sprite)
-                lx += 110 # Shift text right
-            
-            # Draw User Name
-            title_font = self.fonts["card_title"]
-            draw.text((lx, ly + 20), f"{u_name}", fill=COLOR_TEXT_DARK, font=title_font) # Name in Dark
-            
-            # Draw Type Badge next to Name
-            name_w = title_font.getlength(u_name)
-            
-            # Helper to get ZH name
-            badge_text = self._en_to_zh(user_types[0]) if user_types else "一般"
-            self._draw_type_badge(draw, int(lx + name_w + 10), int(ly + 24), badge_text, u_color)
-
-            # Draw Level
-            draw.text((lx, ly + 55), f"Lv.{u_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"])
-            
-            # Draw User HP Bar
-            u_cur_hp = sk.get('current_hp', 0)
-            u_max_hp = sk.get('max_hp', 100)
-            self._draw_hp_bar(draw, lx, ly + 85, 160, u_cur_hp, u_max_hp)
-            
-            # VS in Middle
-            mx = self.width // 2
-            my = card_y + layout["base_h"] // 2
-            
-            # Draw VS Circle Badge
-            draw.ellipse((mx - 25, my - 25, mx + 25, my + 25), fill=(240, 240, 240))
-            draw.text((mx, my), "VS", fill=(180, 180, 180), font=self.fonts["title"], anchor="mm")
-            
-            # Right: Opponent
-            op_name = sk.get('trainer_pokemon_name') or log_data.get('target_name')
-            op_lv = sk.get('trainer_pokemon_level') or sk.get('target_level') or log_data.get('target_level')
-            target_species_id = sk.get('target_species_id')
-            target_types = sk.get('target_types', [])
-
-            # Determine Opponent Header Color
-            op_color = COLOR_TEXT_DARK
-            op_type_str = "一般"
-            if target_types and len(target_types) > 0:
-                op_color = self._get_type_color(target_types[0])
-
-            rx = self.width - pad - 20
-            ry = card_y + 20
-            
-            # 绘制对方精灵 (从右向左布局)
-            if target_species_id and isinstance(target_species_id, int):
-                sprite = self._load_pokemon_sprite(target_species_id)
-                overlay.paste(sprite, (rx - 100, ry), sprite) # 100 is sprite width
-                rx -= 110 # Shift text left
-            
-            # Draw Opponent Name (Right Aligned)
-            draw.text((rx, ry + 20), f"{op_name}", fill=COLOR_TEXT_DARK, font=title_font, anchor="rs")
-            
-            # Draw Type Badge (Left of Name)
-            op_name_w = title_font.getlength(op_name)
-            op_badge_text = self._en_to_zh(target_types[0]) if target_types else "一般"
-            # Calculate badge width approx
-            small_font = self.fonts["small"]
-            badge_w = small_font.getlength(op_badge_text) + 16
-            
-            self._draw_type_badge(draw, int(rx - op_name_w - 10 - badge_w), int(ry + 24), op_badge_text, op_color)
-
-            if op_lv:
-                 draw.text((rx, ry + 55), f"Lv.{op_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"], anchor="rs")
-
-            # Draw Opponent HP Bar (Aligned Right)
-            # HP Bar X start = rx - 160 (Increased width)
-            t_cur_hp = sk.get('target_current_hp', 0)
-            t_max_hp = sk.get('target_max_hp', 100)
-            self._draw_hp_bar(draw, rx - 160, ry + 85, 160, t_cur_hp, t_max_hp, is_right=True)
-
-            # Result Badge
-            res_text = "胜利" if sk.get('result') == 'win' else "失败"
-            res_col = COLOR_SUCCESS if sk.get('result') == 'win' else COLOR_ERROR
-            
-            wr = sk.get('win_rate', 0)
-            
-            # Win Rate Dynamic Color
-            if wr >= 100:
-                wr_color = (255, 215, 0) # Gold
-            elif wr >= 50:
-                wr_color = (0, 100, 0) # Dark Green
-            else:
-                wr_color = COLOR_ERROR
-                
-            bx = mx
-            by = my - 40
-            draw.text((bx, by), res_text, fill=res_col, font=self.fonts["result_win"], anchor="mm")
-            
-            draw.text((mx, my + 40), f"胜率: {wr}%", fill=wr_color, font=self.fonts["subtitle"], anchor="mm")
-            
-            # --- 详细过程区域 (Bottom Details) ---
-            if layout["details"]:
-                details_y_start = card_y + layout["base_h"]
-                # 分割线
-                line_y = details_y_start - 10
-                draw.line((pad + 20, line_y, self.width - pad - 20, line_y), fill=(230, 230, 230), width=1)
-                
-                curr_dy = details_y_start
-                for line in layout["details"]:
-                    # Turn Header Detection
-                    line_str = str(line) # In case line is list
-                    turn_match = re.search(r"--- 第 (\d+) 回合 ---", line_str)
-                    if turn_match:
-                        turn_num = int(turn_match.group(1))
-                        self._draw_turn_header(draw, pad + 30, curr_dy, turn_num)
-                        curr_dy += 40 # line_height (25) + 15
-                    else:
-                        # Rich Text
-                        self._draw_rich_text_line(draw, pad + 30, curr_dy, line, self.fonts["small"])
-                        curr_dy += 30 # line_height (25) + 5
+            layout = layouts[i]
+            self._draw_skirmish_card(draw, overlay, sk, layout, pad, log_data) # Pass log_data
 
         image.paste(overlay, (0,0), overlay)
         return image
 
+    def _draw_skirmish_card(self, draw, overlay, sk, layout, pad, log_data):
+        y, h = int(layout["y"]), int(layout["h"])
+        rect = (pad, y, self.width - pad, y + h)
+        
+        # Draw Shadow & BG
+        self._draw_shadow(overlay, rect, self.cfg["card_radius"]) # Pass overlay to shadow helper if it supports image
+        # Wait, _draw_shadow takes (image, xy, radius). I passed overlay. Correct.
+        draw_rounded_rectangle(draw, rect, self.cfg["card_radius"], fill=self.cfg["colors"]["card_bg"])
+        
+        # --- Top Info (Refactored from old draw) ---
+        card_y = y
+        
+        # Left: User Pokemon
+        u_name = sk.get('pokemon_name', '未知')
+        u_lv = sk.get('level', 1)
+        user_species_id = sk.get('user_species_id') or sk.get('species_name')
+        user_types = sk.get('user_types', [])
+        
+        u_color = COLOR_TEXT_DARK
+        if user_types: u_color = self._get_type_color(user_types[0])
+        
+        lx = pad + 20
+        ly = card_y + 20
+        
+        # Sprite
+        if user_species_id and isinstance(user_species_id, int):
+            sprite = self._load_pokemon_sprite(user_species_id)
+            overlay.paste(sprite, (lx, ly), sprite)
+            lx += 110
+            
+        # Name & Badge
+        title_font = self.fonts["card_title"]
+        draw.text((lx, ly + 20), f"{u_name}", fill=COLOR_TEXT_DARK, font=title_font)
+        name_w = title_font.getlength(u_name)
+        
+        badge_text = self._en_to_zh(user_types[0]) if user_types else "一般"
+        self._draw_type_badge(draw, int(lx + name_w + 10), int(ly + 24), badge_text, u_color)
+        
+        # Level
+        draw.text((lx, ly + 55), f"Lv.{u_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"])
+        
+        # HP Bar
+        u_cur_hp = sk.get('current_hp', 0)
+        u_max_hp = sk.get('max_hp', 100)
+        self._draw_hp_bar(draw, lx, ly + 85, 160, u_cur_hp, u_max_hp)
+        
+        # VS Badge
+        mx = self.width // 2
+        my = card_y + 140 // 2 # base_h // 2
+        draw.ellipse((mx - 25, my - 25, mx + 25, my + 25), fill=(240, 240, 240))
+        draw.text((mx, my), "VS", fill=(180, 180, 180), font=self.fonts["title"], anchor="mm")
+        
+        # Right: Opponent
+        op_name = sk.get('trainer_pokemon_name') or log_data.get('target_name')
+        op_lv = sk.get('trainer_pokemon_level') or sk.get('target_level') or log_data.get('target_level')
+        target_species_id = sk.get('target_species_id')
+        target_types = sk.get('target_types', [])
+        
+        op_color = COLOR_TEXT_DARK
+        if target_types: op_color = self._get_type_color(target_types[0])
+        
+        rx = self.width - pad - 20
+        ry = card_y + 20
+        
+        # Sprite (Right)
+        if target_species_id and isinstance(target_species_id, int):
+            sprite = self._load_pokemon_sprite(target_species_id)
+            overlay.paste(sprite, (rx - 100, ry), sprite)
+            rx -= 110
+            
+        # Name
+        draw.text((rx, ry + 20), f"{op_name}", fill=COLOR_TEXT_DARK, font=title_font, anchor="rs")
+        op_name_w = title_font.getlength(f"{op_name}")
+        
+        # Badge
+        op_badge_text = self._en_to_zh(target_types[0]) if target_types else "一般"
+        small_font = self.fonts["small"]
+        badge_w = small_font.getlength(op_badge_text) + 16
+        self._draw_type_badge(draw, int(rx - op_name_w - 10 - badge_w), int(ry + 24), op_badge_text, op_color)
+        
+        # Level
+        if op_lv:
+             draw.text((rx, ry + 55), f"Lv.{op_lv}", fill=self.cfg["colors"]["text_sub"], font=self.fonts["normal"], anchor="rs")
+             
+        # HP Bar (Right)
+        t_cur_hp = sk.get('target_current_hp', 0)
+        t_max_hp = sk.get('target_max_hp', 100)
+        self._draw_hp_bar(draw, rx - 160, ry + 85, 160, t_cur_hp, t_max_hp, is_right=True)
+        
+        # Result & Win Rate
+        res_text = "胜利" if sk.get('result') == 'win' else "失败"
+        res_col = COLOR_SUCCESS if sk.get('result') == 'win' else COLOR_ERROR
+        wr = sk.get('win_rate', 0)
+        
+        if wr >= 100: wr_col = (255, 215, 0)
+        elif wr >= 50: wr_col = (0, 100, 0)
+        else: wr_col = COLOR_ERROR
+        
+        bx = mx
+        by = my - 40
+        draw.text((bx, by), res_text, fill=res_col, font=self.fonts["result_win"], anchor="mm")
+        draw.text((mx, my + 40), f"胜率: {wr}%", fill=wr_col, font=self.fonts["subtitle"], anchor="mm")
+        
+        # --- 详细过程区域 (Bottom Details - Fixed Logic) ---
+        if layout["details"]:
+            curr_dy = y + 130 
+            draw.line((pad+20, curr_dy, self.width-pad-20, curr_dy), fill=(235, 235, 235), width=1)
+            curr_dy += 20
+            
+            for line in layout["details"]:
+                line_str = str(line)
+                if "第" in line_str and "回合" in line_str:
+                    self._draw_turn_badge(draw, pad + 30, curr_dy, line_str)
+                    curr_dy += self.cfg["line_height"] + 15
+                else:
+                    self._draw_rich_text_line(draw, pad + 35, curr_dy, line)
+                    curr_dy += self.cfg["line_height"] + 4
+
     def _draw_hp_bar(self, draw: ImageDraw.Draw, x: int, y: int, width: int, current_hp: int, max_hp: int, is_right: bool = False):
-        """绘制拟真血量条"""
+        """绘制带高光反闪的血量条"""
         if max_hp <= 0: max_hp = 1
         ratio = max(0, min(1, current_hp / max_hp))
-        height = 10  # 增加厚度
+        h = 10
         
-        # 1. 绘制背景阴影/底框
-        bg_rect = (x, y, x + width, y + height)
-        draw_rounded_rectangle(draw, bg_rect, corner_radius=5, fill=(220, 220, 220))
+        # 背景
+        draw_rounded_rectangle(draw, (x, y, x + width, y + h), corner_radius=5, fill=(220, 220, 220))
         
-        # 2. 判定颜色 (修正逻辑：>50%绿, 20%-50%黄, <20%红)
-        if ratio > 0.5:
-            bar_color = (76, 175, 80)   # 绿色
-        elif ratio > 0.2:
-            bar_color = (255, 193, 7)   # 黄色
-        else:
-            bar_color = (255, 67, 54)   # 红色
+        # 颜色逻辑：>50%绿, >20%黄, 其余红
+        if ratio > 0.5: bar_col = (76, 175, 80)
+        elif ratio > 0.2: bar_col = (255, 193, 7)
+        else: bar_col = (244, 67, 54)
         
-        # 3. 绘制进度条
         if ratio > 0:
             bar_w = int(width * ratio)
-            # 左对齐绘制
-            # draw_rounded_rectangle supports RGBA if fill is tuple
-            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + height), corner_radius=5, fill=bar_color)
+            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + h), corner_radius=5, fill=bar_col)
+            # 反闪高光
+            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + 3), corner_radius=2, fill=(255, 255, 255, 100))
             
-            # Gloss Effect (Top 30%)
-            gloss_h = 3
-            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + gloss_h), corner_radius=2, fill=(255, 255, 255, 100))
-            
-        # 4. 绘制 HP 数值 (精致化处理)
-        hp_font = self.fonts["small"]
+        # HP文字
         hp_text = f"{current_hp}/{max_hp}"
-        
-        # 根据左右位置决定数字是在左还是在右
-        if not is_right:
-            draw.text((x, y + height + 4), hp_text, fill=self.cfg["colors"]["text_sub"], font=hp_font)
-        else:
-            # 右侧对齐
-            text_w = hp_font.getlength(hp_text)
-            draw.text((x + width - text_w, y + height + 4), hp_text, fill=self.cfg["colors"]["text_sub"], font=hp_font)
+        tx = x + width if is_right else x
+        anchor = "ra" if is_right else "la"
+        draw.text((tx, y + h + 4), hp_text, fill=self.cfg["colors"]["text_sub"], font=self.fonts["small"], anchor=anchor)
 
     def _draw_type_badge(self, draw: ImageDraw.Draw, x: int, y: int, type_text: str, color: Tuple[int, int, int]):
         """绘制属性徽章"""
@@ -366,21 +297,53 @@ class BattleDrawer:
         
         return rect_w
 
-    def _draw_turn_header(self, draw: ImageDraw.Draw, x: int, y: int, turn_num: int):
-        """绘制回合标题"""
-        text = f"第 {turn_num} 回合"
+    def _draw_hp_bar(self, draw: ImageDraw.Draw, x: int, y: int, width: int, current_hp: int, max_hp: int, is_right: bool = False):
+        """绘制带高光反闪的血量条"""
+        if max_hp <= 0: max_hp = 1
+        ratio = max(0, min(1, current_hp / max_hp))
+        h = 10
+        
+        # 背景
+        draw_rounded_rectangle(draw, (x, y, x + width, y + h), corner_radius=5, fill=(220, 220, 220))
+        
+        # 颜色逻辑：>50%绿, >20%黄, 其余红
+        if ratio > 0.5: bar_col = (76, 175, 80)
+        elif ratio > 0.2: bar_col = (255, 193, 7)
+        else: bar_col = (244, 67, 54)
+        
+        if ratio > 0:
+            bar_w = int(width * ratio)
+            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + h), corner_radius=5, fill=bar_col)
+            # 反闪高光
+            draw_rounded_rectangle(draw, (x, y, x + bar_w, y + 3), corner_radius=2, fill=(255, 255, 255, 100))
+            
+        # HP文字
+        hp_text = f"{current_hp}/{max_hp}"
+        tx = x + width if is_right else x
+        anchor = "ra" if is_right else "la"
+        draw.text((tx, y + h + 4), hp_text, fill=self.cfg["colors"]["text_sub"], font=self.fonts["small"], anchor=anchor)
+
+    def _draw_type_badge(self, draw: ImageDraw.Draw, x: int, y: int, type_text: str, color: Tuple[int, int, int]):
+        """绘制属性徽章"""
         font = self.fonts["small"]
-        w = int(font.getlength(text))
-        h = 20 # fixed height for header
+        text_w = font.getlength(type_text)
+        text_h = 14
+        pad_x = 8
+        pad_y = 2
         
-        # 绘制圆角矩形底色
-        # Centered or aligned? Providing x is start X.
-        # User requested: light background.
-        bg_color = (240, 240, 240)
-        text_color = (100, 100, 100)
+        rect_w = int(text_w + pad_x * 2)
+        rect_h = int(text_h + pad_y * 2)
         
-        draw_rounded_rectangle(draw, (x, y, x + w + 20, y + h), corner_radius=10, fill=bg_color)
-        draw.text((x + 10, y + 2), text, fill=text_color, font=font)
+        draw_rounded_rectangle(draw, (x, y, x + rect_w, y + rect_h), corner_radius=10, fill=color)
+        draw.text((x + pad_x, y + pad_y), type_text, fill=(255, 255, 255), font=font)
+        return rect_w
+
+    def _draw_turn_badge(self, draw, x, y, text):
+        """绘制回合标签"""
+        txt = text.replace("-", "").strip()
+        w = self.fonts["small"].getlength(txt)
+        draw_rounded_rectangle(draw, (int(x), int(y), int(x + w + 20), int(y + 22)), corner_radius=10, fill=self.cfg["colors"]["turn_bg"])
+        draw.text((x + 10, y + 2), txt, fill=(120, 120, 120), font=self.fonts["small"])
 
     def _en_to_zh(self, type_en: str) -> str:
         """属性英文转中文"""
@@ -400,66 +363,53 @@ class BattleDrawer:
         type_zh = self._en_to_zh(type_input)
         return TYPE_COLORS.get(type_zh, COLOR_TEXT_DARK)
 
-    def _draw_rich_text_line(self, draw: ImageDraw.Draw, x: int, y: int, 
-                            content: Any, font: ImageFont.FreeTypeFont):
-        """绘制单行文本（支持普通字符串或富文本片段列表）"""
+    def _draw_rich_text_line(self, draw, x, y, content):
+        """修复版：移除加粗，改用底色和颜色突出"""
+        full_text = "".join([s.get('text','') for s in content]) if isinstance(content, list) else str(content)
         
-        # Determine Icon and Full Text
-        full_text = ""
-        if isinstance(content, str):
-            full_text = content
-        elif isinstance(content, list):
-            full_text = "".join([seg.get('text', '') for seg in content])
-        
-        # Highlighting "Super Effective" (Optimized)
+        # 1. 效果绝佳高亮（底色方案，不遮挡文字）
         if "效果绝佳" in full_text:
-             text_w = font.getlength(full_text) + 30
-             # Use corner_radius instead of radius
-             draw_rounded_rectangle(draw, (int(x - 5), int(y - 2), int(x + text_w), int(y + 18)), corner_radius=3, fill=(255, 0, 0, 15))
+            text_w = self.fonts["small"].getlength(full_text)
+            draw_rounded_rectangle(draw, (int(x-5), int(y-2), int(x+text_w+10), int(y+18)), corner_radius=4, fill=(255, 0, 0, 15))
 
-        icon = "•"
-        if any(k in full_text for k in ["used", "使用了", "attacked", "攻击"]):
-            icon = "⚔️"
-        elif any(k in full_text for k in ["restored", "回复", "health"]):
-            icon = "💚"
-        elif any(k in full_text for k in ["paralyzed", "burned", "poisoned", "asleep", "frozen", "confused", "麻痹", "灼伤", "中毒", "睡眠", "冰冻", "混乱", "陷入"]):
-            icon = "⚠️"
-        elif any(k in full_text for k in ["fainted", "倒下", "defeated"]):
-            icon = "💀"
+        # 2. 图标识别
+        icon = "• "
+        if any(k in full_text for k in ["used", "使用了"]): icon = "⚔️ "
+        elif any(k in full_text for k in ["restored", "回复"]): icon = "💚 "
+        elif any(k in full_text for k in ["paralyzed", "burned", "poisoned", "asleep", "frozen", "confused", "麻痹", "灼伤", "中毒", "睡眠", "冰冻", "混乱", "陷入"]): icon = "⚠️ "
+        elif any(k in full_text for k in ["fainted", "倒下", "defeated"]): icon = "💀 "
+
+        curr_x = x
+        draw.text((curr_x, y), icon, fill=self.cfg["colors"]["text_sub"], font=self.fonts["small"])
+        curr_x += self.fonts["small"].getlength(icon)
+
+        # 3. 分段渲染
+        if isinstance(content, list):
+            for seg in content:
+                txt = seg.get('text', '')
+                color = self._get_color(seg.get('color', 'default'))
+                draw.text((curr_x, y), txt, fill=color, font=self.fonts["small"])
+                curr_x += self.fonts["small"].getlength(txt)
+        else:
+            draw.text((curr_x, y), full_text, fill=self.cfg["colors"]["text_main"], font=self.fonts["small"])
             
-        current_x = x
-        
-        # 绘制图标
-        bullet = f"{icon} "
-        draw.text((current_x, y), bullet, fill=self.cfg["colors"]["text_main"], font=font)
-        current_x += font.getlength(bullet)
+    def _get_color(self, color_key: str) -> Tuple[int, int, int]:
+        if color_key == 'default': return self.cfg["colors"]["text_main"]
+        if color_key.startswith('type_'):
+            return self._get_type_color(color_key.replace('type_', ''))
+        if color_key in ['red', 'hp']: return COLOR_ERROR
+        if color_key == 'green': return COLOR_SUCCESS
+        if color_key == 'blue': return (66, 133, 244)
+        return self.cfg["colors"]["text_main"]
 
-        if isinstance(content, str):
-            draw.text((current_x, y), f"{content}", fill=self.cfg["colors"]["text_main"], font=font)
-        elif isinstance(content, list):
-             for segment in content:
-                text = segment.get('text', '')
-                color_key = segment.get('color', 'default')
-                
-                # Removed stroke_width to fix blur
-                
-                # 解析颜色
-                if color_key == 'default':
-                    fill_color = self.cfg["colors"]["text_main"]
-                elif color_key.startswith('type_'):
-                    type_en = color_key.replace('type_', '')
-                    fill_color = self._get_type_color(type_en)
-                elif color_key == 'red' or color_key == 'hp':
-                    fill_color = COLOR_ERROR
-                elif color_key == 'green':
-                    fill_color = COLOR_SUCCESS
-                elif color_key == 'blue':
-                    fill_color = (66, 133, 244) # Google Blueish
-                else:
-                    fill_color = self.cfg["colors"]["text_main"]
-                
-                draw.text((current_x, y), text, fill=fill_color, font=font)
-                current_x += font.getlength(text)
+    def _draw_header(self, draw, log_data, pad):
+        cx = self.width // 2
+        cy = pad + 40
+        title_text = f"战斗日志 #{log_data.get('id')}"
+        draw.text((cx, cy), title_text, fill=COLOR_TITLE, font=self.fonts["title"], anchor="mm")
+        
+        date_text = log_data.get('created_at', '')
+        draw.text((cx, cy + 40), date_text, fill=self.cfg["colors"]["text_sub"], font=self.fonts["subtitle"], anchor="mm")
 
 def draw_battle_log(log_data: Dict[str, Any]) -> Image.Image:
     drawer = BattleDrawer()
