@@ -19,9 +19,8 @@ class PokemonHandlers:
         self.move_service = container.move_service
         self.ability_service = container.ability_service
         self.pokemon_repo = container.pokemon_repo
-        self.data_dir = "data"
-        self.tmp_dir = os.path.join(self.data_dir, "tmp")
-        os.makedirs(self.tmp_dir, exist_ok=True)
+        self.tmp_dir = container.tmp_dir
+
         try:
             from .draw.pokedex_detail import draw_pokedex_detail
             self.draw_pokedex_detail_func = draw_pokedex_detail

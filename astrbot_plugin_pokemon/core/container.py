@@ -1,3 +1,5 @@
+import os
+
 from ..core.services import (
     UserPokemonService, PokemonService, TeamService, AdventureService,
     ExpService, UserService, ItemService, ShopService, MoveService,
@@ -137,3 +139,7 @@ class GameContainer:
             pokemon_repo=self.pokemon_repo,
             nature_service=self.nature_service
         )
+        self.data_dir = "data"
+
+        self.tmp_dir = os.path.join(self.data_dir, "tmp")
+        os.makedirs(self.tmp_dir, exist_ok=True)

@@ -633,7 +633,7 @@ class AdventureService:
 
             battle_ended = self.battle_logic.process_turn(user_state, wild_state, logger_obj)
             
-            logger_obj.log(f"\n\n剩余HP - {user_ctx.pokemon.name}: {max(0, user_state.current_hp)}, {wild_ctx.pokemon.name}: {max(0, wild_state.current_hp)}\n\n")
+            logger_obj.log(f"剩余HP - {user_ctx.pokemon.name}: {max(0, user_state.current_hp)}, {wild_ctx.pokemon.name}: {max(0, wild_state.current_hp)}\n\n")
 
             if battle_ended:
                 if user_state.current_hp > 0:

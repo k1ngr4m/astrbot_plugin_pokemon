@@ -1,3 +1,4 @@
+import os
 import time
 import random
 from typing import List, Optional, TYPE_CHECKING, Any
@@ -10,6 +11,7 @@ from ...core.models.common_models import BaseResult
 from ...core.models.pokemon_models import WildPokemonInfo, UserPokemonInfo, WildPokemonEncounterLog, PokemonStats, PokemonIVs, PokemonEVs, PokemonMoves
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
+from .draw.battle_drawer import draw_battle_log
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
@@ -28,6 +30,7 @@ class AdventureHandlers:
         self.move_service = container.move_service
 
         self.adventure_cooldown = self.plugin.game_config["adventure"]["cooldown"]
+        self.tmp_dir = container.tmp_dir
 
     async def view_locations(self, event: AstrMessageEvent):
         """查看所有可冒险的区域"""
@@ -230,23 +233,15 @@ class AdventureHandlers:
             yield event.plain_result("❌ 找不到该战斗日志")
             return
 
-        # 格式化日志详情
-        message = [
-            f"📜 战斗日志 #{log['id']}\n\n",
-            f"时间: {log['created_at']}\n\n",
-            f"对手: {log['target_name']}\n\n",
-            f"结果: {'胜利' if log['result'] == 'success' else '失败'}\n\n",
-        ]
-
-        for i, skirmish in enumerate(log['log_data'], 1):
-            message.append(f"=== 第 {i} 场对战 ===\n\n")
-            message.append(f"我方: {skirmish['pokemon_name']} (Lv.{skirmish['level']})")
-            message.append(f"预测胜率: {skirmish['win_rate']}%\n\n")
-            message.append("详细过程:")
-            message.extend([f"  {line}" for line in skirmish['details']])
-            message.append(f"本场结果: {'胜利' if skirmish['result'] == 'win' else '失败'}\n")
-
-        yield event.plain_result("\n".join(message))
+        # 使用绘图生成图片
+        img = draw_battle_log(log)
+        
+        # 临时保存图片
+        temp_path = f"/tmp/battle_log_{log_id}.png"
+        filename = f"battle_log_{log_id}.png"
+        output_path = os.path.join(self.tmp_dir, filename)
+        img.save(output_path)
+        yield event.image_result(output_path)
 
     async def catch_pokemon(self, event: AstrMessageEvent):
         """处理捕捉野生宝可梦的指令"""
