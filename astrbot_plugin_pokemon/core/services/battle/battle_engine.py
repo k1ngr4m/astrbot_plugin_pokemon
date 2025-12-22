@@ -841,7 +841,52 @@ class BattleLogic:
             # 对于未定义的target_id，默认返回使用者
             return attacker
 
+
     # --- 5. 辅助逻辑 (Helpers) ---
+
+    def _trigger_damage_calc_hooks(self, damage_params: Dict, attacker: BattleState, defender: BattleState, 
+                                   move: BattleMoveInfo, logger_obj: BattleLogger) -> Dict:
+        """
+        触发所有伤害计算相关的钩子，包含破格(Mold Breaker)处理逻辑。
+        """
+        # 1. 触发攻击方钩子
+        damage_params = attacker.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
+        
+        # 2. 检查攻击者是否拥有“破格” (ID 104)
+        has_mold_breaker = (attacker.ability_id == 104)
+        
+        # 日志处理：仅非 NoOpLogger 且未宣布过才宣布
+        should_announce = has_mold_breaker and logger_obj and not isinstance(logger_obj, NoOpBattleLogger)
+        if should_announce and not hasattr(attacker, '_mold_breaker_announced'):
+             # 此时不立即宣布，等到真的忽略了特性再宣布，或者这里只标记
+             # 根据之前逻辑，先不宣布，在忽略时宣布
+             pass
+
+        if has_mold_breaker:
+            # 如果有破格，仅触发那些不能被无视的钩子 (防御方)
+            # 遍历 defensive hooks
+            raw_hooks = defender.hooks._hooks.get("on_damage_calc", [])
+            for hook in raw_hooks:
+                # 检查 source_plugin
+                source_plugin = getattr(hook, 'source_plugin', None)
+                if source_plugin and getattr(source_plugin, 'can_be_ignored', False):
+                    # 发现被忽略的特性，且需要宣布
+                    if should_announce and not hasattr(attacker, '_mold_breaker_announced'):
+                        logger_obj.log(f"{attacker.context.pokemon.name} 通过破格特性突破了防御！\n\n")
+                        attacker._mold_breaker_announced = True
+                    # 跳过执行
+                    continue 
+                
+                # 执行不可忽略的 hook
+                damage_params = hook.callback(damage_params, attacker, defender, move, logger_obj)
+        else:
+            # 正常触发所有防御方钩子
+            damage_params = defender.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
+        
+        # 3. 触发全局环境钩子
+        damage_params = self.field_hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
+        
+        return damage_params
 
     def _calculate_base_damage_params(self, attacker: BattleState, defender: BattleState, move: BattleMoveInfo, logger_obj: Optional[BattleLogger] = None):
         """计算基础伤害所需的参数"""
@@ -872,13 +917,8 @@ class BattleLogic:
             'is_immune': False
         }
 
-        # 3. 触发特性/道具钩子 (由攻击方和防御方分别触发)
-        # 例如：攻击方的【猛火】修改 power，防御方的【飘浮】修改 effectiveness
-        damage_params = attacker.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
-        damage_params = defender.hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
-        
-        # 触发全局环境钩子（如天气对属性的修正）
-        damage_params = self.field_hooks.trigger_value("on_damage_calc", damage_params, attacker, defender, move, logger_obj)
+        # 3. 触发特性/道具/环境钩子 (封装了破格逻辑)
+        damage_params = self._trigger_damage_calc_hooks(damage_params, attacker, defender, move, logger_obj)
 
         eff = damage_params['effectiveness']
         stab = damage_params['stab']
@@ -1318,15 +1358,10 @@ class BattleLogic:
                 'is_immune': False
             }
 
-            # 2. 模拟触发特性钩子 (猛火、蓄电等会在此修改参数)
+            # 2. 模拟触发特性钩子 (使用共享的 _trigger_damage_calc_hooks 方法以支持破格)
             # 使用 NoOpBattleLogger 确保 AI 模拟时不产生日志
             noop_logger = NoOpBattleLogger()
-            
-            sim_params = attacker_state.hooks.trigger_value("on_damage_calc", sim_params, attacker_state, defender_state, move, noop_logger)
-            sim_params = defender_state.hooks.trigger_value("on_damage_calc", sim_params, attacker_state, defender_state, move, noop_logger)
-            
-            # 模拟触发全局环境钩子 (AI感知天气)
-            sim_params = self.field_hooks.trigger_value("on_damage_calc", sim_params, attacker_state, defender_state, move, noop_logger)
+            sim_params = self._trigger_damage_calc_hooks(sim_params, attacker_state, defender_state, move, noop_logger)
 
             # 3. 检查免疫判定
             if sim_params['is_immune'] or sim_params['effectiveness'] == 0:
