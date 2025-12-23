@@ -234,7 +234,8 @@ class AdventureService:
 
     def _run_team_battle(self, user_id: str, user_team_list: List[int], opponent_contexts: List[BattleContext],
                          opponent_list, battle_type: str, target_name: str,
-                         save_battle_log: bool = True) -> Tuple[str, List[Dict], float, float, List[BattleContext]]:
+                         save_battle_log: bool = True, update_persistence: bool = True,
+                         user_contexts: List[BattleContext] = None) -> Tuple[str, List[Dict], float, float, List[BattleContext]]:
         """
         通用战斗循环方法
         Args:
@@ -274,13 +275,17 @@ class AdventureService:
                 all_stat_changes_cache[mid] = self.move_repo.get_move_stat_changes_by_move_id(mid) or []
 
         # 使用缓存数据创建所有战斗上下文
-        user_pokemon_contexts = []
-        for pid in user_team_list:
-            u_info = user_pokemon_map.get(pid)
-            if u_info:
-                user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True,
-                                                                       all_moves_cache=all_moves_cache,
-                                                                       all_stat_changes_cache=all_stat_changes_cache))
+        # 如果传入了 user_contexts (如 PvP 场景)，则直接使用，不重新从数据库加载
+        if user_contexts:
+            user_pokemon_contexts = user_contexts
+        else:
+            user_pokemon_contexts = []
+            for pid in user_team_list:
+                u_info = user_pokemon_map.get(pid)
+                if u_info:
+                    user_pokemon_contexts.append(self._create_battle_context(u_info, is_user=True,
+                                                                           all_moves_cache=all_moves_cache,
+                                                                           all_stat_changes_cache=all_stat_changes_cache))
 
         # 检查是否有可用的宝可梦参与战斗
         if not user_pokemon_contexts:
@@ -367,26 +372,31 @@ class AdventureService:
                     "details": log_data
                 })
 
-            # 检查战斗结束条件 BEFORE updating indices
+            # 检查战斗结束条件
             if battle_type == 'wild':
                 # 野生对战：对手被击败即胜利
                 # 使用对手战斗上下文的 current_hp，因为 WildPokemonInfo 没有 current_hp 属性
                 if opponent_ctx.current_hp <= 0:
                     battle_result_str = "success"
                     break
-            else:
-                # 训练家对战：所有对手被击败才胜利
-                if opponent_idx >= len(opponent_contexts):
-                    battle_result_str = "success"
-                    break
-
+            
+            # --- Index Update Logic ---
             # 检查对手宝可梦是否被击败 (using battle context HP which is properly updated)
             if opponent_ctx.current_hp <= 0:
                 # 对手宝可梦被击败，对方下一只上场
                 opponent_idx += 1
+                
+                # 【Fix】对于训练家对战，在每次击败对手后检查是否全部击败
+                if battle_type != 'wild' and opponent_idx >= len(opponent_contexts):
+                    battle_result_str = "success"
+                    break
             elif battle_outcome == "win":
-                # 我方获胜，对方下一只上场
+                # 我方获胜（通常这是calculate_battle_win_rate模拟用的，实战中应该看HP），对方下一只上场
                 opponent_idx += 1
+                 # 【Fix】同上
+                if battle_type != 'wild' and opponent_idx >= len(opponent_contexts):
+                    battle_result_str = "success"
+                    break
             else:
                 # 我方战败，下一只上场
                 current_idx += 1
@@ -403,21 +413,24 @@ class AdventureService:
 
         # 保存战斗后用户的宝可梦状态（HP和PP）
         # 只保存参与战斗的宝可梦（即在战斗循环中被访问过的）
-        for i in range(current_idx + 1):  # 保存从索引0到当前索引的所有宝可梦
-            if i >= len(user_pokemon_contexts):  # 防御性检查
-                break
-            ctx = user_pokemon_contexts[i]
-            # 更新用户宝可梦的当前HP和当前PP
-            # 通过commit_to_context已经将BattleState的最终状态同步到了BattleContext
-            self.user_pokemon_repo._update_user_pokemon_fields(
-                user_id=user_id,
-                pokemon_id=ctx.pokemon.id,
-                current_hp=ctx.current_hp,  # 使用战斗后同步的当前HP
-                current_pp1=ctx.moves[0].current_pp if len(ctx.moves) > 0 else 0,
-                current_pp2=ctx.moves[1].current_pp if len(ctx.moves) > 1 else 0,
-                current_pp3=ctx.moves[2].current_pp if len(ctx.moves) > 2 else 0,
-                current_pp4=ctx.moves[3].current_pp if len(ctx.moves) > 3 else 0
-            )
+        # 保存战斗后用户的宝可梦状态（HP和PP）
+        # 只保存参与战斗的宝可梦（即在战斗循环中被访问过的）
+        if update_persistence:
+            for i in range(current_idx + 1):  # 保存从索引0到当前索引的所有宝可梦
+                if i >= len(user_pokemon_contexts):  # 防御性检查
+                    break
+                ctx = user_pokemon_contexts[i]
+                # 更新用户宝可梦的当前HP和当前PP
+                # 通过commit_to_context已经将BattleState的最终状态同步到了BattleContext
+                self.user_pokemon_repo._update_user_pokemon_fields(
+                    user_id=user_id,
+                    pokemon_id=ctx.pokemon.id,
+                    current_hp=ctx.current_hp,  # 使用战斗后同步的当前HP
+                    current_pp1=ctx.moves[0].current_pp if len(ctx.moves) > 0 else 0,
+                    current_pp2=ctx.moves[1].current_pp if len(ctx.moves) > 1 else 0,
+                    current_pp3=ctx.moves[2].current_pp if len(ctx.moves) > 2 else 0,
+                    current_pp4=ctx.moves[3].current_pp if len(ctx.moves) > 3 else 0
+                )
 
         return battle_result_str, battle_log, final_u_rate, final_w_rate, user_pokemon_contexts
 
@@ -942,6 +955,136 @@ class AdventureService:
                 is_trainer_battle=True,
                 money_reward=money_reward,
                 user_battle_exp_result=user_exp_result
+            )
+        )
+
+    def _create_pvp_battle_context(self, user_id: str, pokemon_info: UserPokemonInfo) -> BattleContext:
+        """为 PvP 创建 50 级缩放后的战斗上下文"""
+        level = 50
+        species = self.pokemon_repo.get_pokemon_by_id(pokemon_info.species_id)
+        
+        # 1. 重新计算 50 级属性
+        base = species.base_stats
+        ivs = pokemon_info.ivs
+        evs = pokemon_info.evs
+        
+        def calc(b, i, e, is_hp=False):
+            res = (b * 2 + i + e // 4) * level / 100
+            if is_hp:
+                return int(res) + level + 10
+            else:
+                return int(res) + 5
+    
+        new_stats = PokemonStats(
+            hp=calc(base["base_hp"], ivs.hp_iv, evs.hp_ev, True),
+            attack=calc(base["base_attack"], ivs.attack_iv, evs.attack_ev),
+            defense=calc(base["base_defense"], ivs.defense_iv, evs.defense_ev),
+            sp_attack=calc(base["base_sp_attack"], ivs.sp_attack_iv, evs.sp_attack_ev),
+            sp_defense=calc(base["base_sp_defense"], ivs.sp_defense_iv, evs.sp_defense_ev),
+            speed=calc(base["base_speed"], ivs.speed_iv, evs.speed_ev)
+        )
+        
+        # 应用性格修正
+        # nature_service is in self.pokemon_service.nature_service
+        final_stats = self.pokemon_service.nature_service.apply_nature_modifiers(new_stats, pokemon_info.nature_id)
+        
+        # 2. 获取 50 级可用的招式列表
+        # 获取该物种到 50 级为止能学会的所有招式，取最后 4 个作为 PvP 招式
+        # 注意：get_level_up_moves 返回的是 move_ids
+        learnable_move_ids = self.move_repo.get_level_up_moves(pokemon_info.species_id, level)
+        # 确保 learnable_move_ids 是列表
+        if not learnable_move_ids:
+            learnable_move_ids = []
+            
+        pvp_move_ids = learnable_move_ids[-4:] if len(learnable_move_ids) >= 4 else learnable_move_ids
+        
+        # 构造临时的招式对象供 _preload_moves 使用
+        temp_moves_obj = PokemonMoves(
+            move1_id=pvp_move_ids[0] if len(pvp_move_ids) > 0 else 0,
+            move2_id=pvp_move_ids[1] if len(pvp_move_ids) > 1 else 0,
+            move3_id=pvp_move_ids[2] if len(pvp_move_ids) > 2 else 0,
+            move4_id=pvp_move_ids[3] if len(pvp_move_ids) > 3 else 0
+        )
+        
+        # 借用现有逻辑加载招式详情
+        # 注意：这里需要创建一个临时的 info 对象，其 moves 字段被替换
+        temp_info = replace(pokemon_info, stats=final_stats, moves=temp_moves_obj, level=level, current_hp=final_stats.hp)
+        
+        return self._create_battle_context(temp_info, is_user=True)
+
+    def start_pvp_battle(self, attacker_id: str, defender_id: str) -> BaseResult[BattleResult]:
+        """启动玩家间的 50 级基准对战"""
+        # 1. 获取双方队伍
+        a_team = self.team_repo.get_user_team(attacker_id)
+        d_team = self.team_repo.get_user_team(defender_id)
+        
+        if not a_team or not a_team.team_pokemon_ids:
+            return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
+        if not d_team or not d_team.team_pokemon_ids:
+            return BaseResult(success=False, message="对方玩家还没有设置队伍")
+    
+        # 2. 构造 50 级上下文列表
+        attacker_contexts = []
+        for pid in a_team.team_pokemon_ids:
+            p_info = self.user_pokemon_repo.get_user_pokemon_by_id(attacker_id, pid)
+            if p_info:
+                attacker_contexts.append(self._create_pvp_battle_context(attacker_id, p_info))
+            
+        defender_contexts = []
+        defender_pokes = []
+        for pid in d_team.team_pokemon_ids:
+            p_info = self.user_pokemon_repo.get_user_pokemon_by_id(defender_id, pid)
+            if p_info:
+                defender_contexts.append(self._create_pvp_battle_context(defender_id, p_info))
+                defender_pokes.append(p_info)
+    
+        if not attacker_contexts:
+             return BaseResult(success=False, message="你的队伍中没有任何有效的宝可梦")
+        if not defender_contexts:
+             return BaseResult(success=False, message="对方队伍中没有任何有效的宝可梦")
+
+        # 3. 执行战斗循环
+        # 使用 _run_team_battle，传入 save_battle_log=True 以便查看
+        # 借用 'trainer' 类型来处理多对多
+        res_str, logs, _, _, user_contexts = self._run_team_battle(
+            attacker_id, 
+            a_team.team_pokemon_ids, 
+            defender_contexts, 
+            defender_pokes, 
+            'trainer', 
+            "对方玩家",
+            save_battle_log=True, # 强制保存日志
+            update_persistence=False, # PvP 不保存状态（无损）
+            user_contexts=attacker_contexts # 使用自定义的50级上下文
+        )
+    
+        # 4. 保存对战日志
+        log_id = self.battle_repo.save_battle_log(attacker_id, f"与玩家 {defender_id} 的PVP对战", logs, res_str)
+
+        # 5. 构造返回结果
+        # 获取最终用户宝可梦信息
+        final_u_info = None
+        if user_contexts:
+            # 获取最后一只战斗的宝可梦
+            final_idx = min(len(user_contexts) - 1, len(logs) - 1) if logs else 0
+            if final_idx < len(user_contexts):
+                final_u_info = user_contexts[final_idx].pokemon
+        
+        # 获取对方最后一只宝可梦信息
+        final_d_info = defender_contexts[-1].pokemon if defender_contexts else None
+
+        return BaseResult(
+            success=True,
+            message="PVP battle finished",
+            data=BattleResult(
+                user_pokemon=self._format_pokemon_summary(final_u_info),
+                wild_pokemon=self._format_pokemon_summary(final_d_info, is_wild=True), # 对方视为 wild/trainer
+                win_rates={"user_win_rate": 0.0, "wild_win_rate": 0.0}, # PvP 不计算胜率
+                exp_details={}, # PvP 不获得经验
+                result=res_str,
+                battle_log=logs,
+                log_id=log_id,
+                is_trainer_battle=True # PvP 逻辑上接近训练家对战
             )
         )
 

@@ -5,6 +5,7 @@ from typing import List, Optional, TYPE_CHECKING, Any
 
 from astrbot.api.event import AstrMessageEvent
 from astrbot.api import logger
+from astrbot.api.message_components import At
 from data.plugins.astrbot_plugin_pokemon.astrbot_plugin_pokemon.core.models.pokemon_models import UserPokemonInfo
 from ...core.models.adventure_models import LocationInfo, AdventureResult, BattleResult
 from ...core.models.common_models import BaseResult
@@ -207,9 +208,45 @@ class AdventureHandlers:
                 yield event.plain_result(result.message)
                 return
 
-            # 格式化输出 (逻辑抽取到私有方法)
             message = self._format_battle_result_message(result.data)
             yield event.plain_result(message)
+
+    async def pvp_battle(self, event: AstrMessageEvent):
+        """处理 /pk @群友 指令"""
+        user_id = userid_to_base32(event.get_sender_id())
+        
+        # 统一处理注册检查
+        check_res = await self._check_registered(user_id)
+        if not check_res.success:
+            yield event.plain_result(check_res.message)
+            return
+
+        # 获取被艾特的人
+        message_obj = event.message_obj
+        target_id = None
+        if hasattr(message_obj, "message"):
+            for comp in message_obj.message:
+                if isinstance(comp, At):
+                    if comp.qq != message_obj.self_id:
+                        target_id = str(comp.qq) # 转换为字符串
+                        break
+        
+        if not target_id:
+            yield event.plain_result("❌ 请 @ 一位群友进行对战！")
+            return
+            
+        target_user_id = userid_to_base32(target_id)
+        
+        # 执行对战
+        result = self.adventure_service.start_pvp_battle(user_id, target_user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
+            return
+        
+        # 格式化输出
+        d = result.data
+        msg = f"⚔️ PVP对战结束！\n🎯 结果: {'胜利' if d.result == 'success' else '失败'}\n📜 日志ID: {d.log_id} (使用 /查看战斗 {d.log_id} 查看详情)"
+        yield event.plain_result(msg)
 
     async def view_battle_log(self, event: AstrMessageEvent):
         """查看战斗日志"""

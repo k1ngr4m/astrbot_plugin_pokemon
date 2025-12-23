@@ -105,8 +105,9 @@ class PokemonPlugin(Star):
         logger.info(f"[{self.plugin_id}] 正在初始化数据...")
 
         # 1. 准备路径
-        plugin_root_dir = os.path.dirname(__file__)
-        migrations_path = os.path.join(plugin_root_dir, self.plugin_id, "infrastructure", "database", "migrations")
+        # 使用绝对路径确保正确找到 migrations 目录
+        plugin_dir = os.path.dirname(__file__)  # main.py 所在目录
+        migrations_path = os.path.abspath(os.path.join(plugin_dir, "astrbot_plugin_pokemon", "infrastructure", "database", "migrations"))
 
         # 2. 执行数据库迁移
         try:
@@ -259,6 +260,12 @@ class PokemonPlugin(Star):
     async def run(self, event: AstrMessageEvent):
         """逃跑离开当前遇到的野生宝可梦"""
         async for r in self.adventure_handlers.run(event):
+            yield r
+
+    @filter.command("pk", alias={"pvp", "切磋", "基准对战"})
+    async def pvp_battle(self, event: AstrMessageEvent):
+        """与群友进行50级基准对战。用法：/pk @群友"""
+        async for r in self.adventure_handlers.pvp_battle(event):
             yield r
 
     @filter.command("查看战斗")
