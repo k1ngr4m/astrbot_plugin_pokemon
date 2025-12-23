@@ -301,18 +301,8 @@ class AdventureService:
             final_user_info = user_ctx.pokemon  # 使用 Context 里的引用
             opponent_ctx = opponent_contexts[opponent_idx]
 
-            # 模拟前重置 HP
-            sim_u_hp = user_ctx.current_hp
-            sim_o_hp = opponent_ctx.current_hp
-
-            # 计算胜率 (仅用于展示)
-            user_ctx.current_hp = user_ctx.pokemon.stats.hp
-            opponent_ctx.current_hp = opponent_list[opponent_idx].stats.hp
+            # 计算胜率 (基于当前实际状态)
             u_win_rate, o_win_rate = self.calculate_battle_win_rate(user_ctx, opponent_ctx)
-
-            # 恢复实际 HP
-            user_ctx.current_hp = sim_u_hp
-            opponent_ctx.current_hp = sim_o_hp
 
             all_win_rates.append((u_win_rate, o_win_rate))
 
