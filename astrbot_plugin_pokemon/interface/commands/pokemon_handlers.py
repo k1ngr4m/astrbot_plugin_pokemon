@@ -3,14 +3,24 @@ from typing import TYPE_CHECKING
 from ...interface.response.answer_enum import AnswerEnum
 from ...utils.utils import userid_to_base32
 import io
+import uuid
 
 if TYPE_CHECKING:
     from data.plugins.astrbot_plugin_pokemon.main import PokemonPlugin
     from ...core.container import GameContainer
 
 import os
+from pathlib import Path
+import io
+import uuid
+from typing import Dict, Any, Optional, Union
+from PIL import Image
 
 class PokemonHandlers:
+    # 映射常量
+    DAMAGE_CLASS_MAP = {1: '变化', 2: '物理', 3: '特殊'}
+    STAT_MAP = {1: 'HP', 2: '攻击', 3: '防御', 4: '特攻', 5: '特防', 6: '速度', 7: '命中', 8: '闪避'}
+
     def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
         self.user_service = plugin.user_service
@@ -27,6 +37,53 @@ class PokemonHandlers:
         except ImportError:
             self.draw_pokedex_detail_func = None
             print("警告：无法导入图鉴详情生成模块，请确保PIL和numpy已安装。")
+
+        try:
+            from .draw.pokedex_drawer import draw_pokedex_list
+            self.draw_pokedex_list_func = draw_pokedex_list
+        except ImportError:
+            self.draw_pokedex_list_func = None
+            print("警告：无法导入图鉴列表生成模块，请确保PIL和numpy已安装。")
+
+    def _send_image_response(self, event: "AstrMessageEvent", image: "Image.Image", filename_prefix: str = "pokemon_image"):
+        """统一的图片响应处理方法"""
+        try:
+            img_byte_arr = io.BytesIO()
+            image.save(img_byte_arr, format='PNG')
+            img_byte_arr.seek(0)
+
+            # 保存图片到临时文件并返回
+            filename = f"{filename_prefix}_{uuid.uuid4().hex}.png"
+            output_path = os.path.join(self.tmp_dir, filename)
+            # 将字节流保存到临时文件
+            with open(output_path, 'wb') as f:
+                f.write(img_byte_arr.getvalue())
+            return event.image_result(output_path)
+        except Exception as e:
+            print(f"生成图片失败: {e}")
+            return None
+
+    def _send_image_or_fallback(self, event: "AstrMessageEvent", image_func: callable, data: Dict[str, Any],
+                               fallback_func: callable, fallback_args: tuple = (),
+                               filename_prefix: str = "pokemon_image"):
+        """统一处理图片生成或回退到文本"""
+        if not image_func:
+            # 如果图片模块不可用，返回文本
+            result_text = fallback_func(*fallback_args) if callable(fallback_func) else ""
+            return event.plain_result(result_text)
+
+        # 生成图片
+        try:
+            image = image_func(data)
+            image_response = self._send_image_response(event, image, filename_prefix)
+            if image_response:
+                return image_response
+        except Exception as e:
+            print(f"生成图片失败: {e}")
+
+        # 如果生成图片失败，返回文本
+        result_text = fallback_func(*fallback_args) if callable(fallback_func) else ""
+        return event.plain_result(result_text)
 
     def _show_pokedex_detail(self, user_id, query):
         """
@@ -170,9 +227,22 @@ class PokemonHandlers:
                 if page <= 0:
                     yield event.plain_result("页码必须是正整数！")
                     return
-                # 调用 Service 获取列表视图
-                result_text = self.pokemon_service.get_pokedex_view(user_id, page)
-                yield event.plain_result(result_text)
+                # 生成图鉴列表图片或返回文本
+                result_data = self.pokemon_service.get_pokedex_view(user_id, page, return_data=True)
+
+                # 定义回退函数
+                def fallback_text():
+                    return self.pokemon_service.get_pokedex_view(user_id, page)
+
+                # 发送图片或回退到文本
+                response = self._send_image_or_fallback(
+                    event,
+                    self.draw_pokedex_list_func,
+                    result_data,
+                    fallback_text,
+                    filename_prefix="pokedex_list"
+                )
+                yield response
                 return
             except ValueError:
                 yield event.plain_result("页码格式错误！请使用 /图鉴 P+页码 格式。")
@@ -206,9 +276,22 @@ class PokemonHandlers:
             if page <= 0:
                 yield event.plain_result("页码必须是正整数！")
                 return
-            # 调用 Service 获取列表视图
-            result_text = self.pokemon_service.get_pokedex_view(user_id, page)
-            yield event.plain_result(result_text)
+            # 生成图鉴列表图片或返回文本
+            result_data = self.pokemon_service.get_pokedex_view(user_id, page, return_data=True)
+
+            # 定义回退函数
+            def fallback_text():
+                return self.pokemon_service.get_pokedex_view(user_id, page)
+
+            # 发送图片或回退到文本
+            response = self._send_image_or_fallback(
+                event,
+                self.draw_pokedex_list_func,
+                result_data,
+                fallback_text,
+                filename_prefix="pokedex_list"
+            )
+            yield response
             return
 
         # 情况 D: 其他非空参数视为宝可梦名称或ID查询
@@ -230,8 +313,21 @@ class PokemonHandlers:
             return
 
         # 情况 E: 默认显示第一页
-        result_text = self.pokemon_service.get_pokedex_view(user_id, 1)
-        yield event.plain_result(result_text)
+        result_data = self.pokemon_service.get_pokedex_view(user_id, 1, return_data=True)
+
+        # 定义回退函数
+        def fallback_text():
+            return self.pokemon_service.get_pokedex_view(user_id, 1)
+
+        # 发送图片或回退到文本
+        response = self._send_image_or_fallback(
+            event,
+            self.draw_pokedex_list_func,
+            result_data,
+            fallback_text,
+            filename_prefix="pokedex_list"
+        )
+        yield response
 
     async def view_move_info(self, event: AstrMessageEvent):
         """查询招式详细信息。用法：/查询招式 [招式ID或招式名称]"""
@@ -252,6 +348,7 @@ class PokemonHandlers:
 
         # 先尝试按ID查询
         move_info = None
+        move_id_for_stats = None
         try:
             move_id = int(query)
             if move_id > 0:
@@ -276,8 +373,7 @@ class PokemonHandlers:
         description = move_info.get('description', '暂无描述')
 
         # 根据招式类型确定伤害类别
-        damage_class_map = {1: '变化', 2: '物理', 3: '特殊'}
-        damage_class = damage_class_map.get(move_info.get('damage_class_id', 1), '未知')
+        damage_class = self.DAMAGE_CLASS_MAP.get(move_info.get('damage_class_id', 1), '未知')
 
         message = [
             f"📖 招式信息: {move_info['name_zh']} (ID: {move_info['id']})\n\n",
@@ -291,11 +387,10 @@ class PokemonHandlers:
         stat_changes = self.move_service.get_move_stat_changes_by_move_id(move_id_for_stats)
         if stat_changes:
             message.append("能力变化:\n\n")
-            stat_map = {1: 'HP', 2: '攻击', 3: '防御', 4: '特攻', 5: '特防', 6: '速度', 7: '命中', 8: '闪避'}
             for stat_change in stat_changes:
                 stat_id = stat_change['stat_id']
                 change = stat_change['change']
-                stat_name = stat_map.get(stat_id, '未知')
+                stat_name = self.STAT_MAP.get(stat_id, '未知')
                 message.append(f"  {stat_name}: {'+' if change > 0 else ''}{change}\n\n")
             message.append("")
 

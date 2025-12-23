@@ -210,13 +210,14 @@ class PokemonService:
             else:
                 return "F"
 
-    def get_pokedex_view(self, user_id: str, page: int = 1, page_size: int = 20) -> str:
+    def get_pokedex_view(self, user_id: str, page: int = 1, page_size: int = 20, return_data: bool = False) -> str:
         """
         获取用户的图鉴视图
         :param user_id: 用户ID
         :param page: 页码
         :param page_size: 每页数量
-        :return: 图鉴视图字符串
+        :param return_data: 是否返回数据结构而不是文本
+        :return: 图鉴视图字符串或数据结构
         """
         # 1. 获取所有宝可梦 (使用简化的获取方法以提高性能)
         all_species = self.pokemon_repo.get_all_pokemon_simple()
@@ -237,32 +238,67 @@ class PokemonService:
         page_species = all_species[start_idx:end_idx]
 
         if not page_species:
+            if return_data:
+                return {
+                    "list": [],
+                    "page_info": {
+                        "current_page": page,
+                        "total_count": total_count,
+                        "caught_count": caught_count,
+                        "seen_count": seen_count,
+                        "total_pages": max(1, (total_count + page_size - 1) // page_size)
+                    }
+                }
             return "图鉴页码超出范围。"
 
-        # 5. 构建显示文本
-        lines = [f"📖 宝可梦图鉴 (第 {page} 页)"]
-        lines.append(f"收集进度: 🟢 捕捉 {caught_count} / 👁️ 遇见 {seen_count} / 🌐 总计 {total_count}")
-        lines.append("-" * 20)
+        if return_data:
+            # 返回数据结构用于图片生成
+            pokemon_list = []
+            for sp in page_species:
+                sp_id = sp.id
+                pokemon_list.append({
+                    "id": sp_id,
+                    "sprite_id": sp_id,
+                    "name": sp.name_zh if sp_id in seen_set else "???",
+                    "caught": sp_id in caught_set,
+                    "seen": sp_id in seen_set
+                })
 
-        for sp in page_species:
-            sp_id = sp.id
-            if sp_id in caught_set:
-                icon = "🟢" # 已捕捉
-                name = sp.name_zh
-            elif sp_id in seen_set:
-                icon = "👁️" # 仅遇见
-                name = sp.name_zh
-            else:
-                icon = "❓" # 未知
-                name = "???"
+            return {
+                "list": pokemon_list,
+                "page_info": {
+                    "current_page": page,
+                    "total_count": total_count,
+                    "caught_count": caught_count,
+                    "seen_count": seen_count,
+                    "total_pages": max(1, (total_count + page_size - 1) // page_size)
+                }
+            }
+        else:
+            # 5. 构建显示文本
+            lines = [f"📖 宝可梦图鉴 (第 {page} 页)"]
+            lines.append(f"收集进度: 🟢 捕捉 {caught_count} / 👁️ 遇见 {seen_count} / 🌐 总计 {total_count}")
+            lines.append("-" * 20)
 
-            # 格式: #001 🟢 妙蛙种子
-            lines.append(f"#{sp_id:04d} {icon} {name}")
+            for sp in page_species:
+                sp_id = sp.id
+                if sp_id in caught_set:
+                    icon = "🟢" # 已捕捉
+                    name = sp.name_zh
+                elif sp_id in seen_set:
+                    icon = "👁️" # 仅遇见
+                    name = sp.name_zh
+                else:
+                    icon = "❓" # 未知
+                    name = "???"
 
-        lines.append("-" * 20)
-        lines.append("提示: 输入 /图鉴 [M名字/ID] 查看详细资料")
+                # 格式: #001 🟢 妙蛙种子
+                lines.append(f"#{sp_id:04d} {icon} {name}")
 
-        return "\n\n".join(lines)
+            lines.append("-" * 20)
+            lines.append("提示: 输入 /图鉴 [M名字/ID] 查看详细资料")
+
+            return "\n\n".join(lines)
 
 
     # ==========直接返回repo层==========

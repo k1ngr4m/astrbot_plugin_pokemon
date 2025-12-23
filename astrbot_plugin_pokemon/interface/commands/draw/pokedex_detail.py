@@ -56,7 +56,7 @@ class PokedexDetailImageGenerator:
         if bbox is None: return 0, 0
         return bbox[2] - bbox[0], bbox[3] - bbox[1]
 
-    def _load_pokemon_sprite(self, pokemon_id: int) -> Image.Image:
+    def _load_pokemon_sprite(self, pokemon_id: int, pokemon_seen: bool = True) -> Image.Image:
         """加载宝可梦精灵图片"""
         base_path = os.path.dirname(__file__)
         # 保持修复后的路径 (4层回退)
@@ -65,17 +65,36 @@ class PokedexDetailImageGenerator:
             "..", "..", "..", "..", "assets", "sprites", "front", f"{pokemon_id}.png"
         ))
 
-        if pokemon_id in self.sprite_cache:
-            return self.sprite_cache[pokemon_id]
+        if pokemon_seen:
+            if pokemon_id in self.sprite_cache:
+                return self.sprite_cache[pokemon_id]
 
-        try:
-            sprite = Image.open(sprite_path).convert("RGBA")
-            sprite = sprite.resize(self.cfg["sprite_size"], Image.Resampling.LANCZOS)
-            self.sprite_cache[pokemon_id] = sprite
+            try:
+                sprite = Image.open(sprite_path).convert("RGBA")
+                sprite = sprite.resize(self.cfg["sprite_size"], Image.Resampling.LANCZOS)
+                self.sprite_cache[pokemon_id] = sprite
+                return sprite
+            except FileNotFoundError:
+                placeholder = Image.new("RGBA", self.cfg["sprite_size"], (0,0,0,0))
+                return placeholder
+        else:
+            # 未遇见宝可梦的情况：返回灰色遮罩效果
+            sprite = Image.new("RGBA", self.cfg["sprite_size"], (150,150,150,255))
+            draw = ImageDraw.Draw(sprite)
+
+            # 绘制一个问号来表示未遇见
+            question_mark = "?"
+            font = self.fonts["title_name"]  # 使用较大的字体
+            bbox = font.getbbox(question_mark)
+            text_w = bbox[2] - bbox[0]
+            text_h = bbox[3] - bbox[1]
+
+            # 居中绘制问号
+            x = (self.cfg["sprite_size"][0] - text_w) // 2
+            y = (self.cfg["sprite_size"][1] - text_h) // 2
+            draw.text((x, y), question_mark, fill=(255, 255, 255, 255), font=font)
+
             return sprite
-        except FileNotFoundError:
-            placeholder = Image.new("RGBA", self.cfg["sprite_size"], (0,0,0,0))
-            return placeholder
 
     def _draw_shadow(self, image: Image.Image, xy, radius, blur=15, offset=(0, 5)):
         shadow = Image.new('RGBA', image.size, (0, 0, 0, 0))
@@ -259,7 +278,8 @@ class PokedexDetailImageGenerator:
         sw, sh = self.cfg["sprite_size"]
         draw.ellipse((sx + 20, sy + sh - 15, sx + sw - 20, sy + sh + 5), fill=(0,0,0, 30))
         # 精灵图
-        sprite = self._load_pokemon_sprite(pokemon_data["id"])
+        pokemon_seen = pokemon_data.get("seen", False)
+        sprite = self._load_pokemon_sprite(pokemon_data["id"], pokemon_seen)
         overlay.paste(sprite, (sx, sy), sprite)
 
         # 信息
