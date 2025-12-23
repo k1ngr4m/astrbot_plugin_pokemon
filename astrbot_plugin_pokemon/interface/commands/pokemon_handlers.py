@@ -291,7 +291,7 @@ class PokemonHandlers:
         stat_changes = self.move_service.get_move_stat_changes_by_move_id(move_id_for_stats)
         if stat_changes:
             message.append("能力变化:\n\n")
-            stat_map = {1: 'HP', 2: '攻击', 3: '防御', 4: '特攻', 5: '特防', 6: '速度'}
+            stat_map = {1: 'HP', 2: '攻击', 3: '防御', 4: '特攻', 5: '特防', 6: '速度', 7: '命中', 8: '闪避'}
             for stat_change in stat_changes:
                 stat_id = stat_change['stat_id']
                 change = stat_change['change']
