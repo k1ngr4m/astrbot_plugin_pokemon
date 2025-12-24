@@ -297,9 +297,7 @@ class DataSetupService:
                                 "name": str(row['name']),
                                 "description": str(row['description']) if row['description'] else "",
                                 "shop_type": str(row['shop_type']),
-                                "is_active": int(row['is_active']),
-                                "created_at": str(row['created_at']) if row['created_at'] else None,
-                                "updated_at": str(row['updated_at']) if row['updated_at'] else None
+                                "is_active": int(row['is_active'])
                             })
                         except Exception as e:
                             logger.error(f"商店数据错误 (ID: {row.get('id')}): {e}")
