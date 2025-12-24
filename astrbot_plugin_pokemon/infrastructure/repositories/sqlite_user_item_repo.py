@@ -65,7 +65,7 @@ class SqliteUserItemRepository(AbstractUserItemRepository):
             cursor = conn.cursor()
             # 查询用户物品及其详细信息
             sql = """
-            SELECT ui.item_id, ui.quantity, i.name_zh, i.category_id, i.description
+            SELECT ui.item_id, ui.quantity, i.name_en, i.name_zh, i.category_id, i.description
             FROM user_items ui
             JOIN items i ON ui.item_id = i.id
             WHERE ui.user_id = ? and ui.quantity > 0
@@ -78,9 +78,10 @@ class SqliteUserItemRepository(AbstractUserItemRepository):
                 items_list.append(UserItemInfo(
                         item_id=row[0],
                         quantity=row[1],
-                        name_zh=row[2],
-                        category_id=row[3],
-                        description=row[4]
+                        name_en=row[2],
+                        name_zh=row[3],
+                        category_id=row[4],
+                        description=row[5]
                 ))
             user_items: UserItems = UserItems(
                 user_id=user_id,

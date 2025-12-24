@@ -55,3 +55,11 @@ class SqliteItemRepository(AbstractItemRepository):
         cursor.execute("SELECT * FROM items")
         rows = cursor.fetchall()
         return [dict(row) for row in rows]
+
+    def get_item_by_id(self, item_id: int) -> Optional[Dict[str, Any]]:
+        """根据物品ID获取完整的物品信息"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM items WHERE id = ?", (item_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None

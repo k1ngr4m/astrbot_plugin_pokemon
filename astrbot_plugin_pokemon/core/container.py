@@ -125,7 +125,8 @@ class GameContainer:
         self.adventure_service.set_trainer_service(self.trainer_service)
         self.item_service = ItemService(
             user_repo=self.user_repo,
-            user_item_repo=self.user_item_repo
+            user_item_repo=self.user_item_repo,
+            item_repo=self.item_repo
         )
         self.shop_service = ShopService(
             user_repo=self.user_repo,
