@@ -442,6 +442,17 @@ class AdventureService:
             if not user_team_data or not user_team_data.team_pokemon_ids:
                 return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
             user_team_list = user_team_data.team_pokemon_ids
+        
+        # 检查是否有存活的宝可梦
+        has_alive_pokemon = False
+        for pid in user_team_list:
+            p_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
+            if p_info and p_info.current_hp > 0:
+                has_alive_pokemon = True
+                break
+        
+        if not has_alive_pokemon:
+             return BaseResult(success=False, message="你的队伍中没有可以战斗的宝可梦！请先治疗。")
 
         # 性能优化：为野生宝可梦也实现批量查询，避免单独查询
         # 提取野生宝可梦的技能ID
@@ -878,6 +889,17 @@ class AdventureService:
         """开始与训练家的战斗"""
         if not user_team_list:
             return BaseResult(success=False, message=AnswerEnum.USER_TEAM_NOT_SET.value)
+
+        # 检查是否有存活的宝可梦
+        has_alive_pokemon = False
+        for pid in user_team_list:
+            p_info = self.user_pokemon_repo.get_user_pokemon_by_id(user_id, pid)
+            if p_info and p_info.current_hp > 0:
+                has_alive_pokemon = True
+                break
+        
+        if not has_alive_pokemon:
+             return BaseResult(success=False, message="你的队伍中没有可以战斗的宝可梦！请先治疗。")
         if not battle_trainer.pokemon_list:
             return BaseResult(success=False, message="训练家没有宝可梦")
 
