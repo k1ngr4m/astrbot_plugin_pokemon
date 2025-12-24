@@ -74,7 +74,7 @@ class UserPokemonHandlers:
             yield event.plain_result(result.message)
 
     async def view_user_pokemon(self, event: AstrMessageEvent):
-        """查看我的宝可梦，支持查看特定宝可梦详细信息"""
+        """查看我的宝可梦，支持查看特定宝可梦详细信息和按属性类型搜索"""
         user_id = userid_to_base32(event.get_sender_id())
 
         # 1. 权限/注册检查
@@ -98,6 +98,13 @@ class UserPokemonHandlers:
             # 处理详情指令: 数字ID
             elif arg.isdigit():
                 yield await self._handle_detail_view(event, user_id, int(arg))
+            # 处理按属性类型搜索
+            elif self._is_valid_pokemon_type(arg):  # 检查是否为有效宝可梦属性类型
+                pokemon_type = arg
+                page = 1  # 默认显示第一页
+                if len(args) >= 3 and args[2].lower().startswith('p') and args[2].lower()[1:].isdigit():
+                    page = max(1, int(args[2].lower()[1:]))
+                yield await self._handle_type_filter_view(event, user_id, pokemon_type, page)
             else:
                 yield event.plain_result(AnswerEnum.POKEMON_ID_INVALID.value)
 
@@ -232,3 +239,83 @@ class UserPokemonHandlers:
             "nature": nature_name,
             "ability": ability_name
         }
+
+    def _is_valid_pokemon_type(self, type_name: str) -> bool:
+        """检查是否为有效的宝可梦属性类型"""
+        # 宝可梦的标准属性类型列表（中文名）
+        valid_types = {
+            'normal', 'fighting', 'flying', 'poison', 'ground',
+            'rock', 'bug', 'ghost', 'steel', 'fire', 'water',
+            'grass', 'electric', 'psychic', 'ice', 'dragon',
+            'dark', 'fairy',
+            # 中文属性名称
+            '一般', '格斗', '飞行', '毒', '地面', '岩石', '虫',
+            '幽灵', '钢', '火', '水', '草', '电', '超能力',
+            '冰', '龙', '恶', '妖精'
+        }
+        return type_name.lower() in valid_types
+
+    async def _handle_type_filter_view(self, event, user_id, pokemon_type, page):
+        """处理按属性类型过滤的宝可梦列表显示"""
+        page_size = 10
+        # 获取用户所有宝可梦
+        all_res = self.user_pokemon_service.get_user_all_pokemon(user_id)
+        if not all_res.success:
+            return event.plain_result(all_res.message)
+
+        all_pokemon = all_res.data
+        if not all_pokemon:
+            return event.plain_result(AnswerEnum.USER_POKEMONS_NOT_FOUND.value)
+
+        # 按属性类型过滤
+        filtered_pokemon = []
+        for p in all_pokemon:
+            pokemon_info = self._get_pokemon_basic_info(p)
+            types_list = pokemon_info['types'].split('/')
+            if pokemon_type in types_list or pokemon_type in [t.lower() for t in types_list]:
+                filtered_pokemon.append(p)
+
+        # 计算总页数
+        total_count = len(filtered_pokemon)
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+
+        # 检查页码是否有效
+        if page > total_pages:
+            return event.plain_result(f"❌ 页码超出范围，最大页数为 {total_pages}")
+
+        # 获取当前页的数据
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        pokemon_page = filtered_pokemon[start_idx:end_idx]
+
+        if not pokemon_page:
+            return event.plain_result(f"❌ 您没有持有属性为 '{pokemon_type}' 的宝可梦")
+
+        # 构建绘图数据
+        draw_data = {
+            "total_count": total_count,
+            "page": page,
+            "total_pages": total_pages,
+            "list": []
+        }
+
+        for p in pokemon_page:
+            info = self._get_pokemon_basic_info(p)
+            draw_data["list"].append({
+                "id": p.id,
+                "sprite_id": p.species_id,
+                "name": p.name,
+                "level": p.level,
+                "gender": info['gender'],  # 传递图标或文字
+                "nature": info['nature'],
+                "ability": info['ability'],
+                "current_hp": p.current_hp,
+                "max_hp": p.stats.hp,
+                "types": info['types'].split('/') if info['types'] != "未知" else []
+            })
+
+        # 生成图片
+        img = draw_user_pokemon_list(draw_data)
+        save_path = os.path.join(self.tmp_dir, f"user_pokemon_{pokemon_type}_list_{user_id}_{page}.png")
+        img.save(save_path)
+        return event.image_result(save_path)
