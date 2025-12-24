@@ -45,6 +45,14 @@ class BattleConfigLoader:
         """获取目标ID映射"""
         return self.config.get("target_id_mapping", {})
 
+    def get_item_category_names(self) -> Dict[str, str]:
+        """获取物品类别名称映射"""
+        return self.config.get("item_category_names", {})
+
+    def get_mold_breaker_ignorable_ids(self) -> List[int]:
+        """获取破格特性可无视的特性ID列表"""
+        return self.config.get("mold_breaker_ignorable_ids", [])
+
 
 # 初始化全局配置
 battle_config = BattleConfigLoader()

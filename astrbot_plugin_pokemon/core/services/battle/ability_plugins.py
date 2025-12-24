@@ -1,89 +1,15 @@
 from typing import Dict, Type, Any, Optional, List, TYPE_CHECKING
 from .hook_manager import BattleHook
 from .status_plugins import VolatileStatusPlugin
+from .battle_config import battle_config
+
+if TYPE_CHECKING:
+    from .battle_engine import BattleState, BattleLogger
 
 # ==========================================
 # 破格 (Mold Breaker) 可无视的特性列表
 # ==========================================
-MOLD_BREAKER_IGNORABLE_IDS = {
-    # 1. 属性吸收与免疫类 (Immunity)
-    10,  # 蓄电 (Volt Absorb)
-    11,  # 储水 (Water Absorb)
-    18,  # 引火 (Flash Fire)
-    26,  # 飘浮 (Levitate)
-    31,  # 避雷针 (Lightning Rod)
-    43,  # 隔音 (Soundproof)
-    78,  # 电气引擎 (Motor Drive)
-    87,  # 干燥皮肤 (Dry Skin)
-    114, # 引水 (Storm Drain)
-    157, # 食草 (Sap Sipper)
-    171, # 防弹 (Bulletproof)
-    270, # 热交换 (Thermal Exchange)
-    272, # 净化之盐 (Purifying Salt)
-    273, # 烤得恰到好处 (Well-Baked Body)
-    297, # 食土 (Earth Eater)
-
-    # 2. 伤害减免与生存类 (Defense & Survival)
-    4,   # 战斗盔甲 (Battle Armor)
-    5,   # 结实 (Sturdy)
-    25,  # 神奇守护 (Wonder Guard)
-    47,  # 厚脂肪 (Thick Fat)
-    75,  # 硬壳盔甲 (Shell Armor)
-    85,  # 耐热 (Heatproof)
-    111, # 过滤 (Filter)
-    116, # 坚硬岩石 (Solid Rock)
-    136, # 多重鳞片 (Multiscale)
-    209, # 画皮 (Disguise)
-    218, # 毛茸茸 (Fluffy)
-    244, # 庞克摇滚 (Punk Rock)
-    246, # 冰鳞粉 (Ice Scales)
-
-    # 3. 能力等级与状态保护类 (Status Protection)
-    6,   # 湿气 (Damp)
-    7,   # 柔软 (Limber)
-    12,  # 迟钝 (Oblivious)
-    15,  # 不眠 (Insomnia)
-    17,  # 免疫 (Immunity)
-    19,  # 鳞粉 (Shield Dust)
-    20,  # 我行我素 (Own Tempo)
-    21,  # 吸盘 (Suction Cups)
-    29,  # 恒净之躯 (Clear Body)
-    39,  # 精神力 (Inner Focus)
-    40,  # 熔岩铠甲 (Magma Armor)
-    41,  # 水幕 (Water Veil)
-    51,  # 锐利目光 (Keen Eye)
-    52,  # 怪力钳 (Hyper Cutter)
-    60,  # 黏着 (Sticky Hold)
-    72,  # 干劲 (Vital Spirit)
-    73,  # 白色烟雾 (White Smoke)
-    86,  # 单纯 (Simple)
-    102, # 叶子防守 (Leaf Guard)
-    109, # 纯朴 (Unaware)
-    122, # 花之礼 (Flower Gift)
-    126, # 唱反调 (Contrary)
-    132, # 友情防守 (Friend Guard)
-    140, # 心灵感应 (Telepathy)
-    145, # 健壮胸肌 (Big Pecks)
-    147, # 奇迹皮肤 (Wonder Skin)
-    156, # 魔法镜 (Magic Bounce)
-    165, # 芳香幕 (Aroma Veil)
-    175, # 甜幕 (Sweet Veil)
-    219, # 鲜艳之躯 (Dazzling)
-    240, # 镜甲 (Mirror Armor)
-    283, # 坚如磐石 (Good as Gold)
-    296, # 鳞甲尾 (Armor Tail)
-
-    # 4. 其他修正类 (Miscellaneous)
-    8,   # 沙隐 (Sand Veil)
-    63,  # 神奇鳞片 (Marvel Scale)
-    77,  # 蹒跚 (Tangled Feet)
-    81,  # 雪隐 (Snow Cloak)
-    134, # 重金属 (Heavy Metal)
-    135, # 轻金属 (Light Metal)
-}
-
-if TYPE_CHECKING:
-    from .battle_engine import BattleState, BattleLogger
+MOLD_BREAKER_IGNORABLE_IDS = set(battle_config.get_mold_breaker_ignorable_ids())
 
 class AbilityPlugin(VolatileStatusPlugin):
     """特性插件基类 - 复用 VolatileStatusPlugin 的生命周期管理"""

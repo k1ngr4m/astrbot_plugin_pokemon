@@ -3,6 +3,7 @@ from typing import Dict, Any
 from ....interface.response.answer_enum import AnswerEnum
 from ....core.models.user_models import UserItems
 from ....infrastructure.repositories.abstract_repository import AbstractUserRepository, AbstractUserItemRepository
+from ..battle.battle_config import battle_config
 
 
 class ItemService:
@@ -71,62 +72,10 @@ class ItemService:
         formatted_text = f"✅ {items_result['message']}\n\n"
 
         items_by_type = items_result["items_by_type"]
-        type_names = {
-            1: "状态增强",
-            2: "努力值提升",
-            3: "药物",
-            4: "其他",
-            5: "紧急时刻",
-            6: "选择性治疗",
-            7: "属性保护",
-            8: "烘焙专用",
-            9: "收藏品",
-            10: "进化道具",
-            11: "洞窟探索",
-            12: "携带物品",
-            13: "选择类道具",
-            14: "努力值训练",
-            15: "负面携带物品",
-            16: "训练道具",
-            17: "石板",
-            18: "特定物种",
-            19: "属性增强",
-            20: "活动道具",
-            21: "游戏玩法",
-            22: "剧情推进",
-            23: "未使用",
-            24: "战利品",
-            25: "全部邮件",
-            26: "维生素",
-            27: "治疗",
-            28: "PP恢复",
-            29: "复活",
-            30: "状态恢复",
-            32: "堆肥",
-            33: "特殊精灵球",
-            34: "标准精灵球",
-            35: "图鉴完成",
-            36: "围巾",
-            37: "全部机器",
-            38: "笛子",
-            39: "树果精灵球",
-            40: "树果盒",
-            41: "数据卡片",
-            42: "宝石",
-            43: "奇迹发射器",
-            44: "超级石",
-            45: "回忆",
-            46: "Z纯晶",
-            47: "物种糖果",
-            48: "捕捉加成",
-            49: "超极巨晶",
-            50: "性格薄荷",
-            51: "咖喱食材",
-            52: "太晶碎块",
-            53: "三明治食材",
-            54: "招式机器材料",
-            55: "野餐"
-        }
+        # 从配置文件加载物品类别名称映射
+        config_type_names = battle_config.get_item_category_names()
+        # 将字符串键转换为整数键以匹配category_id
+        type_names = {int(k): v for k, v in config_type_names.items()}
 
         for item_type, items in items_by_type.items():
             type_name = type_names.get(item_type, item_type)
