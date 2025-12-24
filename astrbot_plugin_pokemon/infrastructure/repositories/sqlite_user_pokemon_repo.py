@@ -73,6 +73,7 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             current_pp3=row_dict.get('current_pp3', 0),
             current_pp4=row_dict.get('current_pp4', 0),
             ability_id=row_dict.get('ability_id', 0),
+            held_item_id=row_dict.get('held_item_id', 0),
         )
 
     # =========增=========
@@ -84,13 +85,13 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                                         hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev, \
                                         hp, attack, defense, sp_attack, sp_defense, speed, \
                                         move1_id, move2_id, move3_id, move4_id, nature_id, \
-                                        happiness, current_hp, current_pp1, current_pp2, current_pp3, current_pp4, ability_id)
+                                        happiness, current_hp, current_pp1, current_pp2, current_pp3, current_pp4, ability_id, held_item_id)
               VALUES (:user_id, :species_id, :nickname, :level, :exp, :gender, \
                       :hp_iv, :attack_iv, :defense_iv, :sp_attack_iv, :sp_defense_iv, :speed_iv, \
                       :hp_ev, :attack_ev, :defense_ev, :sp_attack_ev, :sp_defense_ev, :speed_ev, \
                       :hp, :attack, :defense, :sp_attack, :sp_defense, :speed, \
                       :move1_id, :move2_id, :move3_id, :move4_id, :nature_id, \
-                      :happiness, :current_hp, :current_pp1, :current_pp2, :current_pp3, :current_pp4, :ability_id) \
+                      :happiness, :current_hp, :current_pp1, :current_pp2, :current_pp3, :current_pp4, :ability_id, :held_item_id) \
               """
 
         # 展平参数字典，使用命名占位符防止位置错误
@@ -120,6 +121,7 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             "current_pp3": 0,
             "current_pp4": 0,
             "ability_id": pokemon.ability_id,
+            "held_item_id": pokemon.held_item_id,
         }
 
         # 在插入记录后，更新PP为技能的最大PP值

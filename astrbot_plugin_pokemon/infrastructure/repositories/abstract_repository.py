@@ -121,6 +121,14 @@ class AbstractPokemonRepository(ABC):
     @abstractmethod
     def get_pokemon_evolutions(self, species_id: int, new_level: int) -> list[PokemonEvolutionInfo]: pass
 
+    # 获取宝可梦携带物品
+    @abstractmethod
+    def get_pokemon_items_by_pokemon_id(self, pokemon_id: int) -> List[Dict[str, Any]]: pass
+
+    # 批量添加宝可梦携带物品模板
+    @abstractmethod
+    def add_pokemon_item_templates_batch(self, data_list: List[Dict[str, Any]]) -> None: pass
+
 
 class AbstractAdventureRepository(ABC):
     """冒险区域数据仓储接口"""

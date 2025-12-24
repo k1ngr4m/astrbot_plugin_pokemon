@@ -106,7 +106,8 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
             evs=evs,
             moves=moves,
             nature_id=row_dict['nature_id'],
-            ability_id=row_dict.get('ability_id', 0)  # 获取特性ID，如果不存在则默认为0
+            ability_id=row_dict.get('ability_id', 0),  # 获取特性ID，如果不存在则默认为0
+            held_item_id=row_dict.get('held_item_id', 0)
         )
 
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
@@ -302,13 +303,13 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id, nature_id, ability_id
+                move1_id, move2_id, move3_id, move4_id, nature_id, ability_id, held_item_id
             )
             VALUES (?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?
             )
             """
 
@@ -350,12 +351,13 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
 
             nature_id = pokemon.nature_id
             ability_id = pokemon.ability_id
+            held_item_id = pokemon.held_item_id
             cursor.execute(sql, (
                 species_id, nickname, level, exp, gender,
                 hp_iv, attack_iv, defense_iv, sp_attack_iv, sp_defense_iv, speed_iv,
                 hp_ev, attack_ev, defense_ev, sp_attack_ev, sp_defense_ev, speed_ev,
                 hp, attack, defense, sp_attack, sp_defense, speed,
-                move1_id, move2_id, move3_id, move4_id, nature_id, ability_id
+                move1_id, move2_id, move3_id, move4_id, nature_id, ability_id, held_item_id
             ))
             new_id = cursor.lastrowid
             conn.commit()
@@ -428,3 +430,21 @@ class SqlitePokemonRepository(AbstractPokemonRepository):
                 """, (species_id, new_level))
             rows = cursor.fetchall()
             return [PokemonEvolutionInfo(**dict(row)) for row in rows]
+
+    def add_pokemon_item_templates_batch(self, data_list: List[Dict[str, Any]]) -> None:
+        if not data_list:
+            return
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.executemany("""
+                INSERT OR IGNORE INTO pokemon_items
+                (pokemon_id, version_id, item_id, rarity)
+                VALUES (:pokemon_id, :version_id, :item_id, :rarity)
+            """, data_list)
+            conn.commit()
+
+    def get_pokemon_items_by_pokemon_id(self, pokemon_id: int) -> List[Dict[str, Any]]:
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM pokemon_items WHERE pokemon_id = ? AND isdel = 0", (pokemon_id,))
+            return [dict(row) for row in cursor.fetchall()]

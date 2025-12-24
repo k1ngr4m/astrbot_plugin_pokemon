@@ -287,7 +287,8 @@ class UserPokemonService:
             id=0, species_id=wild.species_id, name=wild.name,
             level=wild.level, exp=wild.exp, gender=wild.gender,
             stats=wild.stats, ivs=wild.ivs, evs=wild.evs, moves=wild.moves
-            , nature_id=wild.nature_id, ability_id=wild.ability_id
+            , nature_id=wild.nature_id, ability_id=wild.ability_id,
+            held_item_id=wild.held_item_id
         )
         pid = self.user_pokemon_repo.create_user_pokemon(user_id, info)
         # 记录到图鉴历史

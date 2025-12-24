@@ -155,6 +155,9 @@ class AdventureService:
         # 构建 info 对象
         # 随机分配一个非隐藏特性
         ability_id = self._assign_random_ability_to_wild(wild_pokemon.base_pokemon.id)
+        
+        # 随机分配携带物品
+        held_item_id = self._assign_random_held_item_to_wild(wild_pokemon.base_pokemon.id)
 
         wild_pokemon_info = WildPokemonInfo(
             id=0,
@@ -172,6 +175,7 @@ class AdventureService:
             ),
             nature_id=wild_pokemon.nature_id,
             ability_id=ability_id,
+            held_item_id=held_item_id,
         )
 
         wild_pokemon_id = self.pokemon_repo.add_wild_pokemon(wild_pokemon_info)
@@ -222,6 +226,49 @@ class AdventureService:
                 return selected['ability_id']
 
         # 如果没有任何特性关联，返回0
+        return 0
+
+    def _assign_random_held_item_to_wild(self, species_id: int) -> int:
+        """
+        为野生宝可梦随机分配携带物品
+        Args:
+            species_id: 宝可梦种族ID
+        Returns:
+            int: 物品ID (0表示无)
+        """
+        possible_items = self.pokemon_repo.get_pokemon_items_by_pokemon_id(species_id)
+        if not possible_items:
+            logger.info(f"[DEBUG] 野生宝可梦 {species_id} 没有可携带物品")
+            return 0
+            
+        # 按照稀有度排序 (rarity越小越稀有? CSV showing 5, 50, 100. Assume rarity is % chance or weight)
+        # Based on CSV snippet: 
+        # 26,18,132,50 (Ditto, Metal Powder, 50%?)
+        # 12,30,199,5 (Butterfree, Silver Powder, 5%?)
+        # So rarity looks like percentage chance.
+        
+        # Strategy: Iterate items, roll for each according to its rarity.
+        # But wait, ordering matters if we stop at first success.
+        # Usually checking rarer items first is better.
+        # Let's assume input rarity is percentage (1-100).
+        
+        # Sort by rarity ASC (assuming smaller number = rarer/lower chance? or just check in order provided?)
+        # Actually standard logic usually checks from rarest to commonest.
+        # Let's try to check each item independently? No, can only hold one.
+        # Let's shuffle them or just roll? 
+        # "rarity" column in CSV: 5, 50, 100. 
+        # 5% chance, 50% chance, 100% chance.
+        
+        # Sort by rarity ASC (5 before 50).
+        possible_items.sort(key=lambda x: x['rarity'])
+        
+        for item_data in possible_items:
+            rarity = item_data['rarity']
+            logger.info(f"[DEBUG] 检查物品 {item_data['item_id']} (稀有度 {rarity})")
+            if random.randint(1, 100) <= rarity:
+                logger.info(f"[DEBUG] 物品 {item_data['item_id']} 被选中")
+                return item_data['item_id']
+                
         return 0
 
     def adventure_in_battle(self, user_id: str, wild_pokemon_info: WildPokemonInfo) -> BaseResult:

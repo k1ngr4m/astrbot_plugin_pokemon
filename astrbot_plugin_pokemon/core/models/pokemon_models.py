@@ -155,6 +155,7 @@ class UserPokemonInfo:
     current_pp3: int = 0  # 当前技能3 PP
     current_pp4: int = 0  # 当前技能4 PP
     ability_id: int = 0  # 特性ID
+    held_item_id: int = 0  # 携带物品ID
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -207,6 +208,7 @@ class WildPokemonInfo:
     moves: PokemonMoves
     nature_id: int = 1  # 默认性格ID为1，即勤奋
     ability_id: int = 0  # 特性ID
+    held_item_id: int = 0  # 携带物品ID
 
     def to_dict(self):
         def get_dict(obj):
@@ -627,5 +629,24 @@ class PokemonAbilityRelation:
             "ability_id": self.ability_id,
             "is_hidden": self.is_hidden,
             "slot": self.slot,
+            "isdel": self.isdel,
+        }
+
+
+@dataclass
+class PokemonItem:
+    """宝可梦携带物品关联定义"""
+    pokemon_id: int
+    version_id: int
+    item_id: int
+    rarity: int
+    isdel: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "pokemon_id": self.pokemon_id,
+            "version_id": self.version_id,
+            "item_id": self.item_id,
+            "rarity": self.rarity,
             "isdel": self.isdel,
         }

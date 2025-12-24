@@ -586,6 +586,28 @@ class DataSetupService:
 
                     logger.info(f"宝可梦特性关联数据初始化完成，共加载 {len(relation_data_list)} 条数据")
 
+            # 17. 填充 Pokemon Items 关联数据
+            if not self.pokemon_repo.get_pokemon_items_by_pokemon_id(12): # Use a common pokemon ID like 12 (Butterfree) to check
+                logger.info("正在初始化宝可梦携带物品数据...")
+                df = self._read_csv_data("pokemon_items.csv")
+                if not df.empty:
+                    df = df.where(pd.notnull(df), None)
+
+                    item_data_list = [
+                        {
+                            "pokemon_id": int(row['pokemon_id']) if pd.notna(row['pokemon_id']) else 0,
+                            "version_id": int(row['version_id']) if pd.notna(row['version_id']) else 0,
+                            "item_id": int(row['item_id']) if pd.notna(row['item_id']) else 0,
+                            "rarity": int(row['rarity']) if pd.notna(row['rarity']) else 0
+                        }
+                        for row in df.to_dict('records')
+                    ]
+
+                    if hasattr(self.pokemon_repo, 'add_pokemon_item_templates_batch'):
+                        self.pokemon_repo.add_pokemon_item_templates_batch(item_data_list)
+                    
+                    logger.info(f"宝可梦携带物品数据初始化完成，共加载 {len(item_data_list)} 条数据")
+
         except Exception as e:
             logger.error(f"初始化数据时发生全局错误: {e}")
             # 允许继续运行，因为部分数据可能已经加载成功
