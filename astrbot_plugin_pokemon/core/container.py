@@ -1,4 +1,5 @@
 import os
+import shutil
 
 from .services.player.user_item_serviece import UserItemService
 from ..core.services import (
@@ -150,3 +151,18 @@ class GameContainer:
 
         self.tmp_dir = os.path.join(self.data_dir, "tmp")
         os.makedirs(self.tmp_dir, exist_ok=True)
+        self._clear_tmp_directory()
+
+    def _clear_tmp_directory(self):
+        """清空临时目录中的文件"""
+        if os.path.exists(self.tmp_dir):
+            for filename in os.listdir(self.tmp_dir):
+                file_path = os.path.join(self.tmp_dir, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)  # 删除文件或符号链接
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)  # 删除子目录及其内容
+                except Exception as e:
+                    # 如果删除失败，记录错误但不中断操作
+                    print(f"删除临时文件 {file_path} 时出错: {e}")
