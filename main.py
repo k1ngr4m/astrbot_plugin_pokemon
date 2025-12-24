@@ -219,6 +219,24 @@ class PokemonPlugin(Star):
         async for r in self.pokemon_handlers.pokedex(event):
             yield r
 
+    @filter.command("收藏宝可梦")
+    async def favorite_pokemon(self, event: AstrMessageEvent):
+        """收藏指定的宝可梦。用法：/收藏宝可梦 <宝可梦ID>"""
+        async for r in self.user_pokemon_handlers.favorite_pokemon(event):
+            yield r
+
+    @filter.command("取消收藏宝可梦")
+    async def unfavorite_pokemon(self, event: AstrMessageEvent):
+        """取消收藏指定的宝可梦。用法：/取消收藏宝可梦 <宝可梦ID>"""
+        async for r in self.user_pokemon_handlers.unfavorite_pokemon(event):
+            yield r
+
+    @filter.command("查看收藏宝可梦")
+    async def view_favorite_pokemon(self, event: AstrMessageEvent):
+        """查看收藏的宝可梦列表，支持分页。用法：/查看收藏宝可梦 或 /查看收藏宝可梦 P<页码>"""
+        async for r in self.user_pokemon_handlers.view_favorite_pokemon(event):
+            yield r
+
     # ==========冒险系统==========
     @filter.command("设置队伍")
     async def set_team(self, event: AstrMessageEvent):

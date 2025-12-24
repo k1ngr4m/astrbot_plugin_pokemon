@@ -156,6 +156,7 @@ class UserPokemonInfo:
     current_pp4: int = 0  # 当前技能4 PP
     ability_id: int = 0  # 特性ID
     held_item_id: int = 0  # 携带物品ID
+    is_favorite: int = 0  # 是否收藏，0为未收藏，1为已收藏
 
     def __getitem__(self, item):
         return getattr(self, item)
@@ -192,6 +193,7 @@ class UserPokemonInfo:
             "current_pp3": self.current_pp3,
             "current_pp4": self.current_pp4,
             "ability_id": self.ability_id,
+            "is_favorite": self.is_favorite,
         }
 
 @dataclass

@@ -74,6 +74,7 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
             current_pp4=row_dict.get('current_pp4', 0),
             ability_id=row_dict.get('ability_id', 0),
             held_item_id=row_dict.get('held_item_id', 0),
+            is_favorite=row_dict.get('is_favorite', 0),
         )
 
     # =========增=========
@@ -290,6 +291,22 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
                                               current_pp2=current_pps[1] if len(current_pps) > 1 else 0,
                                               current_pp3=current_pps[2] if len(current_pps) > 2 else 0,
                                               current_pp4=current_pps[3] if len(current_pps) > 3 else 0)
+
+    def update_user_pokemon_favorite(self, user_id: str, pokemon_id: int, is_favorite: int) -> None:
+        """更新用户宝可梦的收藏状态"""
+        self._update_user_pokemon_fields(user_id, pokemon_id, is_favorite=is_favorite)
+
+    def get_user_favorite_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
+        """获取用户收藏的宝可梦列表"""
+        sql = """
+              SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
+              FROM user_pokemon up
+                       JOIN pokemon_species ps ON up.species_id = ps.id
+              WHERE up.user_id = ? AND up.is_favorite = 1
+              ORDER BY up.caught_time DESC, up.id \
+              """
+        cursor = self._get_connection().execute(sql, (user_id,))
+        return [self._row_to_user_pokemon(row) for row in cursor.fetchall()]
 
     # =========查=========
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:

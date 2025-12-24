@@ -319,3 +319,135 @@ class UserPokemonHandlers:
         save_path = os.path.join(self.tmp_dir, f"user_pokemon_{pokemon_type}_list_{user_id}_{page}.png")
         img.save(save_path)
         return event.image_result(save_path)
+
+    async def favorite_pokemon(self, event: AstrMessageEvent):
+        """收藏宝可梦命令处理器"""
+        user_id = userid_to_base32(event.get_sender_id())
+
+        # 1. 权限/注册检查
+        reg_check = self.user_service.check_user_registered(user_id)
+        if not reg_check.success:
+            yield event.plain_result(reg_check.message)
+            return
+
+        args = event.message_str.split()
+
+        # 检查参数
+        if len(args) < 2:
+            yield event.plain_result("❌ 请指定要收藏的宝可梦ID，格式：/收藏宝可梦 [宝可梦ID]")
+            return
+
+        try:
+            pokemon_id = int(args[1])
+        except ValueError:
+            yield event.plain_result("❌ 宝可梦ID必须是数字")
+            return
+
+        # 调用服务层设置收藏状态
+        result = self.user_pokemon_service.set_pokemon_favorite(user_id, pokemon_id, True)
+        yield event.plain_result(result.message)
+
+    async def unfavorite_pokemon(self, event: AstrMessageEvent):
+        """取消收藏宝可梦命令处理器"""
+        user_id = userid_to_base32(event.get_sender_id())
+
+        # 1. 权限/注册检查
+        reg_check = self.user_service.check_user_registered(user_id)
+        if not reg_check.success:
+            yield event.plain_result(reg_check.message)
+            return
+
+        args = event.message_str.split()
+
+        # 检查参数
+        if len(args) < 2:
+            yield event.plain_result("❌ 请指定要取消收藏的宝可梦ID，格式：/取消收藏宝可梦 [宝可梦ID]")
+            return
+
+        try:
+            pokemon_id = int(args[1])
+        except ValueError:
+            yield event.plain_result("❌ 宝可梦ID必须是数字")
+            return
+
+        # 调用服务层取消收藏状态
+        result = self.user_pokemon_service.set_pokemon_favorite(user_id, pokemon_id, False)
+        yield event.plain_result(result.message)
+
+    async def view_favorite_pokemon(self, event: AstrMessageEvent):
+        """查看收藏宝可梦命令处理器，支持分页"""
+        user_id = userid_to_base32(event.get_sender_id())
+
+        # 1. 权限/注册检查
+        reg_check = self.user_service.check_user_registered(user_id)
+        if not reg_check.success:
+            yield event.plain_result(reg_check.message)
+            return
+
+        args = event.message_str.split()
+        page = 1
+
+        # 解析页码参数
+        if len(args) > 1:
+            page_arg = args[1].lower()
+            if page_arg.startswith('p'):
+                try:
+                    page = int(page_arg[1:])
+                except ValueError:
+                    yield event.plain_result("❌ 页码格式错误，请使用 P<数字> 格式，例如：/查看收藏宝可梦 P2")
+                    return
+            elif page_arg.isdigit():
+                try:
+                    page = int(page_arg)
+                except ValueError:
+                    yield event.plain_result("❌ 页码格式错误")
+                    return
+
+        # 调用服务层获取收藏的宝可梦列表
+        res = self.user_pokemon_service.get_user_favorite_pokemon_paged(user_id, page=page, page_size=10)
+        if not res.success:
+            yield event.plain_result(res.message)
+            return
+
+        data = res.data
+        pokemon_list = data.get("pokemon_list", [])
+        if not pokemon_list:
+            yield event.plain_result("❌ 您还没有收藏任何宝可梦")
+            return
+
+        # 构建绘图数据
+        draw_data = {
+            "total_count": data['total_count'],
+            "page": data['page'],
+            "total_pages": data['total_pages'],
+            "list": []
+        }
+
+        for p in pokemon_list:
+            info = self._get_pokemon_basic_info(p)
+            draw_data["list"].append({
+                "id": p.id,
+                "sprite_id": p.species_id,
+                "name": p.name,
+                "level": p.level,
+                "gender": info['gender'],  # 传递图标或文字
+                "nature": info['nature'],
+                "ability": info['ability'],
+                "current_hp": p.current_hp,
+                "max_hp": p.stats.hp,
+                "types": info['types'].split('/') if info['types'] != "未知" else []
+            })
+
+        # 生成图片
+        try:
+            img = draw_user_pokemon_list(draw_data)
+            save_path = os.path.join(self.tmp_dir, f"user_favorite_pokemon_list_{user_id}_{page}.png")
+            img.save(save_path)
+
+            # 返回图片
+            yield event.image_result(save_path)
+        except Exception as e:
+            # 如果绘图失败，返回文本格式
+            pokemon_names = [f"{p.name}(ID:{p.id}, Lv.{p.level})" for p in pokemon_list]
+            formatted_message = f"🌟 您收藏的宝可梦列表（第{data['page']}页/{data['total_pages']}页）:\n" + "\n".join(pokemon_names)
+            yield event.plain_result(formatted_message)

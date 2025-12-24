@@ -213,7 +213,8 @@ class UserPokemonService:
                 current_pp1=pokemon.current_pp1,
                 current_pp2=pokemon.current_pp2,
                 current_pp3=pokemon.current_pp3,
-                current_pp4=pokemon.current_pp4
+                current_pp4=pokemon.current_pp4,
+                is_favorite=pokemon.is_favorite,
             ))
 
         # 计算总页数
@@ -428,3 +429,155 @@ class UserPokemonService:
                 success=False,
                 message=f"治愈宝可梦失败: {str(e)}"
             )
+
+    def set_pokemon_favorite(self, user_id: str, pokemon_id: int, favorite: bool) -> BaseResult:
+        """
+        设置/取消宝可梦的收藏状态
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+            favorite: True为收藏，False为取消收藏
+        Returns:
+            BaseResult
+        """
+        # 先检查宝可梦是否存在
+        pokemon_info = self.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_info.success:
+            return pokemon_info
+
+        # 更新收藏状态
+        is_favorite = 1 if favorite else 0
+        try:
+            self.user_pokemon_repo.update_user_pokemon_favorite(user_id, pokemon_id, is_favorite)
+            action = "收藏" if favorite else "取消收藏"
+            return BaseResult(
+                success=True,
+                message=f"成功{action}宝可梦：{pokemon_info.data.name}",
+                data={
+                    "pokemon_id": pokemon_id,
+                    "pokemon_name": pokemon_info.data.name,
+                    "is_favorite": is_favorite
+                }
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"设置收藏状态失败: {str(e)}"
+            )
+
+    def get_user_favorite_pokemon(self, user_id: str) -> BaseResult[list[UserPokemonInfo]]:
+        """
+        获取用户收藏的宝可梦列表
+        Args:
+            user_id: 用户ID
+        Returns:
+            包含用户收藏的宝可梦信息的列表
+        """
+        user_pokemon_list = self.user_pokemon_repo.get_user_favorite_pokemon(user_id)
+
+        if not user_pokemon_list:
+            return BaseResult(
+                success=True,
+                message=AnswerEnum.USER_POKEMONS_NOT_FOUND.value,
+            )
+
+        # 格式化返回数据
+        formatted_pokemon = []
+        for pokemon in user_pokemon_list:
+            formatted_pokemon.append(UserPokemonInfo(
+                id = pokemon.id,
+                species_id = pokemon.species_id,
+                name = pokemon.name,
+                gender = pokemon.gender,
+                level = pokemon.level,
+                exp = pokemon.exp,
+                stats=pokemon.stats,
+                ivs = pokemon.ivs,
+                evs = pokemon.evs,
+                moves = pokemon.moves,
+                nature_id=pokemon.nature_id,
+                ability_id=pokemon.ability_id,
+                held_item_id=pokemon.held_item_id,
+                caught_time=pokemon.caught_time,
+                happiness=pokemon.happiness,
+                current_hp=pokemon.current_hp,
+                current_pp1=pokemon.current_pp1,
+                current_pp2=pokemon.current_pp2,
+                current_pp3=pokemon.current_pp3,
+                current_pp4=pokemon.current_pp4,
+                is_favorite=pokemon.is_favorite,
+            ))
+
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_POKEMON_ALL_POKEMON_SUCCESS.value,
+            data=formatted_pokemon
+        )
+
+    def get_user_favorite_pokemon_paged(self, user_id: str, page: int = 1, page_size: int = 20) -> BaseResult[dict]:
+        """
+        分页获取用户收藏的宝可梦信息
+        Args:
+            user_id: 用户ID
+            page: 页码 (从1开始)
+            page_size: 每页数量
+        Returns:
+            包含分页数据和元信息的字典
+        """
+        offset = (page - 1) * page_size
+        sql = """
+              SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
+              FROM user_pokemon up
+                       JOIN pokemon_species ps ON up.species_id = ps.id
+              WHERE up.user_id = ? AND up.is_favorite = 1
+              ORDER BY up.caught_time DESC, up.id
+              LIMIT ? OFFSET ? \
+              """
+        conn = self.user_pokemon_repo._get_connection()
+        cursor = conn.execute(sql, (user_id, page_size, offset))
+        user_pokemon_list = [self.user_pokemon_repo._row_to_user_pokemon(row) for row in cursor.fetchall()]
+
+        # 获取总数用于计算页数
+        total_pokemon_res = self.get_user_favorite_pokemon(user_id)
+        total_count = len(total_pokemon_res.data) if total_pokemon_res.success and total_pokemon_res.data else 0
+
+        # 计算总页数
+        total_pages = (total_count + page_size - 1) // page_size if total_count > 0 else 1
+
+        # 格式化返回数据
+        formatted_pokemon = []
+        for pokemon in user_pokemon_list:
+            formatted_pokemon.append(UserPokemonInfo(
+                id = pokemon.id,
+                species_id = pokemon.species_id,
+                name = pokemon.name,
+                level = pokemon.level,
+                exp = pokemon.exp,
+                gender = pokemon.gender,
+                stats=pokemon.stats,
+                ivs = pokemon.ivs,
+                evs = pokemon.evs,
+                moves = pokemon.moves,
+                nature_id=pokemon.nature_id,
+                ability_id=pokemon.ability_id,
+                caught_time=pokemon.caught_time,
+                happiness=pokemon.happiness,
+                current_hp=pokemon.current_hp,
+                current_pp1=pokemon.current_pp1,
+                current_pp2=pokemon.current_pp2,
+                current_pp3=pokemon.current_pp3,
+                current_pp4=pokemon.current_pp4,
+                is_favorite=pokemon.is_favorite,
+            ))
+
+        return BaseResult(
+            success=True,
+            message=AnswerEnum.USER_POKEMON_ALL_POKEMON_SUCCESS.value if formatted_pokemon else AnswerEnum.USER_POKEMONS_NOT_FOUND.value,
+            data={
+                "pokemon_list": formatted_pokemon,
+                "page": page,
+                "page_size": page_size,
+                "total_count": total_count,
+                "total_pages": total_pages
+            }
+        )
