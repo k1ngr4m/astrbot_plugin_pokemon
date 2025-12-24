@@ -156,7 +156,7 @@ class ItemHandlers:
             return
 
         yield event.plain_result(
-            f"✅ 成功出售道具：{item_detail['name_zh']} x {sell_quantity}\n"
-            f"💰 获得金币：{total_sell_price} 个 (单价: {sell_price} 个金币)\n"
+            f"✅ 成功出售道具：{item_detail['name_zh']} x {sell_quantity}\n\n"
+            f"💰 获得金币：{total_sell_price} 个 (单价: {sell_price} 个金币)\n\n"
             f"💳 当前金币：{user.coins + total_sell_price} 个"
         )
