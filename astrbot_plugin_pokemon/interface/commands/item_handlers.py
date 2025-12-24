@@ -93,7 +93,7 @@ class ItemHandlers:
         # 解析参数
         args = event.message_str.split()
         if len(args) < 2:
-            yield event.plain_result("❌ 请指定要出售的道具ID，格式：/出售道具 [道具ID]")
+            yield event.plain_result("❌ 请指定要出售的道具ID，格式：/出售道具 [道具ID] [数量]")
             return
 
         try:
@@ -101,6 +101,18 @@ class ItemHandlers:
         except ValueError:
             yield event.plain_result("❌ 道具ID必须是数字")
             return
+
+        # 解析出售数量，默认为1
+        sell_quantity = 1
+        if len(args) >= 3:
+            try:
+                sell_quantity = int(args[2])
+                if sell_quantity <= 0:
+                    yield event.plain_result("❌ 出售数量必须大于0")
+                    return
+            except ValueError:
+                yield event.plain_result("❌ 出售数量必须是正整数")
+                return
 
         # 获取物品详细信息
         item_detail = self.item_service.get_item_by_id(item_id)
@@ -115,6 +127,11 @@ class ItemHandlers:
             yield event.plain_result(f"❌ 您没有持有该道具：{item_detail['name_zh']}")
             return
 
+        # 检查用户是否有足够数量的道具
+        if result.data.quantity < sell_quantity:
+            yield event.plain_result(f"❌ 您持有的道具数量不足，当前持有：{result.data.quantity} 个，尝试出售：{sell_quantity} 个")
+            return
+
         # 计算售价（成本的一半）
         item_cost = item_detail.get('cost', 0)
         sell_price = max(0, int(item_cost / 2))  # 确保不低于0
@@ -123,26 +140,23 @@ class ItemHandlers:
             yield event.plain_result(f"❌ 该道具无法出售：{item_detail['name_zh']} (价格为0)")
             return
 
-        # 从用户手中移除1个该道具
-        # 由于add_user_item方法的逻辑，我们需要确保用户至少有1个该道具
-        if result.data.quantity >= 1:
-            # 将用户道具数量减1
-            result = self.user_item_service.add_user_item(user_id, item_id, -1)
-            if not result.success:
-                yield event.plain_result(result.message)
-                return
-        else:
-            yield event.plain_result(f"❌ 您没有足够的道具出售：{item_detail['name_zh']}")
+        # 计算总售价
+        total_sell_price = sell_price * sell_quantity
+
+        # 从用户手中移除指定数量的该道具
+        result = self.user_item_service.add_user_item(user_id, item_id, -sell_quantity)
+        if not result.success:
+            yield event.plain_result(result.message)
             return
 
         # 给用户增加金币
-        result = self.user_service.add_user_coins(user_id, sell_price)
+        result = self.user_service.add_user_coins(user_id, total_sell_price)
         if not result.success:
             yield event.plain_result(result.message)
             return
 
         yield event.plain_result(
-            f"✅ 成功出售道具：{item_detail['name_zh']}\n"
-            f"💰 获得金币：{sell_price} 个\n"
-            f"💳 当前金币：{user.coins + sell_price} 个"
+            f"✅ 成功出售道具：{item_detail['name_zh']} x {sell_quantity}\n"
+            f"💰 获得金币：{total_sell_price} 个 (单价: {sell_price} 个金币)\n"
+            f"💳 当前金币：{user.coins + total_sell_price} 个"
         )

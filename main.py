@@ -170,7 +170,7 @@ class PokemonPlugin(Star):
         async for r in self.item_handlers.view_items(event):
             yield r
 
-    @filter.command("出售道具")
+    @filter.command("出售道具", alias={"道具出售", "卖出道具"})
     async def sell_item(self, event: AstrMessageEvent):
         """出售道具，获得金币"""
         async for r in self.item_handlers.sell_item(event):
