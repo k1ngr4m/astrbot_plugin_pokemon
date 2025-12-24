@@ -1,9 +1,10 @@
 import math
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from astrbot.core import logger
+from ...models.pokemon_models import Item
 from ....interface.response.answer_enum import AnswerEnum
-from ....core.models.user_models import UserItems
+from ....core.models.user_models import UserItems, UserItemInfo
 from ....infrastructure.repositories.abstract_repository import AbstractUserRepository, AbstractUserItemRepository, \
     AbstractItemRepository
 from ..battle.battle_config import battle_config
@@ -22,6 +23,9 @@ class ItemService:
         self.user_item_repo = user_item_repo
         self.item_repo = item_repo
 
+    def get_item_by_id(self, item_id):
+        return self.item_repo.get_item_by_id(item_id)
+
     def get_user_items(self, user_id: str, page: int = 1, items_per_page: int = 20) -> Dict[str, Any]:
         """
         获取用户的所有道具
@@ -37,7 +41,7 @@ class ItemService:
 
         if not user_items:
             return {
-                "success": True,
+                "success": False,
                 "message": AnswerEnum.USER_ITEMS_EMPTY.value,
                 "items": [],
                 "items_by_type": {},

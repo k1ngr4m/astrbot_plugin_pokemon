@@ -1,5 +1,6 @@
 import os
 
+from .services.player.user_item_serviece import UserItemService
 from ..core.services import (
     UserPokemonService, PokemonService, TeamService, AdventureService,
     ExpService, UserService, ItemService, ShopService, MoveService,
@@ -86,6 +87,10 @@ class GameContainer:
             user_pokemon_repo=self.user_pokemon_repo,
             item_repo=self.item_repo,
             pokemon_ability_repo=self.pokemon_ability_repo,  # 注意：这里参数名未变，但传入的是重命名后的仓库
+            config=self.config
+        )
+        self.user_item_service = UserItemService(
+            user_item_repo=self.user_item_repo,
             config=self.config
         )
         self.team_service = TeamService(

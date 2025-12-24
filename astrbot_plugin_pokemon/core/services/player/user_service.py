@@ -441,3 +441,17 @@ class UserService:
                 message=f"获取用户详细信息失败: {str(e)}",
                 data=None
             )
+
+    def add_user_coins(self, user_id: str, coins: int) -> BaseResult:
+        """
+        添加用户金币
+        Args:
+            user_id: 用户ID
+            coins: 金币数量（可以为负数表示减少）
+        """
+        self.user_repo.add_user_coins(user_id, coins)
+        return BaseResult(
+            success=True,
+            message="添加用户金币成功",
+            data=None
+        )

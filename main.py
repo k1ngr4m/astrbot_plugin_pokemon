@@ -170,6 +170,12 @@ class PokemonPlugin(Star):
         async for r in self.item_handlers.view_items(event):
             yield r
 
+    @filter.command("出售道具")
+    async def sell_item(self, event: AstrMessageEvent):
+        """出售道具，获得金币"""
+        async for r in self.item_handlers.sell_item(event):
+            yield r
+
     # ==========宝可梦和队伍管理==========
     @filter.command("我的宝可梦")
     async def view_user_pokemon(self, event: AstrMessageEvent):

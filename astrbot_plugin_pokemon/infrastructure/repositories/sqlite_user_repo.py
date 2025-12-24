@@ -233,6 +233,22 @@ class SqliteUserRepository(AbstractUserRepository):
             """, (coins, user_id))
             conn.commit()
 
+    def add_user_coins(self, user_id: str, coins: int) -> None:
+        """
+        添加用户金币
+        Args:
+            user_id: 用户ID
+            coins: 金币数量（可以为负数表示减少）
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users
+                SET coins = coins + ?
+                WHERE user_id = ?
+            """, (coins, user_id))
+            conn.commit()
+
     def update_user_last_adventure_time(self, user_id: str, last_adventure_time: float) -> None:
         """
         更新用户的上次冒险时间

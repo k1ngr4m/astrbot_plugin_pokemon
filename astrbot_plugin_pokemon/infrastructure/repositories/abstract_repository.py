@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 
+from data.plugins.astrbot_plugin_fishing.core.domain.models import UserItem
 from ...core.models.trainer_models import TrainerEncounter, TrainerLocation, TrainerPokemon, Trainer
 from ...core.models.user_models import User, UserTeam, UserItems
 from ...core.models.pokemon_models import PokemonSpecies, UserPokemonInfo, \
@@ -31,6 +32,9 @@ class AbstractUserRepository(ABC):
     # 更新用户的金币数量
     @abstractmethod
     def update_user_coins(self, user_id: str, coins: int) -> None: pass
+
+    @abstractmethod
+    def add_user_coins(self, user_id: str, coins: int) -> None: pass
 
     # ==========查==========
     # 根据ID获取用户
@@ -389,6 +393,8 @@ class AbstractUserItemRepository(ABC):
     @abstractmethod
     def get_user_items(self, user_id: str) -> UserItems: pass
 
+    @abstractmethod
+    def get_user_item_by_id(self, user_id: str, item_id: int) -> Optional[UserItem]: pass
 
 class AbstractNatureRepository(ABC):
     """性格数据仓储接口"""
