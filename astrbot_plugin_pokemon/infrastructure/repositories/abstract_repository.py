@@ -202,6 +202,13 @@ class AbstractItemRepository(ABC):
     @abstractmethod
     def get_item_name(self, item_id: int) -> Optional[str]: pass
 
+    @abstractmethod
+    def get_random_item(self) -> Optional[Dict[str, Any]]: pass
+
+    @abstractmethod
+    def get_all_items(self) -> List[Dict[str, Any]]: pass
+
+
 class AbstractMoveRepository(ABC):
     """技能数据仓储接口"""
     # ==========增==========

@@ -534,7 +534,7 @@ class AdventureHandlers:
 
                     evolution_info = lvl_info.get("evolution_info")
                     if evolution_info['can_evolve']:
-                        print(evolution_info)
+                        logger.info(f"[DEBUG] 宝可梦进化信息: {evolution_info}")
                         lines.append(f"\n\n  🔄 可以进化为: {evolution_info['evolved_species_name']} (ID: {evolution_info['evolved_species_id']})")
                 lines.append("")
 
@@ -547,6 +547,12 @@ class AdventureHandlers:
             lines.append(f"\n✨ 玩家经验奖励: +{exp_gained} 经验")
             if levels_gained > 0:
                 lines.append(f"📈 玩家升至 {new_level} 级! (提升了 {levels_gained} 级)")
+
+        # 显示掉落物品
+        if d.dropped_items:
+            lines.append("\n🎁 获得额外掉落:")
+            for item in d.dropped_items:
+                lines.append(f"  • {item['name_zh']}")
 
         return "\n".join(lines)
 

@@ -1,6 +1,6 @@
 import sqlite3
 import threading
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from .abstract_repository import AbstractItemRepository
 
@@ -40,3 +40,18 @@ class SqliteItemRepository(AbstractItemRepository):
         cursor.execute("SELECT name_zh FROM items WHERE id = ?", (item_id,))
         row = cursor.fetchone()
         return row["name_zh"] if row else None
+
+    def get_random_item(self) -> Optional[Dict[str, Any]]:
+        """随机获取一个物品"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM items ORDER BY RANDOM() LIMIT 1")
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def get_all_items(self) -> List[Dict[str, Any]]:
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM items")
+        rows = cursor.fetchall()
+        return [dict(row) for row in rows]

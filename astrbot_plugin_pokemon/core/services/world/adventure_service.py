@@ -17,7 +17,7 @@ from ...models.user_models import UserTeam, UserItems
 from ....infrastructure.repositories.abstract_repository import (
     AbstractAdventureRepository, AbstractPokemonRepository, AbstractUserRepository, AbstractTeamRepository,
     AbstractUserPokemonRepository, AbstractBattleRepository, AbstractUserItemRepository, AbstractMoveRepository,
-    AbstractPokemonAbilityRepository
+    AbstractPokemonAbilityRepository, AbstractItemRepository
 )
 from ...models.adventure_models import AdventureResult, LocationInfo, BattleResult, BattleMoveInfo, BattleContext
 from ..battle.battle_engine import BattleLogic, BattleState, ListBattleLogger, NoOpBattleLogger
@@ -41,6 +41,7 @@ class AdventureService:
             user_pokemon_repo: AbstractUserPokemonRepository,
             battle_repo: AbstractBattleRepository,
             user_item_repo: AbstractUserItemRepository,
+            item_repo: Optional[AbstractItemRepository], # 新增依赖
             move_repo: AbstractMoveRepository,
             pokemon_ability_repo: AbstractPokemonAbilityRepository,
             exp_service: ExpService,
@@ -54,6 +55,7 @@ class AdventureService:
         self.exp_service = exp_service
         self.user_pokemon_repo = user_pokemon_repo
         self.user_item_repo = user_item_repo
+        self.item_repo = item_repo # 新增
         self.config = config
         self.move_repo = move_repo
         self.battle_repo = battle_repo
@@ -544,8 +546,23 @@ class AdventureService:
         self._update_encounter_log(user_id, wild_pokemon_info.id, battle_result_str)
 
         user_exp_result = None
+        dropped_items = []
         if battle_result_str == "success":
             user_exp_result = self.exp_service.add_exp_for_defeating_wild_pokemon(user_id, wild_pokemon_info.level)
+
+            # --- 实现掉落逻辑 ---
+            # 20% 概率掉落随机物品
+            if self.item_repo and random.random() < 0.2:
+                all_items = self.item_repo.get_all_items()
+                if all_items:
+                    # 随机选择一个物品
+                    random_item = random.choice(all_items)
+                    # 增加用户物品
+                    self.user_item_repo.add_user_item(user_id, random_item['id'], 1)
+                    dropped_items.append(random_item)
+                    logger.info(f"[DEBUG] User {user_id} got dropped item: {random_item['name_zh']}")
+            else:
+                logger.info(f"[DEBUG] 未掉落物品")
 
         # 获取最终用户宝可梦信息
         final_user_info = None
@@ -567,7 +584,8 @@ class AdventureService:
                 battle_log=battle_log,
                 log_id=log_id,
                 is_trainer_battle=False,
-                user_battle_exp_result=user_exp_result
+                user_battle_exp_result=user_exp_result,
+                dropped_items=dropped_items # 传递掉落物品
             )
         )
 
