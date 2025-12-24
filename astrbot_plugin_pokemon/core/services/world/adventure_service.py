@@ -552,17 +552,46 @@ class AdventureService:
 
             # --- 实现掉落逻辑 ---
             # 20% 概率掉落随机物品
-            if self.item_repo and random.random() < 0.2:
+            if self.item_repo and random.random() < 1:
                 all_items = self.item_repo.get_all_items()
                 if all_items:
-                    # 随机选择一个物品
-                    random_item = random.choice(all_items)
-                    # 增加用户物品
-                    self.user_item_repo.add_user_item(user_id, random_item['id'], 1)
-                    dropped_items.append(random_item)
-                    logger.info(f"[DEBUG] User {user_id} got dropped item: {random_item['name_zh']}")
+                    # 筛选适合击败宝可梦后掉落的物品类别
+                    # 核心推荐掉落类别：loot (24), healing (27), pp-recovery (28), tm-materials (54), effort-training (14)
+                    # 次要可选掉落类别：evolution (10), species-candies (47), tera-shards (52) (限制概率)
+                    # 限制次要类别的掉落概率，避免破坏游戏平衡
+                    allowed_categories = [24, 27, 28, 54, 14]  # 核心推荐类别
+                    restricted_categories = [10, 47, 52]  # 次要类别，需限制概率
+
+                    # 分离核心类别和限制类别物品
+                    core_items = [item for item in all_items if item['category_id'] in allowed_categories]
+                    restricted_items = [item for item in all_items if item['category_id'] in restricted_categories]
+
+                    # 80% 概率从核心类别选择，20% 概率从限制类别选择
+                    if core_items and random.random() < 0.8:
+                        # 从核心类别中选择
+                        random_item = random.choice(core_items)
+                    elif restricted_items and random.random() < 0.2:
+                        # 从限制类别中选择，需要额外的概率限制
+                        random_item = random.choice(restricted_items)
+                    elif core_items:
+                        # 如果限制类别选择失败但核心类别有物品，则选择核心类别
+                        random_item = random.choice(core_items)
+                    else:
+                        # 如果没有符合条件的物品，则不掉落
+                        logger.info(f"[DEBUG] 没有找到符合条件的掉落物品")
+                        random_item = None
+
+                    if random_item:
+                        # 增加用户物品
+                        self.user_item_repo.add_user_item(user_id, random_item['id'], 1)
+                        dropped_items.append(random_item)
+                        # 如果name_zh为None或空，则使用name_en作为兜底
+                        item_name = random_item.get('name_zh') or random_item.get('name_en') or f"Item {random_item['id']}"
+                        logger.info(f"[DEBUG] User {user_id} got dropped item: [{random_item['id']}] {item_name}")
+                    else:
+                        logger.info(f"[DEBUG] 未掉落物品，没有找到符合条件的物品")
             else:
-                logger.info(f"[DEBUG] 未掉落物品")
+                logger.info(f"[DEBUG] 未掉落物品，概率未触发")
 
         # 获取最终用户宝可梦信息
         final_user_info = None

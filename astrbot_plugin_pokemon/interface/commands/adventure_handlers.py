@@ -552,7 +552,9 @@ class AdventureHandlers:
         if d.dropped_items:
             lines.append("\n🎁 获得额外掉落:")
             for item in d.dropped_items:
-                lines.append(f"  • {item['name_zh']}")
+                # 如果name_zh为None或空，则使用name_en作为兜底
+                item_name = item.get('name_zh') or item.get('name_en') or f"Item {item.get('id', 'Unknown')}"
+                lines.append(f"  • {item_name}")
 
         return "\n".join(lines)
 
