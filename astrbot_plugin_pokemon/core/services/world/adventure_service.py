@@ -29,6 +29,7 @@ class AdventureService:
 
     # --- 常量定义 ---
     TRAINER_ENCOUNTER_RATE = 0.3  # 训练家遭遇几率
+    DROPPABLE_ITEM_RATE = 0.2  # 可掉落物品概率
 
 
     def __init__(
@@ -551,8 +552,8 @@ class AdventureService:
             user_exp_result = self.exp_service.add_exp_for_defeating_wild_pokemon(user_id, wild_pokemon_info.level)
 
             # --- 实现掉落逻辑 ---
-            # 20% 概率掉落随机物品
-            if self.item_repo and random.random() < 1:
+            # 可掉落物品概率
+            if self.item_repo and random.random() < self.DROPPABLE_ITEM_RATE:
                 all_items = self.item_repo.get_all_items()
                 if all_items:
                     # 筛选适合击败宝可梦后掉落的物品类别
