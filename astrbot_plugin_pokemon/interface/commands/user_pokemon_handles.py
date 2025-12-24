@@ -484,3 +484,30 @@ class UserPokemonHandlers:
         result = self.user_pokemon_service.set_pokemon_held_item(user_id, pokemon_id, item_id)
 
         yield event.plain_result(result.message)
+
+    async def unequip_held_item(self, event: AstrMessageEvent):
+        """卸下持有物命令处理器"""
+        user_id = userid_to_base32(event.get_sender_id())
+
+        # 1. 权限/注册检查
+        reg_check = self.user_service.check_user_registered(user_id)
+        if not reg_check.success:
+            yield event.plain_result(reg_check.message)
+            return
+
+        # 解析参数
+        args = event.message_str.split()
+        if len(args) < 2:
+            yield event.plain_result("❌ 请指定宝可梦ID，格式：/卸下持有物 [宝可梦ID]")
+            return
+
+        try:
+            pokemon_id = int(args[1])
+        except ValueError:
+            yield event.plain_result("❌ 宝可梦ID必须是数字")
+            return
+
+        # 调用服务层卸下持有物
+        result = self.user_pokemon_service.remove_pokemon_held_item(user_id, pokemon_id)
+
+        yield event.plain_result(result.message)

@@ -598,7 +598,14 @@ class UserPokemonService:
                 message="您没有持有该道具"
             )
 
-        # 3. 更新宝可梦的持有物
+        # 3. 检查道具是否属于持有物类别 (category_id = 12)
+        if item_result.category_id != 12:
+            return BaseResult(
+                success=False,
+                message="该道具不能作为持有物装备，请使用类别为'持有物'的道具"
+            )
+
+        # 4. 更新宝可梦的持有物
         try:
             self.user_pokemon_repo.update_user_pokemon_held_item(user_id, pokemon_id, item_id)
 
