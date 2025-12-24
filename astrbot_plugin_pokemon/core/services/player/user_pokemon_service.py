@@ -6,11 +6,11 @@ from astrbot.api import logger
 from ...models.common_models import BaseResult
 from ....infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserPokemonRepository,
-    AbstractPokemonAbilityRepository,
+    AbstractPokemonAbilityRepository, AbstractUserItemRepository,
 )
 
 from ....utils.utils import get_today, userid_to_base32
-from ....core.models.user_models import User
+from ....core.models.user_models import User, UserItemInfo
 from ....core.models.pokemon_models import UserPokemonInfo, PokemonDetail, PokemonStats, WildPokemonInfo
 from ....interface.response.answer_enum import AnswerEnum
 
@@ -22,14 +22,16 @@ class UserPokemonService:
             pokemon_repo: AbstractPokemonRepository,
             item_repo: AbstractItemRepository,
             user_pokemon_repo: AbstractUserPokemonRepository,
-            pokemon_ability_repo: AbstractPokemonAbilityRepository,  # Changed: parameter name updated to match new repository
+            pokemon_ability_repo: AbstractPokemonAbilityRepository,
+            user_item_repo: AbstractUserItemRepository,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
         self.pokemon_repo = pokemon_repo
         self.item_repo = item_repo
         self.user_pokemon_repo = user_pokemon_repo
-        self.pokemon_ability_repo = pokemon_ability_repo  # Changed: attribute name updated
+        self.pokemon_ability_repo = pokemon_ability_repo
+        self.user_item_repo = user_item_repo
         self.config = config
 
     def _assign_random_ability(self, species_id: int) -> int:
@@ -524,18 +526,7 @@ class UserPokemonService:
         Returns:
             包含分页数据和元信息的字典
         """
-        offset = (page - 1) * page_size
-        sql = """
-              SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
-              FROM user_pokemon up
-                       JOIN pokemon_species ps ON up.species_id = ps.id
-              WHERE up.user_id = ? AND up.is_favorite = 1
-              ORDER BY up.caught_time DESC, up.id
-              LIMIT ? OFFSET ? \
-              """
-        conn = self.user_pokemon_repo._get_connection()
-        cursor = conn.execute(sql, (user_id, page_size, offset))
-        user_pokemon_list = [self.user_pokemon_repo._row_to_user_pokemon(row) for row in cursor.fetchall()]
+        user_pokemon_list = self.user_pokemon_repo.get_user_favorite_pokemon_paged(user_id, page, page_size)
 
         # 获取总数用于计算页数
         total_pokemon_res = self.get_user_favorite_pokemon(user_id)
@@ -581,3 +572,99 @@ class UserPokemonService:
                 "total_pages": total_pages
             }
         )
+
+    def set_pokemon_held_item(self, user_id: str, pokemon_id: int, item_id: int) -> BaseResult:
+        """
+        为宝可梦装备持有物
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+            item_id: 道具ID
+        Returns:
+            BaseResult
+        """
+        # 1. 检查宝可梦是否存在
+        pokemon_result = self.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_result.success:
+            return pokemon_result
+
+        pokemon_info = pokemon_result.data
+
+        # 2. 检查用户是否拥有该道具且数量大于0
+        item_result: UserItemInfo = self.user_item_repo.get_user_item_by_id(user_id, item_id)
+        if not item_result or item_result.quantity <= 0:
+            return BaseResult(
+                success=False,
+                message="您没有持有该道具"
+            )
+
+        # 3. 更新宝可梦的持有物
+        try:
+            self.user_pokemon_repo.update_user_pokemon_held_item(user_id, pokemon_id, item_id)
+
+            # 获取道具名称
+            item_info = self.item_repo.get_item_by_id(item_id)
+            item_name = item_info.get('name_zh', '未知道具') if item_info else '未知道具'
+
+            return BaseResult(
+                success=True,
+                message=f"成功为宝可梦 {pokemon_info.name} 装备了持有物：{item_name}",
+                data={
+                    "pokemon_id": pokemon_id,
+                    "pokemon_name": pokemon_info.name,
+                    "item_id": item_id,
+                    "item_name": item_name
+                }
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"装备持有物失败: {str(e)}"
+            )
+
+    def remove_pokemon_held_item(self, user_id: str, pokemon_id: int) -> BaseResult:
+        """
+        移除宝可梦的持有物
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+        Returns:
+            BaseResult
+        """
+        # 1. 检查宝可梦是否存在
+        pokemon_result = self.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_result.success:
+            return pokemon_result
+
+        pokemon_info = pokemon_result.data
+
+        # 2. 检查是否已装备持有物
+        if pokemon_info.held_item_id <= 0:
+            return BaseResult(
+                success=False,
+                message=f"宝可梦 {pokemon_info.name} 目前没有装备持有物"
+            )
+
+        # 3. 获取原有道具信息
+        old_item_info = self.item_repo.get_item_by_id(pokemon_info.held_item_id)
+        old_item_name = old_item_info.get('name_zh', '未知道具') if old_item_info else '未知道具'
+
+        # 4. 移除持有物 (设置为0)
+        try:
+            self.user_pokemon_repo.update_user_pokemon_held_item(user_id, pokemon_id, 0)
+
+            return BaseResult(
+                success=True,
+                message=f"成功移除宝可梦 {pokemon_info.name} 的持有物：{old_item_name}",
+                data={
+                    "pokemon_id": pokemon_id,
+                    "pokemon_name": pokemon_info.name,
+                    "removed_item_id": pokemon_info.held_item_id,
+                    "removed_item_name": old_item_name
+                }
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"移除持有物失败: {str(e)}"
+            )

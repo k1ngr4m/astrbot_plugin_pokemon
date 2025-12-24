@@ -296,17 +296,9 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
         """更新用户宝可梦的收藏状态"""
         self._update_user_pokemon_fields(user_id, pokemon_id, is_favorite=is_favorite)
 
-    def get_user_favorite_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
-        """获取用户收藏的宝可梦列表"""
-        sql = """
-              SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
-              FROM user_pokemon up
-                       JOIN pokemon_species ps ON up.species_id = ps.id
-              WHERE up.user_id = ? AND up.is_favorite = 1
-              ORDER BY up.caught_time DESC, up.id \
-              """
-        cursor = self._get_connection().execute(sql, (user_id,))
-        return [self._row_to_user_pokemon(row) for row in cursor.fetchall()]
+    def update_user_pokemon_held_item(self, user_id: str, pokemon_id: int, held_item_id: int) -> None:
+        """更新用户宝可梦的持有物"""
+        self._update_user_pokemon_fields(user_id, pokemon_id, held_item_id=held_item_id)
 
     # =========查=========
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
@@ -453,6 +445,32 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
         """, (user_id,))
         row = cursor.fetchone()
         return row[0] if row and row[0] is not None else None
+
+    def get_user_favorite_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
+        """获取用户收藏的宝可梦列表"""
+        sql = """
+              SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
+              FROM user_pokemon up
+                       JOIN pokemon_species ps ON up.species_id = ps.id
+              WHERE up.user_id = ? AND up.is_favorite = 1
+              ORDER BY up.caught_time DESC, up.id \
+              """
+        cursor = self._get_connection().execute(sql, (user_id,))
+        return [self._row_to_user_pokemon(row) for row in cursor.fetchall()]
+
+    def get_user_favorite_pokemon_paged(self, user_id: str, page: int, page_size: int) -> List[UserPokemonInfo]:
+        """获取用户收藏的宝可梦列表（分页）"""
+        offset = (page - 1) * page_size
+        sql = """
+              SELECT up.*, ps.name_zh as species_name, ps.name_en as species_en_name
+              FROM user_pokemon up
+                       JOIN pokemon_species ps ON up.species_id = ps.id
+              WHERE up.user_id = ? AND up.is_favorite = 1
+              ORDER BY up.caught_time DESC, up.id
+              LIMIT ? OFFSET ?
+              """
+        cursor = self._get_connection().execute(sql, (user_id, page_size, offset))
+        return [self._row_to_user_pokemon(row) for row in cursor.fetchall()]
 
     def clear_user_current_trainer_encounter(self, user_id: str) -> None:
         """清除用户当前遭遇的训练家ID"""

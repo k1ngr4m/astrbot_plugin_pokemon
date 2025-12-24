@@ -160,3 +160,4 @@ class ItemHandlers:
             f"💰 获得金币：{total_sell_price} 个 (单价: {sell_price} 个金币)\n\n"
             f"💳 当前金币：{user.coins + total_sell_price} 个"
         )
+

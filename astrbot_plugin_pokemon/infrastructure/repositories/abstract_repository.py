@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, List, Dict, Any
 
-from data.plugins.astrbot_plugin_fishing.core.domain.models import UserItem
 from ...core.models.trainer_models import TrainerEncounter, TrainerLocation, TrainerPokemon, Trainer
-from ...core.models.user_models import User, UserTeam, UserItems
+from ...core.models.user_models import User, UserTeam, UserItems, UserItemInfo
 from ...core.models.pokemon_models import PokemonSpecies, UserPokemonInfo, \
     WildPokemonInfo, WildPokemonEncounterLog, PokemonMoves, PokemonEvolutionInfo
 from ...core.models.adventure_models import LocationTemplate, LocationPokemon
@@ -330,6 +329,11 @@ class AbstractUserPokemonRepository(ABC):
     @abstractmethod
     def update_user_pokemon_full_heal(self, user_id: str, pokemon_id: int) -> None: pass
 
+    @abstractmethod
+    def update_user_pokemon_favorite(self, user_id: str, pokemon_id: int, is_favorite: int) -> None: pass
+
+    @abstractmethod
+    def update_user_pokemon_held_item(self, user_id: str, pokemon_id: int, item_id: int) -> None: pass
     # ==========查==========
     # 获取用户所有宝可梦
     @abstractmethod
@@ -363,6 +367,11 @@ class AbstractUserPokemonRepository(ABC):
     @abstractmethod
     def get_latest_encounters(self, user_id: str, limit: int = 10) -> List[Dict[str, Any]]: pass
 
+    @abstractmethod
+    def get_user_favorite_pokemon(self, user_id: str) -> List[UserPokemonInfo]: pass
+
+    @abstractmethod
+    def get_user_favorite_pokemon_paged(self, user_id: str, page: int, page_size: int) -> List[UserPokemonInfo]: pass
     # ==========训练家遭遇管理==========
     # 设置用户当前遭遇的训练家ID
     @abstractmethod
@@ -394,7 +403,7 @@ class AbstractUserItemRepository(ABC):
     def get_user_items(self, user_id: str) -> UserItems: pass
 
     @abstractmethod
-    def get_user_item_by_id(self, user_id: str, item_id: int) -> Optional[UserItem]: pass
+    def get_user_item_by_id(self, user_id: str, item_id: int) -> Optional[UserItemInfo]: pass
 
 class AbstractNatureRepository(ABC):
     """性格数据仓储接口"""

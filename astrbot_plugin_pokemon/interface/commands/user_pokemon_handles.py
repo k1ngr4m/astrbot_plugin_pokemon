@@ -451,3 +451,36 @@ class UserPokemonHandlers:
             pokemon_names = [f"{p.name}(ID:{p.id}, Lv.{p.level})" for p in pokemon_list]
             formatted_message = f"🌟 您收藏的宝可梦列表（第{data['page']}页/{data['total_pages']}页）:\n" + "\n".join(pokemon_names)
             yield event.plain_result(formatted_message)
+
+    async def equip_held_item(self, event: AstrMessageEvent):
+        """装备持有物命令处理器"""
+        user_id = userid_to_base32(event.get_sender_id())
+
+        # 1. 权限/注册检查
+        reg_check = self.user_service.check_user_registered(user_id)
+        if not reg_check.success:
+            yield event.plain_result(reg_check.message)
+            return
+
+        # 解析参数
+        args = event.message_str.split()
+        if len(args) < 3:
+            yield event.plain_result("❌ 请指定宝可梦ID和道具ID，格式：/装备持有物 [宝可梦ID] [道具ID]")
+            return
+
+        try:
+            pokemon_id = int(args[1])
+        except ValueError:
+            yield event.plain_result("❌ 宝可梦ID必须是数字")
+            return
+
+        try:
+            item_id = int(args[2])
+        except ValueError:
+            yield event.plain_result("❌ 道具ID必须是数字")
+            return
+
+        # 调用服务层装备持有物
+        result = self.user_pokemon_service.set_pokemon_held_item(user_id, pokemon_id, item_id)
+
+        yield event.plain_result(result.message)

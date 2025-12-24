@@ -87,7 +87,8 @@ class GameContainer:
             pokemon_repo=self.pokemon_repo,
             user_pokemon_repo=self.user_pokemon_repo,
             item_repo=self.item_repo,
-            pokemon_ability_repo=self.pokemon_ability_repo,  # 注意：这里参数名未变，但传入的是重命名后的仓库
+            pokemon_ability_repo=self.pokemon_ability_repo,
+            user_item_repo=self.user_item_repo,
             config=self.config
         )
         self.user_item_service = UserItemService(

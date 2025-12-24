@@ -237,6 +237,12 @@ class PokemonPlugin(Star):
         async for r in self.user_pokemon_handlers.view_favorite_pokemon(event):
             yield r
 
+    @filter.command("装备持有物")
+    async def equip_held_item(self, event: AstrMessageEvent):
+        """为宝可梦装备持有物。用法：/装备持有物 [宝可梦ID] [道具ID]"""
+        async for r in self.user_pokemon_handlers.equip_held_item(event):
+            yield r
+
     # ==========冒险系统==========
     @filter.command("设置队伍")
     async def set_team(self, event: AstrMessageEvent):
