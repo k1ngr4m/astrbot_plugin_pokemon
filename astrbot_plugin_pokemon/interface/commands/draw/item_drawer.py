@@ -160,9 +160,9 @@ class UserItemDrawer(ItemDrawer):
         qty_width = qty_bbox[2] - qty_bbox[0]
         draw.text((x + w - 10 - qty_width, y + h - 25), qty_text,
                   fill=COLOR_TEXT_DARK, font=self.fonts["normal"], anchor="ra")
-
+        logger.info(f"[DEBUG]itemsid:{item})")
         # 4. 物品ID (左下角)
-        id_text = f"#{item.get('id', 0)}"
+        id_text = f"#{item.get('item_id', 0)}"
         draw.text((ix, y + h - 25), id_text, fill=COLOR_TEXT_GRAY, font=self.fonts["small"])
 
 
