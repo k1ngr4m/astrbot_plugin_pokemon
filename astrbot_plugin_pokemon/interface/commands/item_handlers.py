@@ -55,7 +55,6 @@ class ItemHandlers:
         if not result["items"]:
             yield event.plain_result(AnswerEnum.USER_ITEMS_EMPTY.value)
             return
-        logger.info(f"[DEBUG] result: {result['items']}")
         # 生成图片
         try:
             image = draw_user_items({

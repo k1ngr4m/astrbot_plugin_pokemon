@@ -109,7 +109,6 @@ class ItemService:
         type_names = {int(k): v for k, v in config_type_names.items()}
 
         result = self.get_user_items(user_id, page, items_per_page)
-        logger.info(f"[DEBUG] repo_result: {result}")
         if result["success"]:
             # 为每件物品添加类别名称
             for item in result["items"]:

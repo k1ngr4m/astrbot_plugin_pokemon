@@ -43,7 +43,6 @@ class ItemDrawer:
         sprite_path = os.path.abspath(os.path.join(
             base_path, "..", "..", "..", "..", "assets", "items", f"{item_name_en}.png"
         ))
-        logger.info(f"[DEBUG] loading sprite from: {sprite_path}")
         cache_key = f"{item_name_en}_{size}"
         if cache_key in self.sprite_cache:
             return self.sprite_cache[cache_key]
