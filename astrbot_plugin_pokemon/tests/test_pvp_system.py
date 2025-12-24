@@ -100,10 +100,10 @@ class TestPvPSystem(unittest.TestCase):
         print(f"Scaled Current HP: {scaled_pokemon.current_hp} (Expected 207)")
         self.assertEqual(scaled_pokemon.current_hp, 207)
         
-        # Verify Moves Reset (Should take last 4: 11, 12, 13, 14)
+        # Verify Moves Preserved (Should use existing moves: 1, 2, 3, 4)
         print(f"Scaled Moves: {[scaled_pokemon.moves.move1_id, scaled_pokemon.moves.move2_id, scaled_pokemon.moves.move3_id, scaled_pokemon.moves.move4_id]}")
-        self.assertEqual(scaled_pokemon.moves.move1_id, 11)
-        self.assertEqual(scaled_pokemon.moves.move4_id, 14)
+        self.assertEqual(scaled_pokemon.moves.move1_id, 1)
+        self.assertEqual(scaled_pokemon.moves.move4_id, 4)
 
     def test_start_pvp_battle(self):
         print("Testing start_pvp_battle...")

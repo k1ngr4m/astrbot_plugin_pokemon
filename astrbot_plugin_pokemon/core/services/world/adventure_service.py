@@ -962,19 +962,19 @@ class AdventureService:
         """为 PvP 创建 50 级缩放后的战斗上下文"""
         level = 50
         species = self.pokemon_repo.get_pokemon_by_id(pokemon_info.species_id)
-        
+
         # 1. 重新计算 50 级属性
         base = species.base_stats
         ivs = pokemon_info.ivs
         evs = pokemon_info.evs
-        
+
         def calc(b, i, e, is_hp=False):
             res = (b * 2 + i + e // 4) * level / 100
             if is_hp:
                 return int(res) + level + 10
             else:
                 return int(res) + 5
-    
+
         new_stats = PokemonStats(
             hp=calc(base["base_hp"], ivs.hp_iv, evs.hp_ev, True),
             attack=calc(base["base_attack"], ivs.attack_iv, evs.attack_ev),
@@ -983,33 +983,24 @@ class AdventureService:
             sp_defense=calc(base["base_sp_defense"], ivs.sp_defense_iv, evs.sp_defense_ev),
             speed=calc(base["base_speed"], ivs.speed_iv, evs.speed_ev)
         )
-        
+
         # 应用性格修正
         # nature_service is in self.pokemon_service.nature_service
         final_stats = self.pokemon_service.nature_service.apply_nature_modifiers(new_stats, pokemon_info.nature_id)
-        
-        # 2. 获取 50 级可用的招式列表
-        # 获取该物种到 50 级为止能学会的所有招式，取最后 4 个作为 PvP 招式
-        # 注意：get_level_up_moves 返回的是 move_ids
-        learnable_move_ids = self.move_repo.get_level_up_moves(pokemon_info.species_id, level)
-        # 确保 learnable_move_ids 是列表
-        if not learnable_move_ids:
-            learnable_move_ids = []
-            
-        pvp_move_ids = learnable_move_ids[-4:] if len(learnable_move_ids) >= 4 else learnable_move_ids
-        
-        # 构造临时的招式对象供 _preload_moves 使用
-        temp_moves_obj = PokemonMoves(
-            move1_id=pvp_move_ids[0] if len(pvp_move_ids) > 0 else 0,
-            move2_id=pvp_move_ids[1] if len(pvp_move_ids) > 1 else 0,
-            move3_id=pvp_move_ids[2] if len(pvp_move_ids) > 2 else 0,
-            move4_id=pvp_move_ids[3] if len(pvp_move_ids) > 3 else 0
+
+        # 2. 使用宝可梦现有技能，而不是重新生成
+        # 保留宝可梦当前拥有的技能，而不是根据等级重新生成
+        current_moves_obj = PokemonMoves(
+            move1_id=pokemon_info.moves.move1_id,
+            move2_id=pokemon_info.moves.move2_id,
+            move3_id=pokemon_info.moves.move3_id,
+            move4_id=pokemon_info.moves.move4_id
         )
-        
+
         # 借用现有逻辑加载招式详情
         # 注意：这里需要创建一个临时的 info 对象，其 moves 字段被替换
-        temp_info = replace(pokemon_info, stats=final_stats, moves=temp_moves_obj, level=level, current_hp=final_stats.hp)
-        
+        temp_info = replace(pokemon_info, stats=final_stats, moves=current_moves_obj, level=level, current_hp=final_stats.hp)
+
         return self._create_battle_context(temp_info, is_user=True)
 
     def start_pvp_battle(self, attacker_id: str, defender_id: str) -> BaseResult[BattleResult]:
