@@ -164,11 +164,38 @@ class UserPokemonListDrawer(BaseDrawer):
         draw.text((ix, level_y_offset), f"Lv.{p.get('level', 1)}", fill=COLOR_TEXT_GRAY, font=self.fonts["small"])
         draw.text((ix + 60, level_y_offset), f"HP {cur}/{max_hp}", fill=COLOR_TEXT_DARK, font=self.fonts["small"])
 
+        # 获取收藏状态
+        is_favorite = p.get('is_favorite', 0)
+
         # ID Badge (Top Right)
         id_txt = f"#{p.get('id', 0)}"
         iw = self.fonts["small"].getlength(id_txt) + 10
-        draw_rounded_rectangle(draw, (x+w-iw-10, y+10, x+w-10, y+30), corner_radius=5, fill=(240, 240, 240))
-        draw.text((x+w-10-iw/2, y+20), id_txt, fill=COLOR_TEXT_GRAY, font=self.fonts["small"], anchor="mm")
+        # 如果有星星，则ID的位置需要调整
+        id_x_start = x+w-iw-10  # 为星星留出空间
+        # id_x_start = x+w-iw-10 if not is_favorite else x+w-iw-25  # 为星星留出空间
+        draw_rounded_rectangle(draw, (id_x_start, y+10, x+w-10, y+30), corner_radius=5, fill=(240, 240, 240))
+        draw.text((id_x_start + iw/2, y+20), id_txt, fill=COLOR_TEXT_GRAY, font=self.fonts["small"], anchor="mm")
+
+        # 收藏标识 (Top Right, left of ID)
+        if is_favorite:
+            # 绘制五角星，放在ID标签的左边
+            import math
+            star_size = 8
+            # 星星绘制在ID标签的左边
+            center_x, center_y = id_x_start - 10, y+20  # 在ID框的左边留10像素间距
+            # 画五角星
+            points = []
+            for i in range(5):
+                # 外圈点
+                angle = math.radians(72 * i - 90)  # -90度开始，使顶部朝上
+                points.append((center_x + star_size * math.cos(angle),
+                              center_y + star_size * math.sin(angle)))
+                # 内圈点
+                angle = math.radians(72 * i + 36 - 90)  # 中间角度
+                points.append((center_x + star_size * 0.4 * math.cos(angle),
+                              center_y + star_size * 0.4 * math.sin(angle)))
+            # 绘制星形
+            draw.polygon(points, fill=(255, 215, 0))  # 金色/黄色
 
         # 6. IV标记 (新增：在ID标签下方添加IV标识)
         ivs = p.get('ivs', {})
