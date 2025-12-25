@@ -140,7 +140,8 @@ class UserPokemonHandlers:
                 "ability": info['ability'],
                 "current_hp": p.current_hp,
                 "max_hp": p.stats.hp,
-                "types": info['types'].split('/') if info['types'] != "未知" else []
+                "types": info['types'].split('/') if info['types'] != "未知" else [],
+                "ivs": p.ivs  # 添加IV信息
             })
         # 生成图片
         img = draw_user_pokemon_list(draw_data)
@@ -311,7 +312,8 @@ class UserPokemonHandlers:
                 "ability": info['ability'],
                 "current_hp": p.current_hp,
                 "max_hp": p.stats.hp,
-                "types": info['types'].split('/') if info['types'] != "未知" else []
+                "types": info['types'].split('/') if info['types'] != "未知" else [],
+                "ivs": p.ivs  # 添加IV信息
             })
 
         # 生成图片
@@ -435,7 +437,8 @@ class UserPokemonHandlers:
                 "ability": info['ability'],
                 "current_hp": p.current_hp,
                 "max_hp": p.stats.hp,
-                "types": info['types'].split('/') if info['types'] != "未知" else []
+                "types": info['types'].split('/') if info['types'] != "未知" else [],
+                "ivs": p.ivs  # 添加IV信息
             })
 
         # 生成图片

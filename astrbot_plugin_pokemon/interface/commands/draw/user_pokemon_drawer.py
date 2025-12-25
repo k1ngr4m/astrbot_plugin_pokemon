@@ -129,7 +129,7 @@ class UserPokemonListDrawer(BaseDrawer):
         name = p.get('name', '未知')
         gender = p.get('gender', '')
         g_col = (50, 150, 255) if 'm' in gender.lower() or '♂' in gender else (255, 100, 150)
-        if 'N' in gender or '⚲' in gender: g_col = COLOR_TEXT_GRAY
+        if 'N' in gender or ' bisexual ' in gender: g_col = COLOR_TEXT_GRAY
 
         draw.text((ix, iy), name, fill=COLOR_TEXT_DARK, font=self.fonts["card_title"])
         nw = self.fonts["card_title"].getlength(name)
@@ -148,26 +148,65 @@ class UserPokemonListDrawer(BaseDrawer):
         na_text = f"{nature} · {ability}"
         draw.text((ix, iy + 60), na_text, fill=COLOR_TEXT_DARK, font=self.fonts["small"])
 
-        # 4. HP 血条 (下移至 iy + 82，确保不遮挡文字)
+        # 4. HP 血条 (iy + 78)
         cur, max_hp = p.get('current_hp', 0), p.get('max_hp', 0)
         ratio = max(0, min(1, cur / max_hp)) if max_hp > 0 else 0
         bar_w, bar_h = 140, 6
-        bar_x, bar_y = ix, iy + 82  # 关键改动：从 62 改为 82
+        bar_x, bar_y = ix, iy + 78
 
         draw_rounded_rectangle(draw, (bar_x, bar_y, bar_x + bar_w, bar_y + bar_h), 3, fill=(230, 230, 230))
         bar_col = COLOR_SUCCESS if ratio > 0.5 else (COLOR_WARNING if ratio > 0.2 else COLOR_ERROR)
         if ratio > 0:
             draw_rounded_rectangle(draw, (bar_x, bar_y, bar_x + int(bar_w * ratio), bar_y + bar_h), 3, fill=bar_col)
 
-        # 5. 等级与数值 (下移至 iy + 95)
-        draw.text((ix, iy + 95), f"Lv.{p.get('level', 1)}", fill=COLOR_TEXT_GRAY, font=self.fonts["small"])
-        draw.text((ix + 60, iy + 95), f"HP {cur}/{max_hp}", fill=COLOR_TEXT_DARK, font=self.fonts["small"])
+        # 5. 等级与数值 (相应调整位置)
+        level_y_offset = bar_y + 12
+        draw.text((ix, level_y_offset), f"Lv.{p.get('level', 1)}", fill=COLOR_TEXT_GRAY, font=self.fonts["small"])
+        draw.text((ix + 60, level_y_offset), f"HP {cur}/{max_hp}", fill=COLOR_TEXT_DARK, font=self.fonts["small"])
 
         # ID Badge (Top Right)
         id_txt = f"#{p.get('id', 0)}"
         iw = self.fonts["small"].getlength(id_txt) + 10
         draw_rounded_rectangle(draw, (x+w-iw-10, y+10, x+w-10, y+30), corner_radius=5, fill=(240, 240, 240))
         draw.text((x+w-10-iw/2, y+20), id_txt, fill=COLOR_TEXT_GRAY, font=self.fonts["small"], anchor="mm")
+
+        # 6. IV标记 (新增：在ID标签下方添加IV标识)
+        ivs = p.get('ivs', {})
+        if ivs and hasattr(ivs, '__dict__'):
+            # 将ivs对象转换为字典
+            iv_values = {k: v for k, v in ivs.__dict__.items() if k.endswith('_iv')}
+        elif isinstance(ivs, dict):
+            iv_values = {k: v for k, v in ivs.items() if k.endswith('_iv')}
+        else:
+            iv_values = {}
+
+        # 检查是否有完美的IV (0或31) 并生成标记
+        perfect_ivs = []
+        for key, value in iv_values.items():
+            if value == 31 or value == 0:
+                # 修正：先替换sp_attack和sp_defense，再替换其他
+                stat_name = key.replace('_iv', '')
+                if stat_name == 'sp_attack':
+                    stat_name = '特攻'
+                elif stat_name == 'sp_defense':
+                    stat_name = '特防'
+                else:
+                    stat_name = stat_name.replace('hp', 'H  P').replace('attack', '攻击').replace('defense', '防御').replace('speed', '速度')
+                if value == 31:
+                    perfect_ivs.append(f"{stat_name}\t31")
+                else:  # value == 0
+                    perfect_ivs.append(f"{stat_name}\t0")
+
+        if perfect_ivs:
+            # 在ID标签下方显示IV标记，每个IV单独一行，位置往左调整
+            start_y = y + 35  # 在ID标签下方开始
+            # 使用更小的字体和不同颜色显示IV标记
+            for i, iv_text in enumerate(perfect_ivs):
+                iv_y = start_y + i * 18  # 每个IV标记垂直间距18像素
+                # 根据IV值选择颜色：31用绿色，0用红色
+                iv_color = COLOR_SUCCESS if '31' in iv_text else COLOR_ERROR
+                # 往左调整位置，避免超出边距
+                draw.text((x+w-iw-30, iv_y), iv_text, fill=iv_color, font=self.fonts["small"])
 
 
 class UserPokemonDetailDrawer(BaseDrawer):
