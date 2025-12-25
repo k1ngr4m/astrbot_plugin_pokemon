@@ -787,10 +787,16 @@ class AdventureService:
     def calculate_battle_win_rate(self, user_ctx: BattleContext, wild_ctx: BattleContext, simulations: int = 100) -> \
     Tuple[float, float]:
         """优化版蒙特卡洛模拟：减少对象创建，仅追踪整数PP"""
+        import time
+
+        # 添加开始时间日志
+        start_time = time.time()
+        logger.info(f"[DEBUG]开始进行 {simulations} 次对战模拟...")
+
         user_wins = 0
         logger_obj = NoOpBattleLogger()
 
-        for _ in range(simulations):
+        for i in range(simulations):
             # Create fresh state for each simulation
             user_state = BattleState.from_context(user_ctx)
             wild_state = BattleState.from_context(wild_ctx)
@@ -801,11 +807,17 @@ class AdventureService:
                 battle_ended = self.battle_logic.process_turn(user_state, wild_state, logger_obj)
                 if battle_ended:
                     break
-            
+
             if user_state.current_hp > 0:
                 user_wins += 1
 
         win_rate = (user_wins / simulations) * 100
+
+        # 添加结束时间日志
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        logger.info(f"[DEBUG]完成 {simulations} 次对战模拟，耗时 {elapsed_time:.3f} 秒")
+
         return round(win_rate, 1), round(100 - win_rate, 1)
 
     def calculate_type_effectiveness(self, attacker_types: List[str], defender_types: List[str]) -> float:
