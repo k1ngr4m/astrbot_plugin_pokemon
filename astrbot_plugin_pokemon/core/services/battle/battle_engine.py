@@ -300,7 +300,7 @@ class BattleLogic:
             # 添加调试日志（可选）
             if logger_obj.should_log_details():
                 from astrbot.api import logger
-                logger.info(f"[DEBUG] 天气 {self.current_weather} 剩余回合: {self.weather_turns}")
+                logger.debug(f"[DEBUG] 天气 {self.current_weather} 剩余回合: {self.weather_turns}")
                 
             # 当回合数归零，执行清理
             if self.weather_turns == 0:
@@ -363,7 +363,7 @@ class BattleLogic:
 
         if not available_moves:
             if logger_obj and logger_obj.should_log_details():
-                logger.info("[DEBUG] 没有可用招式，使用挣扎")
+                logger.debug("[DEBUG] 没有可用招式，使用挣扎")
             return self.get_struggle_move()
 
         # 评分与选择
@@ -381,7 +381,7 @@ class BattleLogic:
             score += random.uniform(0, 3)
 
             if logger_obj and logger_obj.should_log_details():
-                logger.info(f"[DEBUG] {move.move_name} (Cat:{move.meta_category_id}) 评分: {score:.2f}")
+                logger.debug(f"[DEBUG] {move.move_name} (Cat:{move.meta_category_id}) 评分: {score:.2f}")
 
             if score > best_score:
                 best_score = score
@@ -408,10 +408,10 @@ class BattleLogic:
 
         # 添加调试日志
         if logger_obj.should_log_details():
-            logger.info(f"[DEBUG] 开始执行行动: {attacker.context.pokemon.name} 使用 {move.move_name} (ID: {move.move_id})")
-            logger.info(f"[DEBUG] 攻击方当前状态: charging_move_id={attacker.charging_move_id}, protection_status={attacker.protection_status}")
-            logger.info(f"[DEBUG] 防御方当前状态: charging_move_id={defender.charging_move_id}, protection_status={defender.protection_status}")
-            logger.info(f"[DEBUG] 技能配置: {move_config}")
+            logger.debug(f"[DEBUG] 开始执行行动: {attacker.context.pokemon.name} 使用 {move.move_name} (ID: {move.move_id})")
+            logger.debug(f"[DEBUG] 攻击方当前状态: charging_move_id={attacker.charging_move_id}, protection_status={attacker.protection_status}")
+            logger.debug(f"[DEBUG] 防御方当前状态: charging_move_id={defender.charging_move_id}, protection_status={defender.protection_status}")
+            logger.debug(f"[DEBUG] 技能配置: {move_config}")
 
         # --- Phase 1: 蓄力状态检查 (Charging Check) ---
 
@@ -435,7 +435,7 @@ class BattleLogic:
 
                 # 添加调试日志
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 大地掌控第二回合提升能力: {move_config['turn_2_boost']}")
+                    logger.debug(f"[DEBUG] 大地掌控第二回合提升能力: {move_config['turn_2_boost']}")
 
         # 如果当前没有蓄力，但是使用了蓄力技能 -> 说明是第一回合，进入蓄力
         elif move_config:
@@ -453,7 +453,7 @@ class BattleLogic:
 
             # 添加调试日志
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 攻击方开始蓄力: charging_move_id={attacker.charging_move_id}, protection_status={attacker.protection_status}")
+                logger.debug(f"[DEBUG] 攻击方开始蓄力: charging_move_id={attacker.charging_move_id}, protection_status={attacker.protection_status}")
 
             # 3. 应用第一回合的属性提升 (如流星光束、火箭头锤)
             if "stat_boost" in move_config:
@@ -465,7 +465,7 @@ class BattleLogic:
 
                 # 添加调试日志
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 第一回合蓄力技能提升能力: {move_config['stat_boost']}")
+                    logger.debug(f"[DEBUG] 第一回合蓄力技能提升能力: {move_config['stat_boost']}")
 
             return False  # 第一回合结束，不造成伤害
 
@@ -475,7 +475,7 @@ class BattleLogic:
         # 只有当技能目标是对手时，才检查保护状态（防止自己用增益技能被对手保护状态拦截）
         if defender.protection_status and move.target_id in self.TARGETS_OPPONENT:
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 防御方处于保护状态: {defender.protection_status}")
+                logger.debug(f"[DEBUG] 防御方处于保护状态: {defender.protection_status}")
 
             can_hit = False
 
@@ -483,18 +483,18 @@ class BattleLogic:
             if move_config and move_config.get("bypass_protect"):
                 can_hit = True
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 技能可以穿透保护 (bypass_protect=True)")
+                    logger.debug(f"[DEBUG] 技能可以穿透保护 (bypass_protect=True)")
 
             # 2. 技能属性是否克制该保护状态 (如地震打挖洞)
             allowed_moves = self.PROTECTION_PENETRATION.get(defender.protection_status, [])
             if move.move_id in allowed_moves:
                 can_hit = True
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 技能可以穿透保护 (在穿透列表中)")
+                    logger.debug(f"[DEBUG] 技能可以穿透保护 (在穿透列表中)")
 
             if not can_hit:
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 攻击未能命中处于保护状态的防御方")
+                    logger.debug(f"[DEBUG] 攻击未能命中处于保护状态的防御方")
 
                 if not is_struggle: self._deduct_pp(attacker, move)
                 logger_obj.log(f"{attacker.context.pokemon.name} 使用了 {move.move_name}！\n\n")
@@ -502,7 +502,7 @@ class BattleLogic:
                 return False
             else:
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 攻击成功穿透保护")
+                    logger.debug(f"[DEBUG] 攻击成功穿透保护")
 
         # B. 消耗 PP
         # 对于两回合技能的第二回合，PP已经在第一回合消耗过了，所以不再重复消耗
@@ -539,7 +539,7 @@ class BattleLogic:
         # E. 计算结果 (Calculate) - 需要处理连续攻击逻辑
         # 此步骤只计算数据，不修改任何状态
         if logger_obj.should_log_details():
-            logger.info(f"[DEBUG] 开始计算招式结果: {move.move_name}")
+            logger.debug(f"[DEBUG] 开始计算招式结果: {move.move_name}")
 
         # 检查是否是连续攻击技能
         if move.min_hits > 1 or move.max_hits > 1:
@@ -583,7 +583,7 @@ class BattleLogic:
                         total_damage_dealt += outcome.damage
                         # 检查是否需要在击倒前记录伤害
                         if logger_obj.should_log_details():
-                            logger.info(f"[DEBUG] 连击在第{hit_i+1}次攻击后击倒对手，累计造成 {total_damage_dealt} 点伤害")
+                            logger.debug(f"[DEBUG] 连击在第{hit_i+1}次攻击后击倒对手，累计造成 {total_damage_dealt} 点伤害")
                         break
                     else:
                         # 造成伤害
@@ -591,14 +591,14 @@ class BattleLogic:
                         hits_landed += 1
                         total_damage_dealt += outcome.damage
                         if logger_obj.should_log_details():
-                            logger.info(f"[DEBUG] 连击第{hit_i+1}次攻击造成 {outcome.damage} 点伤害")
+                            logger.debug(f"[DEBUG] 连击第{hit_i+1}次攻击造成 {outcome.damage} 点伤害")
 
             # 统一显示结果
             if not move_missed:
                 if total_damage_dealt > 0:
                     # 记录最后一次攻击的暴击和效果状态
                     if logger_obj.should_log_details():
-                        logger.info(f"[DEBUG] 连续攻击总共造成 {total_damage_dealt} 点伤害")
+                        logger.debug(f"[DEBUG] 连续攻击总共造成 {total_damage_dealt} 点伤害")
                     # Rich Log for Multi-Hit
                     dmg_color = 'red' if (outcome and (outcome.is_crit or outcome.effectiveness > 1.0)) else 'default'
                     logger_obj.log_rich([
@@ -611,19 +611,19 @@ class BattleLogic:
                     if outcome and outcome.is_crit:
                         logger_obj.log_rich([{'text': "击中要害！\n\n", 'color': 'red'}])
                         if logger_obj.should_log_details():
-                            logger.info("[DEBUG] 触发暴击")
+                            logger.debug("[DEBUG] 触发暴击")
                     if outcome and outcome.effectiveness > 1.0:
                         logger_obj.log_rich([{'text': "效果绝佳！\n\n", 'color': 'red'}])
                         if logger_obj.should_log_details():
-                            logger.info("[DEBUG] 效果绝佳")
+                            logger.debug("[DEBUG] 效果绝佳")
                     elif outcome and outcome.effectiveness == 0.0:
                         logger_obj.log_rich([{'text': "似乎没有效果！\n\n", 'color': 'blue'}])
                         if logger_obj.should_log_details():
-                            logger.info("[DEBUG] 技能对目标无效")
+                            logger.debug("[DEBUG] 技能对目标无效")
                     elif outcome and outcome.effectiveness < 1.0:
                         logger_obj.log_rich([{'text': "效果不佳！\n\n", 'color': 'blue'}])
                         if logger_obj.should_log_details():
-                            logger.info("[DEBUG] 效果不佳")
+                            logger.debug("[DEBUG] 效果不佳")
                 else:
                     if hits_landed > 0:
                         # 如果命中了但是没有造成伤害（例如对钢系宝可梦使用地面系技能）
@@ -635,7 +635,7 @@ class BattleLogic:
             # 传统单次攻击逻辑
             outcome = self._calculate_move_outcome(attacker, defender, move, logger_obj=logger_obj)
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 招式结果计算完成: 伤害={outcome.damage}, 命中={not outcome.missed}, 暴击={outcome.is_crit}, 效果={outcome.effectiveness}x")
+                logger.debug(f"[DEBUG] 招式结果计算完成: 伤害={outcome.damage}, 命中={not outcome.missed}, 暴击={outcome.is_crit}, 效果={outcome.effectiveness}x")
 
             # F. 应用结果 (Apply)
 
@@ -649,7 +649,7 @@ class BattleLogic:
             # 2. 伤害判定 (如果有伤害)
             if outcome.damage > 0:
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 造成伤害: {outcome.damage} 点, 防御方HP从 {defender.current_hp} 变为 {max(0, defender.current_hp - outcome.damage)}")
+                    logger.debug(f"[DEBUG] 造成伤害: {outcome.damage} 点, 防御方HP从 {defender.current_hp} 变为 {max(0, defender.current_hp - outcome.damage)}")
 
                 defender.current_hp -= outcome.damage
                 if is_struggle:
@@ -666,19 +666,19 @@ class BattleLogic:
                 if outcome.is_crit:
                     logger_obj.log_rich([{'text': "击中要害！\n\n", 'color': 'red'}])
                     if logger_obj.should_log_details():
-                        logger.info("[DEBUG] 触发暴击")
+                        logger.debug("[DEBUG] 触发暴击")
                 if outcome.effectiveness > 1.0:
                     logger_obj.log_rich([{'text': "效果绝佳！\n\n", 'color': 'red'}])
                     if logger_obj.should_log_details():
-                        logger.info("[DEBUG] 效果绝佳")
+                        logger.debug("[DEBUG] 效果绝佳")
                 elif outcome.effectiveness == 0.0:
                     logger_obj.log_rich([{'text': "似乎没有效果！\n\n", 'color': 'blue'}])
                     if logger_obj.should_log_details():
-                        logger.info("[DEBUG] 技能对目标无效")
+                        logger.debug("[DEBUG] 技能对目标无效")
                 elif outcome.effectiveness < 1.0:
                     logger_obj.log_rich([{'text': "效果不佳！\n\n", 'color': 'blue'}])
                     if logger_obj.should_log_details():
-                        logger.info("[DEBUG] 效果不佳")
+                        logger.debug("[DEBUG] 效果不佳")
 
         # 3. 应用特效 (Meta Effects)
         # 包括：异常状态、能力变化、回复、吸血、反伤、一击必杀
@@ -686,18 +686,18 @@ class BattleLogic:
         if logger_obj.should_log_details():
             # 只有在outcome存在时才记录特效数量
             if 'outcome' in locals() and outcome is not None:
-                logger.info(f"[DEBUG] 开始应用特效: {len(outcome.meta_effects)} 个效果")
+                logger.debug(f"[DEBUG] 开始应用特效: {len(outcome.meta_effects)} 个效果")
             elif move.min_hits > 1 or move.max_hits > 1:
                 # 对于连续攻击，我们用first_outcome来记录特效
                 # 安全地检查first_outcome是否存在并应用特效
                 if 'first_outcome' in locals() and first_outcome is not None:
-                    logger.info(f"[DEBUG] 开始应用特效: {len(first_outcome.meta_effects)} 个效果")
+                    logger.debug(f"[DEBUG] 开始应用特效: {len(first_outcome.meta_effects)} 个效果")
                     self._log_meta_effects(attacker, defender, first_outcome.meta_effects, logger_obj)
                     self._apply_meta_effect_changes(attacker, defender, first_outcome.meta_effects)
                 else:
-                    logger.info("[DEBUG] 开始应用特效: 0 个效果")
+                    logger.debug("[DEBUG] 开始应用特效: 0 个效果")
             else:
-                logger.info("[DEBUG] 开始应用特效: 0 个效果")
+                logger.debug("[DEBUG] 开始应用特效: 0 个效果")
 
         # 只在非连续攻击技能或连续攻击的第一次命中时应用特效
         # 连续攻击技能通常只有第一次攻击能触发异常状态
@@ -715,20 +715,20 @@ class BattleLogic:
             # 记录属性变化 - 只在outcome存在时检查
             if 'outcome' in locals() and outcome is not None:
                 if any(e.get('type') == 'stat_change' for e in outcome.meta_effects):
-                    logger.info(f"[DEBUG] 应用属性变化后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
+                    logger.debug(f"[DEBUG] 应用属性变化后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
             elif 'first_outcome' in locals() and first_outcome is not None:
                 if any(e.get('type') == 'stat_change' for e in first_outcome.meta_effects):
-                    logger.info(f"[DEBUG] 应用属性变化后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
+                    logger.debug(f"[DEBUG] 应用属性变化后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
 
         # 4. 应用额外属性变化 (Residual Stat Changes)
         # 处理那些虽然是攻击技能，但带有额外属性变化的情况
         # 连续攻击技能通常只有第一次攻击能触发额外属性变化
         if move.move_id > 0 and move.stat_changes and move.meta_category_id not in [2, 6, 7]:
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 应用额外属性变化 - 技能 {move.move_name} 的 stat_changes: {move.stat_changes}")
+                logger.debug(f"[DEBUG] 应用额外属性变化 - 技能 {move.move_name} 的 stat_changes: {move.stat_changes}")
             self._apply_residual_stat_changes(attacker, defender, move, logger_obj)
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 额外属性变化应用后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
+                logger.debug(f"[DEBUG] 额外属性变化应用后 - 攻击方属性等级: {attacker.stat_levels}, 防御方属性等级: {defender.stat_levels}")
 
         # G. 特殊逻辑处理
 
@@ -739,7 +739,7 @@ class BattleLogic:
             attacker.current_hp -= recoil
             logger_obj.log(f"{attacker.context.pokemon.name} 因挣扎受到 {recoil} 点反作用伤害！\n\n")
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 挣扎反伤: HP从 {old_hp} 变为 {attacker.current_hp} (减少 {recoil} 点)")
+                logger.debug(f"[DEBUG] 挣扎反伤: HP从 {old_hp} 变为 {attacker.current_hp} (减少 {recoil} 点)")
 
         # 2. 自爆逻辑
         if move.move_id == self.SELF_DESTRUCT_ID:
@@ -747,17 +747,17 @@ class BattleLogic:
             attacker.current_hp = 0
             logger_obj.log(f"{attacker.context.pokemon.name} 发生了爆炸，因此倒下了！\n\n")
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 自爆逻辑: HP从 {old_hp} 变为 {attacker.current_hp} (减少 {old_hp} 点)")
+                logger.debug(f"[DEBUG] 自爆逻辑: HP从 {old_hp} 变为 {attacker.current_hp} (减少 {old_hp} 点)")
 
         # H. 胜负判定
         if attacker.current_hp <= 0:
             if logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 攻击方 {attacker.context.pokemon.name} HP归零，战斗结束")
+                logger.debug(f"[DEBUG] 攻击方 {attacker.context.pokemon.name} HP归零，战斗结束")
             # logger_obj.log(f"{attacker.context.pokemon.name} 倒下了！\n\n") # 交给外部或最后统一显示
             return True
         if defender.current_hp <= 0:
             if logger_obj and logger_obj.should_log_details():
-                logger.info(f"[DEBUG] 防御方 {defender.context.pokemon.name} HP归零")
+                logger.debug(f"[DEBUG] 防御方 {defender.context.pokemon.name} HP归零")
             
             # 1. 触发防御方的 on_faint (处理气势披带等 - 暂未实现具体逻辑，仅触发)
             defender.hooks.trigger_event("on_faint", defender, attacker, logger_obj)
@@ -771,7 +771,7 @@ class BattleLogic:
             return True
 
         if logger_obj.should_log_details():
-            logger.info(f"[DEBUG] 回合结束，攻击方HP: {attacker.current_hp}, 防御方HP: {defender.current_hp}")
+            logger.debug(f"[DEBUG] 回合结束，攻击方HP: {attacker.current_hp}, 防御方HP: {defender.current_hp}")
 
         return False
 
@@ -1103,7 +1103,7 @@ class BattleLogic:
                 attacker.current_pps[idx] -= 1
                 # 添加调试日志
                 # if hasattr(logger, 'info'):
-                #     logger.info(f"[DEBUG] PP消耗: {attacker.context.pokemon.name}的{move.move_name} PP从 {old_pp} 变为 {attacker.current_pps[idx]}")
+                #     logger.debug(f"[DEBUG] PP消耗: {attacker.context.pokemon.name}的{move.move_name} PP从 {old_pp} 变为 {attacker.current_pps[idx]}")
         except ValueError:
             pass
 
@@ -1121,7 +1121,7 @@ class BattleLogic:
                 # 添加调试日志
                 if hasattr(attacker, 'context') and hasattr(attacker.context.pokemon, 'name'):
                     if attacker.context.pokemon.name:  # 确保name存在
-                        logger.info(f"[DEBUG] HP回复: {attacker.context.pokemon.name} HP从 {old_hp} 变为 {attacker.current_hp} (回复 {amt} 点)")
+                        logger.debug(f"[DEBUG] HP回复: {attacker.context.pokemon.name} HP从 {old_hp} 变为 {attacker.current_hp} (回复 {amt} 点)")
 
             elif etype == "damage":
                 amt = eff.get("amount", 0)
@@ -1131,7 +1131,7 @@ class BattleLogic:
                 # 添加调试日志
                 if hasattr(attacker, 'context') and hasattr(attacker.context.pokemon, 'name'):
                     if attacker.context.pokemon.name:  # 确保name存在
-                        logger.info(f"[DEBUG] HP损伤: {attacker.context.pokemon.name} HP从 {old_hp} 变为 {attacker.current_hp} (减少 {amt} 点)")
+                        logger.debug(f"[DEBUG] HP损伤: {attacker.context.pokemon.name} HP从 {old_hp} 变为 {attacker.current_hp} (减少 {amt} 点)")
 
             elif etype == "stat_change":
                 # 从 effect 中获取目标对象和新等级
@@ -1146,7 +1146,7 @@ class BattleLogic:
                     # if hasattr(target, 'context') and hasattr(target.context.pokemon, 'name'):
                     #     if target.context.pokemon.name:  # 确保name存在
                     #         stat_name = self.STAT_NAMES.get(sid, f"未知属性({sid})")
-                    #         logger.info(f"[DEBUG] 属性变化: {target.context.pokemon.name}的{stat_name}等级从 {old_level} 变为 {new_val}")
+                    #         logger.debug(f"[DEBUG] 属性变化: {target.context.pokemon.name}的{stat_name}等级从 {old_level} 变为 {new_val}")
 
             # --- 新增：处理状态附加 ---
             elif etype == "ailment":
@@ -1210,7 +1210,7 @@ class BattleLogic:
 
                 # 添加调试日志
                 if logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] 属性变化: {t_name}的{eff['stat_name']}等级从 {eff['target_obj'].stat_levels.get(eff['stat_id'], 0)} 变为 {eff['new_stage']} (变化量: {eff['change']})")
+                    logger.debug(f"[DEBUG] 属性变化: {t_name}的{eff['stat_name']}等级从 {eff['target_obj'].stat_levels.get(eff['stat_id'], 0)} 变为 {eff['new_stage']} (变化量: {eff['change']})")
             elif etype == "heal":
                 if eff.get("from_drain"):
                     logger_obj.log(f"{attacker.context.pokemon.name}通过攻击吸收了{eff['amount']}点HP！\n\n")
@@ -1611,8 +1611,8 @@ class BattleLogic:
             if max_other_damage >= defender_hp:
                 score = -100.0  # 绝对不选，直接打死
                 if logger_obj and hasattr(logger_obj, 'should_log_details') and logger_obj.should_log_details():
-                    logger.info(f"[DEBUG] {move.move_name} 被惩罚: 能直接斩杀时不使用变化技")
-                    logger.info(f"[DEBUG] 最大其他技能伤害: {max_other_damage}, 对手HP: {defender_hp}")
+                    logger.debug(f"[DEBUG] {move.move_name} 被惩罚: 能直接斩杀时不使用变化技")
+                    logger.debug(f"[DEBUG] 最大其他技能伤害: {max_other_damage}, 对手HP: {defender_hp}")
 
             # 3.2 自身状态检查：如果我快死了 (HP < 40%)，别强化了，赶紧输出
             attacker_hp_ratio = attacker_state.current_hp / attacker_state.context.pokemon.stats.hp

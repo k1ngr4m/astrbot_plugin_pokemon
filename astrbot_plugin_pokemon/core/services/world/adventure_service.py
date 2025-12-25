@@ -241,7 +241,7 @@ class AdventureService:
         """
         possible_items = self.pokemon_repo.get_pokemon_items_by_pokemon_id(species_id)
         if not possible_items:
-            logger.info(f"[DEBUG] 野生宝可梦 {species_id} 没有可携带物品")
+            logger.debug(f"[DEBUG] 野生宝可梦 {species_id} 没有可携带物品")
             return 0
             
         # 按照稀有度排序 (rarity越小越稀有? CSV showing 5, 50, 100. Assume rarity is % chance or weight)
@@ -267,9 +267,9 @@ class AdventureService:
         
         for item_data in possible_items:
             rarity = item_data['rarity']
-            logger.info(f"[DEBUG] 检查物品 {item_data['item_id']} (稀有度 {rarity})")
+            logger.debug(f"[DEBUG] 检查物品 {item_data['item_id']} (稀有度 {rarity})")
             if random.randint(1, 100) <= rarity:
-                logger.info(f"[DEBUG] 物品 {item_data['item_id']} 被选中")
+                logger.debug(f"[DEBUG] 物品 {item_data['item_id']} 被选中")
                 return item_data['item_id']
                 
         return 0
@@ -542,7 +542,7 @@ class AdventureService:
                 log_data=battle_log,
                 result=battle_result_str
             )
-        logger.info(f"战斗日志ID: {log_id}")
+        logger.debug(f"[DEBUG] 战斗日志ID: {log_id}")
         exp_details = self._handle_battle_experience(user_id, battle_result_str, wild_pokemon_info, battle_log)
         self._update_encounter_log(user_id, wild_pokemon_info.id, battle_result_str)
 
@@ -579,7 +579,7 @@ class AdventureService:
                         random_item = random.choice(core_items)
                     else:
                         # 如果没有符合条件的物品，则不掉落
-                        logger.info(f"[DEBUG] 没有找到符合条件的掉落物品")
+                        logger.debug(f"[DEBUG] 没有找到符合条件的掉落物品")
                         random_item = None
 
                     if random_item:
@@ -588,11 +588,11 @@ class AdventureService:
                         dropped_items.append(random_item)
                         # 如果name_zh为None或空，则使用name_en作为兜底
                         item_name = random_item.get('name_zh') or random_item.get('name_en') or f"Item {random_item['id']}"
-                        logger.info(f"[DEBUG] User {user_id} got dropped item: [{random_item['id']}] {item_name}")
+                        logger.debug(f"[DEBUG] User {user_id} got dropped item: [{random_item['id']}] {item_name}")
                     else:
-                        logger.info(f"[DEBUG] 未掉落物品，没有找到符合条件的物品")
+                        logger.debug(f"[DEBUG] 未掉落物品，没有找到符合条件的物品")
             else:
-                logger.info(f"[DEBUG] 未掉落物品，概率未触发")
+                logger.debug(f"[DEBUG] 未掉落物品，概率未触发")
 
         # 获取最终用户宝可梦信息
         final_user_info = None
@@ -724,7 +724,7 @@ class AdventureService:
                         min_hits=min_hits,
                         max_hits=max_hits
                     ))
-        logger.info(f"[DEBUG] 招式详情：{loaded_moves}")
+        logger.debug(f"[DEBUG] 招式详情：{loaded_moves}")
 
         return loaded_moves
 
@@ -751,7 +751,7 @@ class AdventureService:
         turn = 0
         max_turns = 50
         winner = None
-        logger.info(f"[DEBUG] =====================执行实战，生成详细日志=====================")
+        logger.debug(f"[DEBUG] =====================执行实战，生成详细日志=====================")
         
         while user_state.current_hp > 0 and wild_state.current_hp > 0 and turn < max_turns:
             turn += 1
@@ -774,7 +774,7 @@ class AdventureService:
         else:
             result = "win" if winner == "user" else "fail"
         
-        logger.info("[DEBUG] =====================实战结束=====================")
+        logger.debug("[DEBUG] =====================实战结束=====================")
 
         # 使用 commit 模式同步状态变化到上下文，确保数据一致性
         user_state.commit_to_context()
@@ -791,7 +791,7 @@ class AdventureService:
 
         # 添加开始时间日志
         start_time = time.time()
-        logger.info(f"[DEBUG]开始进行 {simulations} 次对战模拟...")
+        logger.debug(f"[DEBUG]开始进行 {simulations} 次对战模拟...")
 
         user_wins = 0
         logger_obj = NoOpBattleLogger()
@@ -816,7 +816,7 @@ class AdventureService:
         # 添加结束时间日志
         end_time = time.time()
         elapsed_time = end_time - start_time
-        logger.info(f"[DEBUG]完成 {simulations} 次对战模拟，耗时 {elapsed_time:.3f} 秒")
+        logger.debug(f"[DEBUG]完成 {simulations} 次对战模拟，耗时 {elapsed_time:.3f} 秒")
 
         return round(win_rate, 1), round(100 - win_rate, 1)
 
