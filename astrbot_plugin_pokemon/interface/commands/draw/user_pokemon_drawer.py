@@ -14,7 +14,7 @@ from .gradient_utils import create_vertical_gradient
 LIST_CONFIG = {
     "width": 800,
     "padding": 30,
-    "card_h": 125, # Increased height to fit Nature/Ability
+    "card_h": 180, # Increased height to fit 6 IV indicators (was 125)
     "cols": 2,
     "col_gap": 20,
     "row_gap": 15,
@@ -268,9 +268,17 @@ class UserPokemonDetailDrawer(BaseDrawer):
         
         # Name
         draw.text((ix, iy), p.get('name', ''), fill=COLOR_TITLE, font=self.fonts["title"])
-        
+
+        # Species Name (显示物种名称，紧接在昵称下方)
+        species_name = p.get('species_name', '')
+        if species_name:
+            species_y = iy + 35  # 紧接在昵称下方
+            draw.text((ix, species_y), f"({species_name})", fill=COLOR_TEXT_GRAY, font=self.fonts["normal"])
+            ty = species_y + 35  # 更新类型标签的Y坐标
+        else:
+            ty = iy + 45  # 没有物种名称时的原始坐标
+
         # 独立一行的属性展示
-        ty = iy + 45
         tx = ix
         for t in p.get('types', []):
             tw = self._draw_type_badge(draw, tx, ty, t)
@@ -305,7 +313,7 @@ class UserPokemonDetailDrawer(BaseDrawer):
         
         # 2. Stats Table (IV/EV)
         table_y = line_y + 30
-        draw.text((pad, table_y), "能力详情 (能力值 | 个体值 IV | 努力值 EV)", fill=COLOR_TITLE, font=self.fonts["card_title"])
+        draw.text((pad, table_y), "能力详情", fill=COLOR_TITLE, font=self.fonts["card_title"])
         
         # Headers
         headers = ["属性", "能力值", "IV (个体值)", "EV (努力值)"]

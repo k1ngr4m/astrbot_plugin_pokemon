@@ -675,3 +675,53 @@ class UserPokemonService:
                 success=False,
                 message=f"移除持有物失败: {str(e)}"
             )
+
+    def update_pokemon_nickname(self, user_id: str, pokemon_id: int, nickname: str) -> BaseResult:
+        """
+        更新宝可梦昵称
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+            nickname: 新昵称
+        Returns:
+            BaseResult
+        """
+        # 1. 检查宝可梦是否存在
+        pokemon_result = self.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_result.success:
+            return pokemon_result
+
+        # 2. 检查昵称是否符合要求
+        if not nickname or len(nickname.strip()) == 0:
+            return BaseResult(
+                success=False,
+                message="昵称不能为空"
+            )
+
+        # 3. 检查昵称长度
+        if len(nickname) > 8:  # 限制昵称长度为8个字
+            return BaseResult(
+                success=False,
+                message="昵称长度不能超过8个字"
+            )
+
+        pokemon_info = pokemon_result.data
+
+        # 4. 更新昵称
+        try:
+            self.user_pokemon_repo.update_user_pokemon_nickname(user_id, pokemon_id, nickname)
+
+            return BaseResult(
+                success=True,
+                message=f"成功将宝可梦的昵称更新为：{nickname}",
+                data={
+                    "pokemon_id": pokemon_id,
+                    "original_name": pokemon_info.name,
+                    "new_nickname": nickname
+                }
+            )
+        except Exception as e:
+            return BaseResult(
+                success=False,
+                message=f"更新昵称失败: {str(e)}"
+            )

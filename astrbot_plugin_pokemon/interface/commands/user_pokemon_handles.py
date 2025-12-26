@@ -159,6 +159,10 @@ class UserPokemonHandlers:
         p: UserPokemonInfo = res.data
         info = self._get_pokemon_basic_info(p)
 
+        # 获取物种名称
+        species_info = self.pokemon_service.get_pokemon_by_id(p.species_id)
+        species_name = species_info.name_zh if species_info else "未知"
+
         # 招式数据
         moves_data = []
         for i in range(1, 5):
@@ -200,6 +204,7 @@ class UserPokemonHandlers:
              "id": p.id,
              "sprite_id": p.species_id,
              "name": p.name,
+             "species_name": species_name,  # 添加物种名称
              "level": p.level,
              "gender": info['gender'],
              "nature": info['nature'],
@@ -515,5 +520,35 @@ class UserPokemonHandlers:
 
         # 调用服务层卸下持有物
         result = self.user_pokemon_service.remove_pokemon_held_item(user_id, pokemon_id)
+
+        yield event.plain_result(result.message)
+
+    async def change_nickname(self, event: AstrMessageEvent):
+        """修改宝可梦昵称命令处理器"""
+        user_id = userid_to_base32(event.get_sender_id())
+
+        # 1. 权限/注册检查
+        reg_check = self.user_service.check_user_registered(user_id)
+        if not reg_check.success:
+            yield event.plain_result(reg_check.message)
+            return
+
+        # 解析参数
+        args = event.message_str.split()
+        if len(args) < 3:
+            yield event.plain_result("❌ 请指定宝可梦ID和新昵称，格式：/修改昵称 [宝可梦ID] [新昵称]")
+            return
+
+        try:
+            pokemon_id = int(args[1])
+        except ValueError:
+            yield event.plain_result("❌ 宝可梦ID必须是数字")
+            return
+
+        # 获取昵称(可能包含空格，所以从第三个参数开始拼接)
+        new_nickname = " ".join(args[2:])
+
+        # 调用服务层修改昵称
+        result = self.user_pokemon_service.update_pokemon_nickname(user_id, pokemon_id, new_nickname)
 
         yield event.plain_result(result.message)

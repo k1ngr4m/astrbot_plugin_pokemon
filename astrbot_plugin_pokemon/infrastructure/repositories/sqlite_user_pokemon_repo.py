@@ -300,6 +300,10 @@ class SqliteUserPokemonRepository(AbstractUserPokemonRepository):
         """更新用户宝可梦的持有物"""
         self._update_user_pokemon_fields(user_id, pokemon_id, held_item_id=held_item_id)
 
+    def update_user_pokemon_nickname(self, user_id: str, pokemon_id: int, nickname: str) -> None:
+        """更新用户宝可梦的昵称"""
+        self._update_user_pokemon_fields(user_id, pokemon_id, nickname=nickname)
+
     # =========查=========
     def get_user_pokemon(self, user_id: str) -> List[UserPokemonInfo]:
         sql = """

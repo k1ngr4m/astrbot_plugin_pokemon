@@ -61,11 +61,12 @@ class EvolutionService:
             # 6. 记录原始物种ID到图鉴历史，确保在图鉴中保持"已捕获"状态
             self.user_pokemon_repo.record_pokedex_capture(user_id, current_pokemon.species_id)
 
-            # 7. 写入数据库
+            # 7. 写入数据库 - 保留用户设置的昵称
             self.user_pokemon_repo._update_user_pokemon_fields(
                 user_id, pokemon_id,
                 species_id=evolved_species.id,
-                nickname=evolved_species.name_zh,
+                # 保留用户设置的昵称，而不是替换为新物种的名称
+                nickname=current_pokemon.name,
                 hp=new_stats.hp,
                 attack=new_stats.attack,
                 defense=new_stats.defense,

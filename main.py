@@ -249,6 +249,12 @@ class PokemonPlugin(Star):
         async for r in self.user_pokemon_handlers.unequip_held_item(event):
             yield r
 
+    @filter.command("修改宝可梦昵称")
+    async def change_nickname(self, event: AstrMessageEvent):
+        """修改宝可梦的昵称。用法：/修改宝可梦昵称 [宝可梦ID] [新昵称]"""
+        async for r in self.user_pokemon_handlers.change_nickname(event):
+            yield r
+
     # ==========冒险系统==========
     @filter.command("设置队伍")
     async def set_team(self, event: AstrMessageEvent):
