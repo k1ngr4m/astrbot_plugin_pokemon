@@ -536,7 +536,7 @@ class UserPokemonHandlers:
         # 解析参数
         args = event.message_str.split()
         if len(args) < 3:
-            yield event.plain_result("❌ 请指定宝可梦ID和新昵称，格式：/修改昵称 [宝可梦ID] [新昵称]")
+            yield event.plain_result("❌ 请指定宝可梦ID和新昵称，格式：/修改宝可梦昵称 [宝可梦ID] [新昵称]")
             return
 
         try:
