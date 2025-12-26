@@ -778,9 +778,17 @@ class UserPokemonService:
                     if move_info:
                         level_up_move_names.append(f"{move_info['name_zh']} (等级 {move_data['level']})")
 
+        # 获取持有物名称
+        held_item_name = "无"
+        if pokemon_info.held_item_id and pokemon_info.held_item_id > 0:
+            item_info = self.item_repo.get_item_by_id(pokemon_info.held_item_id)
+            if item_info:
+                held_item_name = item_info.get('name', '未知道具')
+
         info_str = (
             f"宝可梦昵称: {nickname}\n 宝可梦物种名称: {species_name}\n 等级: {pokemon_info.level}\n 基础统计值: {stats}\n IV值: {ivs}\n EV值: {evs}\n"
             f"当前已学会招式: {learned_move_names}\n 可通过升级学习的招式: {level_up_move_names}\n"
+            f"持有物: {held_item_name}\n"
         )
 
         return BaseResult(
