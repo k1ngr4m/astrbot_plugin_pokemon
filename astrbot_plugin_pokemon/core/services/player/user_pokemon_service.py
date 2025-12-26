@@ -585,6 +585,7 @@ class UserPokemonService:
         Returns:
             BaseResult
         """
+        from ..battle.battle_config import battle_config
         # 1. 检查宝可梦是否存在
         pokemon_result = self.get_user_pokemon_by_id(user_id, pokemon_id)
         if not pokemon_result.success:
@@ -600,11 +601,19 @@ class UserPokemonService:
                 message="您没有持有该道具"
             )
 
-        # 3. 检查道具是否属于持有物类别 (category_id = 12)
-        if item_result.category_id != 12:
+        # 3. 检查道具是否属于允许的背包类别 (pocket_id为1, 2, 5, 7)
+        # 从配置获取物品类别信息
+        item_category_info = battle_config.get_item_category_info()
+        # 创建category_id到pocket_id的映射
+        category_to_pocket = {cat['id']: cat['pocket_id'] for cat in item_category_info}
+
+        item_pocket_id = category_to_pocket.get(item_result.category_id)
+
+        # 检查pocket_id是否为1, 2, 5或7
+        if item_pocket_id not in [1, 2, 5, 7]:
             return BaseResult(
                 success=False,
-                message="该道具不能作为持有物装备，请使用类别为'持有物'的道具"
+                message="该道具不能作为持有物装备，请使用'道具'、'回复道具'、'树果'或'战斗道具'类别的道具"
             )
 
         # 4. 更新宝可梦的持有物

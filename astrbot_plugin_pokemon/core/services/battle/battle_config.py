@@ -45,9 +45,9 @@ class BattleConfigLoader:
         """获取目标ID映射"""
         return self.config.get("target_id_mapping", {})
 
-    def get_item_category_names(self) -> Dict[str, str]:
-        """获取物品类别名称映射"""
-        return self.config.get("item_category_names", {})
+    def get_item_category_info(self) -> List[Dict[str, Any]]:
+        """获取物品类别信息，包含类别名称和pocket_id"""
+        return self.config.get("item_categories", [])
 
     def get_mold_breaker_ignorable_ids(self) -> List[int]:
         """获取破格特性可无视的特性ID列表"""
@@ -60,6 +60,14 @@ class BattleConfigLoader:
     def get_stat_map(self) -> Dict[str, str]:
         """获取属性映射"""
         return self.config.get("STAT_MAP", {})
+
+    def get_pocket_id_mapping(self) -> List[Dict[str, Any]]:
+        """获取背包ID映射"""
+        return self.config.get("pocket_id_mapping", [])
+
+    def get_item_categories(self) -> List[Dict[str, Any]]:
+        """获取物品类别映射（包含pocket_id信息）"""
+        return self.config.get("item_categories", [])
 
 
 # 初始化全局配置

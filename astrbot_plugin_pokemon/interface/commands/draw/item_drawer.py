@@ -149,9 +149,14 @@ class UserItemDrawer(ItemDrawer):
         draw.text((ix, iy), name, fill=COLOR_TEXT_DARK, font=self.fonts["card_title"])
 
         # 2. 物品类别徽章 (下移)
+        # 优先显示pocket_name（背包名称），如果不存在则显示category_name
+        pocket_name = item.get('pocket_name', '')
         category_name = item.get('category_name', f'类别{item.get("category_id", 0)}')
+
+        # 显示pocket_name（背包名称）作为主要分类
+        display_name = pocket_name if pocket_name else category_name
         ty = iy + 25
-        self._draw_item_category_badge(draw, ix, ty, category_name)
+        self._draw_item_category_badge(draw, ix, ty, display_name)
 
         # 3. 数量 (右下角)
         quantity = item.get('quantity', 0)

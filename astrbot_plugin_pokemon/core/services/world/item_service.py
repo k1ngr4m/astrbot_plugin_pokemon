@@ -48,26 +48,33 @@ class ItemService:
                 "total_count": 0
             }
 
-        # 按类型分组道具
-        items_by_type = {}
+        # 从配置获取物品类别映射（包含pocket_id信息）
+        item_categories = battle_config.get_item_categories()
+        # 创建category_id到pocket_id的映射
+        category_to_pocket = {int(cat['id']): cat['pocket_id'] for cat in item_categories}
+
+        # 按pocket_id分组道具
+        items_by_pocket = {}
         total_items = 0
 
         for item in user_items.items:
-            item_type = item.category_id
-            if item_type not in items_by_type:
-                items_by_type[item_type] = []
-            items_by_type[item_type].append(item)
+            category_id = item.category_id
+            pocket_id = category_to_pocket.get(category_id, 0)  # 默认为0
+            if pocket_id not in items_by_pocket:
+                items_by_pocket[pocket_id] = []
+            items_by_pocket[pocket_id].append(item)
             total_items += item.quantity
 
         # 扁平化物品列表用于分页
         all_items = []
-        for category_id, items in items_by_type.items():
+        for pocket_id, items in items_by_pocket.items():
             for item in items:
                 all_items.append({
                     "item_id": item.item_id,
                     "name_en": item.name_en,
                     "name": item.name_zh or item.name_en or f"Item {item.item_id}",
-                    "category_id": category_id,
+                    "category_id": item.category_id,  # 保留原始category_id
+                    "pocket_id": pocket_id,
                     "quantity": item.quantity,
                     "description": getattr(item, 'description', ''),
                     "price": getattr(item, 'price', 0)
@@ -89,7 +96,7 @@ class ItemService:
             "message": f"🎒 您的背包 (共{total_items}件物品)",
             "items": current_page_items,
             "all_items": all_items,  # 所有物品（未分页）
-            "items_by_type": items_by_type,
+            "items_by_type": items_by_pocket,  # 按pocket分组
             "total_count": total_items,
             "page": page,
             "total_pages": total_pages,
@@ -106,40 +113,47 @@ class ItemService:
         Returns:
             包含用户道具信息的字典，包含类别中文名称
         """
-        from ..battle.battle_config import battle_config
-        # 从配置文件加载物品类别名称映射
-        config_type_names = battle_config.get_item_category_names()
-        # 将字符串键转换为整数键以匹配category_id
-        type_names = {int(k): v for k, v in config_type_names.items()}
+        # 从配置文件加载物品类别信息
+        item_category_info = battle_config.get_item_category_info()
+        # 创建category_id到名称的映射
+        type_names = {int(cat['id']): cat['name'] for cat in item_category_info}
+
+        # 从配置获取背包ID映射
+        pocket_mapping = battle_config.get_pocket_id_mapping()
+        # 创建pocket_id到背包名称的映射
+        pocket_names = {int(pocket['id']): pocket['name'] for pocket in pocket_mapping}
 
         result = self.get_user_items(user_id, page, items_per_page)
         if result["success"]:
             # 为每件物品添加类别名称
             for item in result["items"]:
                 item["category_name"] = type_names.get(item["category_id"], f"类别{item['category_id']}")
+                item["pocket_name"] = pocket_names.get(item["pocket_id"], f"背包{item['pocket_id']}")
 
-            # 为items_by_type也添加类别名称
-            formatted_by_category = {}
-            for category_id, items in result["items_by_type"].items():
-                formatted_by_category[category_id] = []
-                category_name = type_names.get(category_id, f"类别{category_id}")
+            # 为items_by_type也添加类别名称（现在是按pocket_id分组）
+            formatted_by_pocket = {}
+            for pocket_id, items in result["items_by_type"].items():
+                formatted_by_pocket[pocket_id] = []
+                pocket_name = pocket_names.get(pocket_id, f"背包{pocket_id}")
                 for item in items:
                     # 从item_repo获取完整的物品信息，包括name_en
                     item_detail = self.item_repo.get_item_by_id(item.item_id) if self.item_repo else None
                     item_name_en = item_detail['name_en']
                     item_name_zh = item_detail['name_zh'] if item_detail['name_zh'] != "None" else item_detail['name_en']
 
-                    formatted_by_category[category_id].append({
+                    formatted_by_pocket[pocket_id].append({
                         "item_id": item.item_id,
                         "name": item_name_zh or item_name_en or f"Item {item.item_id}",
                         "name_en": item_name_en,
-                        "category_id": category_id,
-                        "category_name": category_name,
+                        "category_id": item.category_id,
+                        "pocket_id": pocket_id,
+                        "category_name": type_names.get(item.category_id, f"类别{item.category_id}"),
+                        "pocket_name": pocket_name,
                         "quantity": item.quantity,
                         "description": getattr(item, 'description', ''),
                         "price": getattr(item, 'price', 0)
                     })
-            result["items_by_category"] = formatted_by_category
+            result["items_by_category"] = formatted_by_pocket
 
         return result
 
@@ -161,14 +175,14 @@ class ItemService:
         formatted_text = f"✅ {items_result['message']}\n\n"
 
         items_by_type = items_result["items_by_type"]
-        # 从配置文件加载物品类别名称映射
-        config_type_names = battle_config.get_item_category_names()
-        # 将字符串键转换为整数键以匹配category_id
-        type_names = {int(k): v for k, v in config_type_names.items()}
+        # 从配置获取背包ID映射
+        pocket_mapping = battle_config.get_pocket_id_mapping()
+        # 创建pocket_id到背包名称的映射
+        pocket_names = {int(pocket['id']): pocket['name'] for pocket in pocket_mapping}
 
-        for item_type, items in items_by_type.items():
-            type_name = type_names.get(item_type, item_type)
-            formatted_text += f"🔸 {type_name}:\n\n"
+        for pocket_id, items in items_by_type.items():
+            pocket_name = pocket_names.get(pocket_id, f"背包{pocket_id}")
+            formatted_text += f"🔸 {pocket_name}:\n\n"
 
             for item in items:
                 # 如果name_zh为None或空，则使用name_en作为兜底
