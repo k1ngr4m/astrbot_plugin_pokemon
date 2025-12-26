@@ -1,8 +1,6 @@
 import random
 from typing import Dict, Any, Optional
 
-from pokebase import pokemon_species
-
 from astrbot.api import logger
 
 from ...models.common_models import BaseResult
