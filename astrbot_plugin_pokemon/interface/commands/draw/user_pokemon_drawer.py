@@ -290,6 +290,7 @@ class UserPokemonDetailDrawer(BaseDrawer):
 
         rows = [
             f"性格: {p.get('nature')}   特性: {p.get('ability')}",
+            f"持有物: {p.get('held_item_name', '无')}",  # 持有物信息
             f"捕获时间: {p.get('caught_time', '未知')}"
         ]
         curr_y = info_y + 35

@@ -203,6 +203,16 @@ class UserPokemonHandlers:
                 "ev": p.evs[ev_key]
             })
 
+        # 获取持有物名称
+        held_item_name = "无"
+        if p.held_item_id and p.held_item_id > 0:
+            item_info = self.plugin.item_repo.get_item_by_id(p.held_item_id)
+            if item_info:
+                # 优先使用中文名，否则使用英文名
+                held_item_name = item_info.get('name_zh', item_info.get('name_en', f"道具{p.held_item_id}"))
+            else:
+                held_item_name = f"道具{p.held_item_id}"
+
         detail_data = {
              "id": p.id,
              "sprite_id": p.species_id,
@@ -216,7 +226,8 @@ class UserPokemonHandlers:
              "caught_time": p.caught_time, # str
              "types": info['types'].split('/') if info['types'] != "未知" else [],
              "stats_detail": stats_detail,
-             "moves": moves_data
+             "moves": moves_data,
+             "held_item_name": held_item_name  # 添加持有物名称
         }
         
         img = draw_user_pokemon_detail(detail_data)
