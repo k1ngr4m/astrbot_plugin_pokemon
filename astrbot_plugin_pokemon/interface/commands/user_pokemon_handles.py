@@ -1,6 +1,9 @@
+from click import prompt
+
 from astrbot.api.event import AstrMessageEvent
 from typing import TYPE_CHECKING, List
 
+from astrbot.core import logger
 from ...core.models.pokemon_models import UserPokemonInfo
 from ...core.models.user_models import User
 from ...interface.response.answer_enum import AnswerEnum
@@ -552,3 +555,118 @@ class UserPokemonHandlers:
         result = self.user_pokemon_service.update_pokemon_nickname(user_id, pokemon_id, new_nickname)
 
         yield event.plain_result(result.message)
+
+    async def pokemon_training_suggestion(self, event: AstrMessageEvent):
+        """通过pokemon_id查看宝可梦的培养建议"""
+        user_id = userid_to_base32(event.get_sender_id())
+        # 统一处理注册检查
+        check_res = self.user_service.check_user_registered(user_id)
+        if not check_res.success:
+            yield event.plain_result(check_res.message)
+            return
+
+        args = event.message_str.split()
+        if len(args) < 2:
+            yield event.plain_result("❌ 请提供有效的宝可梦ID，例如：/宝可梦培养建议 1")
+            return
+
+        pokemon_id = args[1].strip()
+        # 检查是否为数字
+        if not pokemon_id.isdigit():
+            yield event.plain_result("❌ 请提供有效的宝可梦ID，例如：/宝可梦培养建议 1")
+            return
+
+        # 查询宝可梦信息 (已包含招式信息)
+        pokemon_info = self.user_pokemon_service.get_user_pokemon_info_str_by_id(user_id, int(pokemon_id))
+        if not pokemon_info.success:
+            yield event.plain_result(f"❌ 找不到ID为 {pokemon_id} 的宝可梦！")
+            return
+
+        info_str = pokemon_info.data.get("info_str")
+
+        # 获取宝可梦的物种信息以构建更详细的培养建议
+        user_pokemon = self.user_pokemon_service.get_user_pokemon_by_id(user_id, int(pokemon_id))
+        if not user_pokemon.success:
+            yield event.plain_result(f"❌ 找不到ID为 {pokemon_id} 的宝可梦详细信息！")
+            return
+
+        user_pokemon_data = user_pokemon.data
+        species_info = self.pokemon_service.get_pokemon_by_id(user_pokemon_data.species_id)
+        if not species_info:
+            yield event.plain_result(f"❌ 找不到宝可梦物种信息！")
+            return
+
+        # 获取性格名称
+        nature_name = self.nature_service.get_nature_name_by_id(user_pokemon_data.nature_id)
+
+        # 获取特性名称
+        ability_name = "未知"
+        if user_pokemon_data.ability_id and user_pokemon_data.ability_id > 0:
+            ability_info = self.ability_service.get_ability_by_id(user_pokemon_data.ability_id)
+            if ability_info:
+                ability_name = ability_info.get('name_zh', ability_info.get('name_en', '未知'))
+
+        # 构建详细的培养建议提示
+        prompt_str = f"""
+请根据以下宝可梦信息提供详细的培养建议：
+
+{info_str}
+类型: {'/'.join(self.pokemon_service.get_pokemon_types(user_pokemon_data.species_id))}
+性格: {nature_name}
+特性: {ability_name}
+
+种族值:
+- HP: {species_info.base_stats.base_hp}
+- 攻击: {species_info.base_stats.base_attack}
+- 防御: {species_info.base_stats.base_defense}
+- 特攻: {species_info.base_stats.base_sp_attack}
+- 特防: {species_info.base_stats.base_sp_defense}
+- 速度: {species_info.base_stats.base_speed}
+
+个体值(IV):
+- HP: {user_pokemon_data.ivs.hp_iv}
+- 攻击: {user_pokemon_data.ivs.attack_iv}
+- 防御: {user_pokemon_data.ivs.defense_iv}
+- 特攻: {user_pokemon_data.ivs.sp_attack_iv}
+- 特防: {user_pokemon_data.ivs.sp_defense_iv}
+- 速度: {user_pokemon_data.ivs.speed_iv}
+
+努力值(EV):
+- HP: {user_pokemon_data.evs.hp_ev}
+- 攻击: {user_pokemon_data.evs.attack_ev}
+- 防御: {user_pokemon_data.evs.defense_ev}
+- 特攻: {user_pokemon_data.evs.sp_attack_ev}
+- 特防: {user_pokemon_data.evs.sp_defense_ev}
+- 速度: {user_pokemon_data.evs.speed_ev}
+
+请提供以下方面的培养建议：
+1. 推荐的性格偏向（基于当前性格分析）
+2. 推荐的特性搭配
+3. 推荐的招式配置（结合当前招式和可学习招式给出完整配置建议）
+4. 适合的对战定位
+5. 努力值分配建议（考虑当前EV分配）
+6. 培养目标建议
+请用中文提供详细且专业的培养建议。
+        """
+        logger.debug(f"user_pokemon_handles -> {prompt_str}")
+        umo = event.unified_msg_origin
+        provider_id = await self.plugin.context.get_current_chat_provider_id(umo=umo)
+        # logger.debug(f"provider_id -> {provider_id}")
+        loading_msg = f"正在为 {user_pokemon_data.name} 生成培养建议，请稍后..."
+        yield event.plain_result(loading_msg)
+
+        # 调用LLM获取培养建议
+        llm_resp = await self.plugin.context.llm_generate(
+            chat_provider_id=provider_id,
+            prompt=prompt_str,
+        )
+        # logger.debug(f"llm_resp -> {llm_resp}")
+
+        # 发送LLM返回的培养建议
+        if llm_resp and llm_resp.completion_text:
+            result_msg = f"🌟 {user_pokemon_data.name} 培养建议：\n\n{llm_resp.completion_text}"
+        else:
+            result_msg = f"❌ 未能生成 {user_pokemon_data.name} 的培养建议，请稍后重试。"
+
+        yield event.plain_result(result_msg)
+

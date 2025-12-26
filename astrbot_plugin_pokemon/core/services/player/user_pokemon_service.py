@@ -1,12 +1,14 @@
 import random
 from typing import Dict, Any, Optional
 
+from pokebase import pokemon_species
+
 from astrbot.api import logger
 
 from ...models.common_models import BaseResult
 from ....infrastructure.repositories.abstract_repository import (
     AbstractUserRepository, AbstractPokemonRepository, AbstractItemRepository, AbstractUserPokemonRepository,
-    AbstractPokemonAbilityRepository, AbstractUserItemRepository,
+    AbstractPokemonAbilityRepository, AbstractUserItemRepository, AbstractMoveRepository,
 )
 
 from ....utils.utils import get_today, userid_to_base32
@@ -24,6 +26,7 @@ class UserPokemonService:
             user_pokemon_repo: AbstractUserPokemonRepository,
             pokemon_ability_repo: AbstractPokemonAbilityRepository,
             user_item_repo: AbstractUserItemRepository,
+            move_repo: AbstractMoveRepository,
             config: Dict[str, Any]
     ):
         self.user_repo = user_repo
@@ -32,6 +35,7 @@ class UserPokemonService:
         self.user_pokemon_repo = user_pokemon_repo
         self.pokemon_ability_repo = pokemon_ability_repo
         self.user_item_repo = user_item_repo
+        self.move_repo = move_repo
         self.config = config
 
     def _assign_random_ability(self, species_id: int) -> int:
@@ -725,3 +729,66 @@ class UserPokemonService:
                 success=False,
                 message=f"更新昵称失败: {str(e)}"
             )
+
+    def get_user_pokemon_info_str_by_id(self, user_id: str, pokemon_id: int) -> BaseResult:
+        """
+        获取用户宝可梦信息字符串
+        Args:
+            user_id: 用户ID
+            pokemon_id: 宝可梦ID
+        Returns:
+            BaseResult
+        """
+        # 1. 检查宝可梦是否存在
+        pokemon_result = self.get_user_pokemon_by_id(user_id, pokemon_id)
+        if not pokemon_result.success:
+            return pokemon_result
+
+        pokemon_info = pokemon_result.data
+        nickname = pokemon_info.name
+        species_name = self.pokemon_repo.get_pokemon_by_id(pokemon_info.species_id).name_zh
+        can_learn_moves = self.move_repo.get_pokemon_moves_by_species_id(pokemon_info.species_id)
+        can_learn_move_ids = []
+        for move in can_learn_moves:
+            if move.get('move_method_id') == 1:
+                can_learn_move_ids.append(move.get('move_id'))
+        can_learn_move_names = [self.move_repo.get_move_by_id(move_id).get('name_zh', '未知招式') for move_id in can_learn_move_ids]
+        stats = pokemon_info.stats
+        ivs = pokemon_info.ivs
+        evs = pokemon_info.evs
+        # 从PokemonMoves对象中提取实际的技能ID
+        learned_move_ids = [
+            pokemon_info.moves.move1_id,
+            pokemon_info.moves.move2_id,
+            pokemon_info.moves.move3_id,
+            pokemon_info.moves.move4_id
+        ]
+        # 过滤掉无效的技能ID（0表示未学习）
+        valid_move_ids = [move_id for move_id in learned_move_ids if move_id and move_id > 0]
+        learned_move_names = [self.move_repo.get_move_by_id(move_id).get('name_zh', '未知招式') for move_id in valid_move_ids]
+
+        # 获取可通过升级学习的招式 (获取详细信息，包括级别)
+        all_learnable_moves = self.move_repo.get_pokemon_moves_by_species_id(pokemon_info.species_id)
+        level_up_move_names = []
+        for move_data in all_learnable_moves:
+            # 检查是否为升级招式 (move_method_id == 1) 和是否超过当前等级
+            if move_data.get('move_method_id') == 1 and move_data.get('level', 0) > pokemon_info.level:
+                move_id = move_data.get('move_id')
+                # 检查是否已经学会这个招式
+                if move_id and move_id not in valid_move_ids:
+                    move_info = self.move_repo.get_move_by_id(move_id)
+                    if move_info:
+                        level_up_move_names.append(f"{move_info['name_zh']} (等级 {move_data['level']})")
+
+        info_str = (
+            f"宝可梦昵称: {nickname}\n 宝可梦物种名称: {species_name}\n 等级: {pokemon_info.level}\n 基础统计值: {stats}\n IV值: {ivs}\n EV值: {evs}\n"
+            f"当前已学会招式: {learned_move_names}\n 可通过升级学习的招式: {level_up_move_names}\n"
+        )
+
+        return BaseResult(
+            success=True,
+            message="成功获取宝可梦信息",
+            data={
+                "info_str": info_str
+            }
+        )

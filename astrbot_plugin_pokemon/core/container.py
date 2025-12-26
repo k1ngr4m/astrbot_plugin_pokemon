@@ -89,6 +89,7 @@ class GameContainer:
             item_repo=self.item_repo,
             pokemon_ability_repo=self.pokemon_ability_repo,
             user_item_repo=self.user_item_repo,
+            move_repo=self.move_repo,
             config=self.config
         )
         self.user_item_service = UserItemService(

@@ -53,6 +53,14 @@ class BattleConfigLoader:
         """获取破格特性可无视的特性ID列表"""
         return self.config.get("mold_breaker_ignorable_ids", [])
 
+    def get_damage_class_map(self) -> Dict[str, str]:
+        """获取伤害类别映射"""
+        return self.config.get("DAMAGE_CLASS_MAP", {})
+
+    def get_stat_map(self) -> Dict[str, str]:
+        """获取属性映射"""
+        return self.config.get("STAT_MAP", {})
+
 
 # 初始化全局配置
 battle_config = BattleConfigLoader()

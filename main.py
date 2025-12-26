@@ -255,6 +255,12 @@ class PokemonPlugin(Star):
         async for r in self.user_pokemon_handlers.change_nickname(event):
             yield r
 
+    @filter.command("宝可梦培养建议")
+    async def pokemon_evolve_suggestion(self, event: AstrMessageEvent):
+        """查看宝可梦的培养建议"""
+        async for r in self.user_pokemon_handlers.pokemon_training_suggestion(event):
+            yield r
+
     # ==========冒险系统==========
     @filter.command("设置队伍")
     async def set_team(self, event: AstrMessageEvent):

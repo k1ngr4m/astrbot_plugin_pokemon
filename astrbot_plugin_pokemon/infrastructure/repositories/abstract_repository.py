@@ -334,6 +334,9 @@ class AbstractUserPokemonRepository(ABC):
 
     @abstractmethod
     def update_user_pokemon_held_item(self, user_id: str, pokemon_id: int, item_id: int) -> None: pass
+
+    @abstractmethod
+    def update_user_pokemon_nickname(self, user_id: str, pokemon_id: int, nickname: str) -> None: pass
     # ==========查==========
     # 获取用户所有宝可梦
     @abstractmethod

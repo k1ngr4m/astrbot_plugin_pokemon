@@ -300,7 +300,6 @@ class PokemonService:
 
             return "\n\n".join(lines)
 
-
     # ==========直接返回repo层==========
     def get_pokemon_by_id(self, pokemon_id: int) -> Optional[PokemonSpecies]:
         """

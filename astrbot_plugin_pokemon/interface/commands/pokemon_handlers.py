@@ -15,12 +15,9 @@ import io
 import uuid
 from typing import Dict, Any, Optional, Union
 from PIL import Image
+from ...core.services.battle.battle_config import battle_config
 
 class PokemonHandlers:
-    # 映射常量
-    DAMAGE_CLASS_MAP = {1: '变化', 2: '物理', 3: '特殊'}
-    STAT_MAP = {1: 'HP', 2: '攻击', 3: '防御', 4: '特攻', 5: '特防', 6: '速度', 7: '命中', 8: '闪避'}
-
     def __init__(self, plugin: "PokemonPlugin", container: "GameContainer"):
         self.plugin = plugin
         self.user_service = plugin.user_service
@@ -30,6 +27,14 @@ class PokemonHandlers:
         self.ability_service = container.ability_service
         self.pokemon_repo = container.pokemon_repo
         self.tmp_dir = container.tmp_dir
+
+        # 加载配置中的常量
+        # 将字符串键转换为整数键以匹配使用方式
+        raw_damage_class_map = battle_config.get_damage_class_map()
+        self.DAMAGE_CLASS_MAP = {int(k): v for k, v in raw_damage_class_map.items()} if raw_damage_class_map else {}
+
+        raw_stat_map = battle_config.get_stat_map()
+        self.STAT_MAP = {int(k): v for k, v in raw_stat_map.items()} if raw_stat_map else {}
 
         try:
             from .draw.pokedex_detail import draw_pokedex_detail
@@ -393,21 +398,6 @@ class PokemonHandlers:
                 stat_name = self.STAT_MAP.get(stat_id, '未知')
                 message.append(f"  {stat_name}: {'+' if change > 0 else ''}{change}\n\n")
             message.append("")
-
-        # 添加连击/回合信息
-        # min_hits = move_info.get('min_hits')
-        # max_hits = move_info.get('max_hits')
-        # if min_hits and max_hits and min_hits != max_hits:
-        #     message.append(f"连击次数: {min_hits}-{max_hits}次\n\n")
-        # elif min_hits and max_hits and min_hits == max_hits and min_hits > 1:
-        #     message.append(f"连击次数: {min_hits}次\n\n")
-        #
-        # min_turns = move_info.get('min_turns')
-        # max_turns = move_info.get('max_turns')
-        # if min_turns and max_turns and min_turns != max_turns:
-        #     message.append(f"持续回合: {min_turns}-{max_turns}回合\n\n")
-        # elif min_turns and max_turns and min_turns == max_turns and min_turns > 1:
-        #     message.append(f"持续回合: {max_turns}回合\n\n")
 
         # 添加吸血/回复信息
         drain = move_info.get('drain', 0)
