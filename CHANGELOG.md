@@ -5,9 +5,20 @@
 ### ✨ 新功能 (Features)
 - 宝可梦背包指令现在根据 pocket_id_mapping 进行分类，而不是 item_category_names
 - 装备持有物指令现在允许宝可梦携带 pocket_id_mapping 中 ID 为 1、2、5、7 的道具 (道具、回复道具、树果、战斗道具)
+- 实现多种经典对战道具插件，包括生命宝玉、吃剩的东西、讲究系列、达人带、白色香草、突击背心、力量头带、博识眼镜、电气球、进化奇石、粗骨头、气球、气势披带、气势头带、凸凸头盔、弱点保险、王者之证、红线、焦点镜、黑色污泥、贝壳之铃、大根茎、火焰宝珠、剧毒宝珠、先制之爪、各类树果、各种属性石板和宝石等
+- 完善持有物系统，添加回复与持续类持有物功能
 
 ### 🐛 修复 (Bug Fixes)
 - 删除 item_category_names 配置，使用 item_categories 替代
+- 修复BattleState中持有物ID获取问题
+- 修复生命宝玉等持有物效果未触发的问题，添加after_damage钩子调用
+- 修正after_damage钩子方法的参数签名，确保正确传递(attacker, defender, move, damage, logger_obj)参数
+- 修复多种持有物插件的实现，确保其效果正确触发
+
+### 📝 其他变更
+- 根据CSV数据修正持有物数值和功能
+- 优化持有物插件架构，使用统一的ItemPlugin基类和ItemRegistry注册中心
+- 改进钩子系统，确保after_damage事件在单次和多次攻击后都能正确触发
 
 ---
 

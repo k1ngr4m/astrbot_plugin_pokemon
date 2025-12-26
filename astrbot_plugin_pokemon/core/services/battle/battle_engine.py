@@ -10,6 +10,7 @@ from .hook_manager import HookManager, BattleHook
 from .hook_manager import HookManager, BattleHook
 from .status_plugins import StatusRegistry
 from .ability_plugins import AbilityRegistry
+from .item_plugins import ItemRegistry
 
 
 # --- 基础协议与数据类 ---
@@ -73,17 +74,21 @@ class BattleState:
 
     # 挥发性状态 (如 6:混乱, 18:寄生种子) - ID -> 剩余回合数/参数
     volatile_statuses: Dict[int, int] = field(default_factory=dict)
-    
+
     # 钩子管理器
     hooks: HookManager = field(default_factory=HookManager)
-    
+
     # 运行中的插件实例：{ status_id: PluginInstance }
     active_plugins: Dict[int, Any] = field(default_factory=dict)
-    
+
     # --- 新增：特性支持 ---
     ability_id: Optional[int] = None
     ability_plugin: Optional[Any] = None
     # -----------------------
+
+    # --- 新增：持有物支持 ---
+    item_id: Optional[int] = None
+    item_plugin: Optional[Any] = None
     # -----------------------
 
     @classmethod
@@ -98,10 +103,12 @@ class BattleState:
             volatile_statuses=context.volatile_statuses.copy() if context.volatile_statuses else {},
             charging_move_id=context.charging_move_id,
             protection_status=context.protection_status,
-            ability_id=getattr(context.pokemon, 'ability_id', None)
+            ability_id=getattr(context.pokemon, 'ability_id', None),
+            item_id=getattr(context.pokemon, 'held_item_id', None)  # 新增：获取持有物ID
         )
         state._setup_initial_hooks()
         state._init_ability() # 初始化特性
+        state._init_item()    # 新增：初始化持有物
         return state
 
     def _init_ability(self):
@@ -111,6 +118,15 @@ class BattleState:
             if plugin:
                 plugin.on_apply()
                 self.ability_plugin = plugin
+
+    def _init_item(self):
+        """初始化持有物插件"""
+        if self.item_id:
+            from .item_plugins import ItemRegistry
+            plugin = ItemRegistry.create_plugin(self.item_id, self)
+            if plugin:
+                plugin.on_apply()
+                self.item_plugin = plugin
 
     def trigger_entry_effect(self, opponent: 'BattleState', logger_obj: 'BattleLogger', logic: Any = None):
         """触发登场效果（如威吓）"""
@@ -578,20 +594,31 @@ class BattleLogic:
                     # 检查是否击倒目标，如果击倒则停止后续攻击
                     if defender.current_hp - outcome.damage <= 0:
                         # 造成这次伤害并击倒对手
+                        damage_dealt = outcome.damage
                         defender.current_hp -= outcome.damage
                         hits_landed += 1
                         total_damage_dealt += outcome.damage
                         # 检查是否需要在击倒前记录伤害
                         if logger_obj.should_log_details():
                             logger.debug(f"[DEBUG] 连击在第{hit_i+1}次攻击后击倒对手，累计造成 {total_damage_dealt} 点伤害")
+
+                        # 触发after_damage钩子
+                        attacker.hooks.trigger_event("after_damage", attacker, defender, move, damage_dealt, logger_obj)
+                        defender.hooks.trigger_event("after_damage", defender, attacker, move, damage_dealt, logger_obj)
+
                         break
                     else:
                         # 造成伤害
+                        damage_dealt = outcome.damage
                         defender.current_hp -= outcome.damage
                         hits_landed += 1
                         total_damage_dealt += outcome.damage
                         if logger_obj.should_log_details():
                             logger.debug(f"[DEBUG] 连击第{hit_i+1}次攻击造成 {outcome.damage} 点伤害")
+
+                        # 触发after_damage钩子
+                        attacker.hooks.trigger_event("after_damage", attacker, defender, move, damage_dealt, logger_obj)
+                        defender.hooks.trigger_event("after_damage", defender, attacker, move, damage_dealt, logger_obj)
 
             # 统一显示结果
             if not move_missed:
@@ -651,6 +678,8 @@ class BattleLogic:
                 if logger_obj.should_log_details():
                     logger.debug(f"[DEBUG] 造成伤害: {outcome.damage} 点, 防御方HP从 {defender.current_hp} 变为 {max(0, defender.current_hp - outcome.damage)}")
 
+                # 先记录伤害量，用于after_damage钩子
+                damage_dealt = outcome.damage
                 defender.current_hp -= outcome.damage
                 if is_struggle:
                     logger_obj.log(f"{attacker.context.pokemon.name} 使用了挣扎！（PP耗尽）\n\n")
@@ -679,6 +708,10 @@ class BattleLogic:
                     logger_obj.log_rich([{'text': "效果不佳！\n\n", 'color': 'blue'}])
                     if logger_obj.should_log_details():
                         logger.debug("[DEBUG] 效果不佳")
+
+                # 触发after_damage钩子：攻击方、防御方、招式、造成的伤害量
+                attacker.hooks.trigger_event("after_damage", attacker, defender, move, damage_dealt, logger_obj)
+                defender.hooks.trigger_event("after_damage", defender, attacker, move, damage_dealt, logger_obj)
 
         # 3. 应用特效 (Meta Effects)
         # 包括：异常状态、能力变化、回复、吸血、反伤、一击必杀
