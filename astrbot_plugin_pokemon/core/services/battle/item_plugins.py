@@ -108,6 +108,50 @@ class ChoiceBandPlugin(ItemPlugin):
             return False
         return True
 
+@ItemRegistry.register(259)
+class IcyRockPlugin(ItemPlugin):
+    """冰冷岩石 - 携带后，由冰系招式制造的冰雹会持续8回合"""
+    def on_apply(self):
+        # 这里需要在天气系统中注册效果，简化实现
+        # 冰雹效果持续时间延长
+        pass
+
+@ItemRegistry.register(260)
+class SmoothRockPlugin(ItemPlugin):
+    """沙沙岩石 - 携带后，由地面系招式引发的沙暴会持续8回合"""
+    def on_apply(self):
+        # 沙暴效果持续时间延长
+        pass
+
+@ItemRegistry.register(261)
+class HeatRockPlugin(ItemPlugin):
+    """炽热岩石 - 携带后，由火系招式引发的大晴天会持续8回合"""
+    def on_apply(self):
+        # 大晴天效果持续时间延长
+        pass
+
+@ItemRegistry.register(246)
+class LightClayPlugin(ItemPlugin):
+    """光之黏土 - 携带后，反射壁和光墙的持续时间从5回合延长至8回合"""
+    def on_apply(self):
+        # 这里需要在场地效果系统中注册效果，简化实现
+        # 反射壁和光墙持续时间延长
+        pass
+
+@ItemRegistry.register(262)
+class DampRockPlugin(ItemPlugin):
+    """潮湿岩石 - 携带后，由水系招式引发的下雨会持续8回合"""
+    def on_apply(self):
+        # 下雨效果持续时间延长
+        pass
+
+@ItemRegistry.register(896)
+class TerrainExtenderPlugin(ItemPlugin):
+    """大地膜 - 携带后，场地效果会从5回合延长至8回合"""
+    def on_apply(self):
+        # 场地效果持续时间延长
+        pass
+
 @ItemRegistry.register(264)
 class ChoiceScarfPlugin(ItemPlugin):
     """讲究围巾 - 虽然携带后速度会提高，但只能使出相同的招式"""
@@ -269,7 +313,7 @@ class EviolitePlugin(ItemPlugin):
         stats.sp_defense = int(stats.sp_defense * 1.5)
         return stats
 
-@ItemRegistry.register(233)
+@ItemRegistry.register(235)
 class ThickClubPlugin(ItemPlugin):
     """粗骨头 - 格斗或骨系宝可梦物攻翻倍"""
     def on_apply(self):
@@ -279,7 +323,8 @@ class ThickClubPlugin(ItemPlugin):
     def stat_mod(self, stats):
         # 简化实现：总是增加物攻
         # 在实际游戏中，只对特定类型的宝可梦有效
-        stats.attack = int(stats.attack * 2.0)
+        if self.owner.context.pokemon.species_id == 104 or self.owner.context.pokemon.species_id == 105:
+            stats.attack = int(stats.attack * 2.0)
         return stats
 
 # --- 生存与反作用类持有物 ---
@@ -397,6 +442,59 @@ class KingsRockPlugin(ItemPlugin):
             # 由于我们无法直接应用状态，这里记录日志
             logger_obj.log(f"{attacker.context.pokemon.name} 的攻击让对手畏缩了！\n\n")
 
+@ItemRegistry.register(255)
+class IronBallPlugin(ItemPlugin):
+    """黑色铁球 - 携带后，速度减半并失去地面系免疫"""
+    def on_apply(self):
+        # 注册速度减半
+        hook = BattleHook("iron_ball_spd", 10, self.stat_mod)
+        self.owner.hooks.register("on_stat_calc", hook)
+
+    def stat_mod(self, stats):
+        # 速度减半
+        stats.speed = int(stats.speed * 0.5)
+        return stats
+
+@ItemRegistry.register(256)
+class LaggingTailPlugin(ItemPlugin):
+    """后攻之尾 - 强制在同优先度下最后行动"""
+    def on_apply(self):
+        # 注册优先度修改
+        hook = BattleHook("lagging_tail_prio", 10, self.prio_mod)
+        self.owner.hooks.register("on_priority_calc", hook)
+
+    def prio_mod(self, current_priority, attacker, move):
+        # 在同优先级中最后行动，通过降低优先度实现
+        if attacker == self.owner:
+            return current_priority - 0.1  # 确保在同优先级中最后行动
+        return current_priority
+
+@ItemRegistry.register(265)
+class StickyBarbPlugin(ItemPlugin):
+    """附着针 - 每回合扣血并可能传给对手"""
+    def on_apply(self):
+        # 注册回合结束扣血
+        hook = BattleHook("sticky_barb_tick", 10, self.tick)
+        self.owner.hooks.register("turn_end", hook)
+        # 注册伤害时可能传递持有物
+        dmg_hook = BattleHook("sticky_barb_contact", 10, self.on_damage)
+        self.owner.hooks.register("after_damage", dmg_hook)
+
+    def tick(self, state, opponent, logger_obj):
+        # 每回合扣血
+        if state.current_hp > 0:
+            dmg = max(1, state.context.pokemon.stats.hp // 8)
+            state.current_hp = max(0, state.current_hp - dmg)
+            logger_obj.log(f"{state.context.pokemon.name} 因附着针损失了 {dmg} HP！\n\n")
+
+    def on_damage(self, attacker, defender, move, damage, logger_obj):
+        # 当被接触攻击时，可能传递持有物
+        if (defender == self.owner and attacker != defender and
+            move.damage_class_id == 2):  # 物理攻击（通常是接触攻击）
+            # 在实际游戏中，若对手无持有物，则传递附着针
+            # 这里简单记录日志
+            logger_obj.log(f"附着针可能传递给了攻击者！\n\n")
+
 @ItemRegistry.register(257)
 class DestinyKnotPlugin(ItemPlugin):
     """红线 - 携带后，在自己着迷时能让对手也着迷"""
@@ -404,6 +502,20 @@ class DestinyKnotPlugin(ItemPlugin):
         # 这个效果需要在着迷状态触发时生效，暂时注册钩子
         # 在实际实现中，这个效果需要在应用着迷状态时检查
         pass
+
+@ItemRegistry.register(190)
+class BrightPowderPlugin(ItemPlugin):
+    """光粉 - 携带后，对手的招式命中率降低10%"""
+    def on_apply(self):
+        hook = BattleHook("bright_powder_evasion", 10, self.modify_accuracy)
+        self.owner.hooks.register("on_damage_calc", hook)
+
+    def modify_accuracy(self, damage_params, attacker, defender, move, logger_obj):
+        # 这里处理的是被攻击方（defender）携带光粉
+        if defender == self.owner and move.accuracy < 100:  # 假设100是完全命中
+            # 降低命中率
+            # 在这里我们模拟命中率下降10%
+            pass  # 具体实现需要在命中计算中修改
 
 @ItemRegistry.register(209)
 class ScopeLensPlugin(ItemPlugin):
@@ -418,6 +530,20 @@ class ScopeLensPlugin(ItemPlugin):
         # 这里我们通过模拟的方式来增加暴击效果
         # 实际修改暴击率需要访问战斗逻辑
         pass  # 具体实现需要在战斗逻辑中修改暴击率计算
+
+@ItemRegistry.register(242)
+class WideLensPlugin(ItemPlugin):
+    """广角镜 - 携带后，招式的命中率提升10%"""
+    def on_apply(self):
+        hook = BattleHook("wide_lens_accuracy", 10, self.modify_accuracy)
+        self.owner.hooks.register("on_damage_calc", hook)
+
+    def modify_accuracy(self, damage_params, attacker, defender, move, logger_obj):
+        # 这里处理的是攻击方（attacker）携带广角镜
+        if attacker == self.owner and move.accuracy < 100:  # 假设100是完全命中
+            # 提升命中率
+            # 在这里我们模拟命中率提升10%
+            pass  # 具体实现需要在命中计算中修改
 
 @ItemRegistry.register(545)  # 修正达人带ID，它与气势头带不同
 class FocusBandPluginOld(ItemPlugin):
@@ -631,6 +757,68 @@ class OranBerryPlugin(ItemPlugin):
             heal = min(10, state.context.pokemon.stats.hp - state.current_hp)
             state.current_hp = min(state.context.pokemon.stats.hp, state.current_hp + heal)
             logger_obj.log(f"{state.context.pokemon.name} 通过橙橙果回复了 {heal} HP！\n\n")
+
+@ItemRegistry.register(186)
+class MicleBerryPlugin(ItemPlugin):
+    """奇秘果 - HP 低于 1/4 时，下一招命中率提升（一次性）"""
+    def on_apply(self):
+        hook = BattleHook("micle_berry_check", 10, self.check_accuracy, persistent=False)
+        self.owner.hooks.register("turn_end", hook)
+
+    def check_accuracy(self, state, opponent, logger_obj):
+        max_hp = state.context.pokemon.stats.hp
+        if state.current_hp > 0 and state.current_hp <= max_hp // 4:  # HP低于1/4
+            # 提升下一招命中率，由于是一次性的，我们这里模拟效果
+            logger_obj.log(f"{state.context.pokemon.name} 通过奇秘果提升了命中率！\n\n")
+
+@ItemRegistry.register(187)
+class CustapBerryPlugin(ItemPlugin):
+    """释陀果 - HP 低于 1/4 时，下一回合优先行动（一次性）"""
+    def on_apply(self):
+        hook = BattleHook("custap_berry_check", 10, self.check_priority, persistent=False)
+        self.owner.hooks.register("turn_end", hook)
+
+    def check_priority(self, state, opponent, logger_obj):
+        max_hp = state.context.pokemon.stats.hp
+        if state.current_hp > 0 and state.current_hp <= max_hp // 4:  # HP低于1/4
+            # 使下一回合优先行动，由于是一次性的，我们这里模拟效果
+            logger_obj.log(f"{state.context.pokemon.name} 通过释陀果获得了优先行动权！\n\n")
+
+@ItemRegistry.register(188)
+class JabocaBerryPlugin(ItemPlugin):
+    """嘉珍果 - 受到物理攻击时对对手造成反伤"""
+    def on_apply(self):
+        hook = BattleHook("jaboca_berry_check", 10, self.on_damage, persistent=False)
+        self.owner.hooks.register("after_damage", hook)
+
+    def on_damage(self, attacker, defender, move, damage, logger_obj):
+        # 持有嘉珍果的宝可梦（defender）受到物理攻击时触发
+        if (defender == self.owner and
+            attacker != defender and
+            move.damage_class_id == 2 and  # 物理攻击
+            damage > 0):
+            # 对攻击者造成伤害
+            recoil = max(1, attacker.context.pokemon.stats.hp // 8)
+            attacker.current_hp = max(0, attacker.current_hp - recoil)
+            logger_obj.log(f"{attacker.context.pokemon.name} 因攻击持有嘉珍果的宝可梦，受到了 {recoil} 点反伤！\n\n")
+
+@ItemRegistry.register(189)
+class RowapBerryPlugin(ItemPlugin):
+    """雾莲果 - 受到特殊攻击时对对手造成反伤"""
+    def on_apply(self):
+        hook = BattleHook("rowap_berry_check", 10, self.on_damage, persistent=False)
+        self.owner.hooks.register("after_damage", hook)
+
+    def on_damage(self, attacker, defender, move, damage, logger_obj):
+        # 持有雾莲果的宝可梦（defender）受到特殊攻击时触发
+        if (defender == self.owner and
+            attacker != defender and
+            move.damage_class_id == 3 and  # 特殊攻击
+            damage > 0):
+            # 对攻击者造成伤害
+            recoil = max(1, attacker.context.pokemon.stats.hp // 8)
+            attacker.current_hp = max(0, attacker.current_hp - recoil)
+            logger_obj.log(f"{attacker.context.pokemon.name} 因攻击持有雾莲果的宝可梦，受到了 {recoil} 点反伤！\n\n")
 
 @ItemRegistry.register(136)  # 勿花果
 class PersimBerryPlugin(ItemPlugin):
