@@ -595,13 +595,11 @@ class UserPokemonService:
 
         # 2. 检查用户是否拥有该道具且数量大于0
         item_result: UserItemInfo = self.user_item_repo.get_user_item_by_id(user_id, item_id)
-        # 内测用户直接带
-        if user_id not in ['PJFGIZ2LGF2EUWRLGE4W6YLZNRQU4WRX', 'OFRUC32BLJGCWTSLMFREURTYMZHVG2TX']:
-            if not item_result or item_result.quantity <= 0 :
-                return BaseResult(
-                    success=False,
-                    message="您没有持有该道具"
-                )
+        if not item_result or item_result.quantity <= 0 :
+            return BaseResult(
+                success=False,
+                message="您没有持有该道具"
+            )
 
         # 3. 检查道具是否属于允许的背包类别 (pocket_id为1, 2, 5, 7)
         # 从配置获取物品类别信息
@@ -639,7 +637,7 @@ class UserPokemonService:
         except Exception as e:
             return BaseResult(
                 success=False,
-                message=f"装备持有物失败: {str(e)}"
+                message=f"装备道具失败: {str(e)}"
             )
 
     def remove_pokemon_held_item(self, user_id: str, pokemon_id: int) -> BaseResult:

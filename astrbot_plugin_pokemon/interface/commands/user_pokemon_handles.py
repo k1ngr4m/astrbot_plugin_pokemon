@@ -490,7 +490,7 @@ class UserPokemonHandlers:
         # 解析参数
         args = event.message_str.split()
         if len(args) < 3:
-            yield event.plain_result("❌ 请指定宝可梦ID和道具ID，格式：/装备持有物 [宝可梦ID] [道具ID]")
+            yield event.plain_result("❌ 请指定宝可梦ID和道具ID，格式：/装备道具 [宝可梦ID] [道具ID]")
             return
 
         try:
@@ -523,7 +523,7 @@ class UserPokemonHandlers:
         # 解析参数
         args = event.message_str.split()
         if len(args) < 2:
-            yield event.plain_result("❌ 请指定宝可梦ID，格式：/卸下持有物 [宝可梦ID]")
+            yield event.plain_result("❌ 请指定宝可梦ID，格式：/卸下道具 [宝可梦ID]")
             return
 
         try:

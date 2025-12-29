@@ -243,15 +243,15 @@ class PokemonPlugin(Star):
         async for r in self.user_pokemon_handlers.view_favorite_pokemon(event):
             yield r
 
-    @filter.command("装备持有物")
+    @filter.command("装备道具", alias={"装备持有物"})
     async def equip_held_item(self, event: AstrMessageEvent):
-        """为宝可梦装备持有物。用法：/装备持有物 [宝可梦ID] [道具ID]"""
+        """为宝可梦装备道具。用法：/装备道具 [宝可梦ID] [道具ID]"""
         async for r in self.user_pokemon_handlers.equip_held_item(event):
             yield r
 
-    @filter.command("卸下持有物")
+    @filter.command("卸下道具", alias={"卸下持有物"})
     async def unequip_held_item(self, event: AstrMessageEvent):
-        """卸下宝可梦的持有物。用法：/卸下持有物 [宝可梦ID]"""
+        """卸下宝可梦的道具。用法：/卸下道具 [宝可梦ID]"""
         async for r in self.user_pokemon_handlers.unequip_held_item(event):
             yield r
 
