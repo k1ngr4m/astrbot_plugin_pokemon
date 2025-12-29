@@ -249,11 +249,10 @@ class LightBallPlugin(ItemPlugin):
         self.owner.hooks.register("on_stat_calc", hook)
 
     def stat_mod(self, stats):
-        # 根据CSV数据：电气球使皮卡丘的攻击和特攻翻倍
-        # 简化实现：假设这个效果适用于所有宝可梦
-        # 在实际游戏中，电气球只对皮卡丘有效
-        stats.attack = int(stats.attack * 2.0)
-        stats.sp_attack = int(stats.sp_attack * 2.0)
+        # 仅对比卡丘有效 (假设 species_id 为 25)
+        if self.owner.context.pokemon.species_id == 25:
+            stats.attack = int(stats.attack * 2.0)
+            stats.sp_attack = int(stats.sp_attack * 2.0)
         return stats
 
 @ItemRegistry.register(581)
@@ -487,7 +486,7 @@ class BigRootPlugin(ItemPlugin):
             pass  # 这个效果需要在吸血计算时实现，现在只注册钩子
         return damage_params
 
-@ItemRegistry.register(270)
+@ItemRegistry.register(250)
 class FlameOrbPlugin(ItemPlugin):
     """火焰宝珠 - 每回合烧伤"""
     def on_apply(self):
@@ -504,7 +503,7 @@ class FlameOrbPlugin(ItemPlugin):
                 state.non_volatile_status = 4
                 logger_obj.log(f"{state.context.pokemon.name} 被火焰宝珠烧伤了！\n\n")
 
-@ItemRegistry.register(271)
+@ItemRegistry.register(249)
 class ToxicOrbPlugin(ItemPlugin):
     """剧毒宝珠 - 每回合中毒"""
     def on_apply(self):
