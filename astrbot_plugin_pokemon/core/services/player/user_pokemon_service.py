@@ -757,11 +757,14 @@ class UserPokemonService:
         can_learn_moves = self.move_repo.get_pokemon_moves_by_species_id(pokemon_info.species_id)
         can_learn_move_ids = []
         for move in can_learn_moves:
+            logger.debug(f"检查招式 {move.get('name_zh')} (ID: {move.get('move_id')}) 是否可通过自然学习 (move_method_id: {move.get('move_method_id')})")
             if move.get('move_method_id') == 1:
                 can_learn_move_ids.append(move.get('move_id'))
         can_learn_move_names = []
         for move_id in can_learn_move_ids:
+            logger.debug(f"检查招式 {move_id} 是否可通过自然学习")
             move_data = self.move_repo.get_move_by_id(move_id)
+            logger.debug(f"招式 {move_id} 详细信息: {move_data}")
             if move_data:
                 can_learn_move_names.append(move_data.get('name_zh', '未知招式'))
             else:
