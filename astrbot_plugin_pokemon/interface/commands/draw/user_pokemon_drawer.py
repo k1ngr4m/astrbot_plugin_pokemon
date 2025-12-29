@@ -80,7 +80,7 @@ class UserPokemonDetailDrawer(BaseDrawer):
         total_h = max(700, int(dynamic_h))  # 最小保证 700
 
         image = create_vertical_gradient(self.width, total_h, *self.cfg["bg_colors"])
-        overlay = Image.new("RGBA", image.size, (0, 0, 0))
+        overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))  # 透明背景
         draw = ImageDraw.Draw(overlay)
 
         # 1. Header
@@ -129,8 +129,18 @@ class UserPokemonDetailDrawer(BaseDrawer):
 
         # Optional: Background Tint based on Primary Type
         if p.get('types'):
+            # 如果有多种类型，混合两种颜色；否则使用单一类型颜色
             primary_type = p.get('types')[0]
-            tint_col = TYPE_COLORS.get(primary_type, (200, 200, 200))
+            if len(p.get('types', [])) > 1:
+                secondary_type = p.get('types')[1]
+                primary_col = TYPE_COLORS.get(primary_type, (200, 200, 200))
+                secondary_col = TYPE_COLORS.get(secondary_type, (200, 200, 200))
+                # 混合两种颜色，取平均值
+                mixed_col = tuple(int((c1 + c2) / 2) for c1, c2 in zip(primary_col, secondary_col))
+                tint_col = mixed_col
+            else:
+                tint_col = TYPE_COLORS.get(primary_type, (200, 200, 200))
+
             # Create a very light tint
             tint_h = int(line_y)
             tint_layer = Image.new("RGBA", (self.width, tint_h), (*tint_col, 40))
