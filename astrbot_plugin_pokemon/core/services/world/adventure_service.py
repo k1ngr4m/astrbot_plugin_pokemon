@@ -1531,7 +1531,7 @@ class AdventureService:
             
             msg = (f"✅ 击败了 {trainer_title}{battle_trainer.trainer.name}！\n\n"
                    f"当前进度：{state.current_stage}/{len(opponents)}\n\n"
-                   f"⚠ 你的状态已保存。可以使用 /背包 使用伤药，但使用/宝可梦恢复。\n\n"
+                   f"⚠ 你的状态已保存。\n\n"
                    f"输入 /挑战道馆 {location_id} 继续挑战下一位对手！")
             
             return BaseResult(success=True, message=msg, data=res.data)
