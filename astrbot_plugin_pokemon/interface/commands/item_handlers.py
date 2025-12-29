@@ -110,13 +110,13 @@ class ItemHandlers:
                     item_name = item_info.get('name_en', f'Item {item_id}')
 
                 response = f"📦 道具信息:\n\n"
-                response += f"ID: {item_info['id']}\n"
-                response += f"名称: {item_name}\n"
-                response += f"英文名称: {item_info.get('name_en', 'N/A')}\n"
-                response += f"类别ID: {item_info.get('category_id', 'N/A')}\n"
-                response += f"价格: {item_info.get('cost', 'N/A')} 金币\n"
+                response += f"ID: {item_info['id']}\n\n"
+                response += f"名称: {item_name}\n\n"
+                response += f"英文名称: {item_info.get('name_en', 'N/A')}\n\n"
+                response += f"类别ID: {item_info.get('category_id', 'N/A')}\n\n"
+                response += f"价格: {item_info.get('cost', 'N/A')} 金币\n\n"
                 if item_info.get('description'):
-                    response += f"描述: {item_info['description']}\n"
+                    response += f"描述: {item_info['description']}\n\n"
 
                 yield event.plain_result(response)
             else:
@@ -131,13 +131,13 @@ class ItemHandlers:
                     item_name = item_info.get('name_en', f'Item {item_info["id"]}')
 
                 response = f"📦 道具信息:\n\n"
-                response += f"ID: {item_info['id']}\n"
-                response += f"名称: {item_name}\n"
-                response += f"英文名称: {item_info.get('name_en', 'N/A')}\n"
-                response += f"类别ID: {item_info.get('category_id', 'N/A')}\n"
-                response += f"价格: {item_info.get('cost', 'N/A')} 金币\n"
+                response += f"ID: {item_info['id']}\n\n"
+                response += f"名称: {item_name}\n\n"
+                response += f"英文名称: {item_info.get('name_en', 'N/A')}\n\n"
+                response += f"类别ID: {item_info.get('category_id', 'N/A')}\n\n"
+                response += f"价格: {item_info.get('cost', 'N/A')} 金币\n\n"
                 if item_info.get('description'):
-                    response += f"描述: {item_info['description']}\n"
+                    response += f"描述: {item_info['description']}\n\n"
 
                 yield event.plain_result(response)
             else:
