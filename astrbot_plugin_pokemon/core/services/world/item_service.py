@@ -26,6 +26,10 @@ class ItemService:
     def get_item_by_id(self, item_id):
         return self.item_repo.get_item_by_id(item_id)
 
+    def get_item_by_name(self, item_name):
+        """根据名称查询道具"""
+        return self.item_repo.get_item_by_name(item_name)
+
     def get_user_items(self, user_id: str, page: int = 1, items_per_page: int = 20) -> Dict[str, Any]:
         """
         获取用户的所有道具

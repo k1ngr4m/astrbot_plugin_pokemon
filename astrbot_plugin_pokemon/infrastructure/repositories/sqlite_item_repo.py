@@ -63,3 +63,24 @@ class SqliteItemRepository(AbstractItemRepository):
         cursor.execute("SELECT * FROM items WHERE id = ?", (item_id,))
         row = cursor.fetchone()
         return dict(row) if row else None
+
+    def get_item_by_name(self, item_name: str) -> Optional[Dict[str, Any]]:
+        """根据物品名称获取物品信息，支持模糊匹配"""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        # 先精确匹配中文名称
+        cursor.execute("SELECT * FROM items WHERE name_zh = ? OR name_en = ?", (item_name, item_name))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+
+        # 然后进行模糊匹配中文名称
+        cursor.execute("SELECT * FROM items WHERE name_zh LIKE ?", (f'%{item_name}%',))
+        row = cursor.fetchone()
+        if row:
+            return dict(row)
+
+        # 最后进行模糊匹配英文名称
+        cursor.execute("SELECT * FROM items WHERE name_en LIKE ?", (f'%{item_name}%',))
+        row = cursor.fetchone()
+        return dict(row) if row else None

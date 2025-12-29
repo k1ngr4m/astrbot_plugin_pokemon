@@ -170,6 +170,12 @@ class PokemonPlugin(Star):
         async for r in self.item_handlers.view_items(event):
             yield r
 
+    @filter.command("查询道具", alias={"道具查询", "查看道具", "item_query"})
+    async def query_item(self, event: AstrMessageEvent):
+        """查询道具信息。用法：/查询道具 [道具ID] 或 /查询道具 [道具名称]"""
+        async for r in self.item_handlers.query_item(event):
+            yield r
+
     @filter.command("出售道具", alias={"道具出售", "卖出道具"})
     async def sell_item(self, event: AstrMessageEvent):
         """出售道具，获得金币"""

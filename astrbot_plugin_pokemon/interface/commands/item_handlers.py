@@ -81,6 +81,68 @@ class ItemHandlers:
             formatted_message = self.item_service.format_items_list(result)
             yield event.plain_result(formatted_message)
 
+    async def query_item(self, event: AstrMessageEvent):
+        """查询道具命令处理器，支持通过ID或名称查询"""
+        user_id = userid_to_base32(event.get_sender_id())
+        user = self.plugin.user_repo.get_user_by_id(user_id)
+
+        if not user:
+            yield event.plain_result(AnswerEnum.USER_NOT_REGISTERED.value)
+            return
+
+        # 解析参数
+        args = event.message_str.split()
+        if len(args) < 2:
+            yield event.plain_result("❌ 请指定要查询的道具ID或名称，格式：/查询道具 [道具ID/道具名称]")
+            return
+
+        query_param = args[1]
+
+        # 尝试解析为ID
+        item_info = None
+        try:
+            item_id = int(query_param)
+            item_info = self.item_service.get_item_by_id(item_id)
+            if item_info:
+                # 构建返回信息
+                item_name = item_info.get('name_zh', item_info.get('name_en', f'Item {item_id}'))
+                if item_name == "None":
+                    item_name = item_info.get('name_en', f'Item {item_id}')
+
+                response = f"📦 道具信息:\n\n"
+                response += f"ID: {item_info['id']}\n"
+                response += f"名称: {item_name}\n"
+                response += f"英文名称: {item_info.get('name_en', 'N/A')}\n"
+                response += f"类别ID: {item_info.get('category_id', 'N/A')}\n"
+                response += f"价格: {item_info.get('cost', 'N/A')} 金币\n"
+                if item_info.get('description'):
+                    response += f"描述: {item_info['description']}\n"
+
+                yield event.plain_result(response)
+            else:
+                yield event.plain_result("❌ 找不到指定ID的道具")
+        except ValueError:
+            # 如果不是数字，则按名称查询
+            item_info = self.item_service.get_item_by_name(query_param)
+            if item_info:
+                # 构建返回信息
+                item_name = item_info.get('name_zh', item_info.get('name_en', f'Item {item_info["id"]}'))
+                if item_name == "None":
+                    item_name = item_info.get('name_en', f'Item {item_info["id"]}')
+
+                response = f"📦 道具信息:\n\n"
+                response += f"ID: {item_info['id']}\n"
+                response += f"名称: {item_name}\n"
+                response += f"英文名称: {item_info.get('name_en', 'N/A')}\n"
+                response += f"类别ID: {item_info.get('category_id', 'N/A')}\n"
+                response += f"价格: {item_info.get('cost', 'N/A')} 金币\n"
+                if item_info.get('description'):
+                    response += f"描述: {item_info['description']}\n"
+
+                yield event.plain_result(response)
+            else:
+                yield event.plain_result("❌ 找不到指定名称的道具")
+
     async def sell_item(self, event: AstrMessageEvent):
         """出售道具命令处理器"""
         user_id = userid_to_base32(event.get_sender_id())
