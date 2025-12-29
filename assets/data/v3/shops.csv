@@ -1,2 +1,4 @@
 id,name,description,shop_type,is_active
 1,精灵球商店,提供各种精灵球捕捉宝可梦,normal,1
+2,药剂商店,提供各种伤药和回复道具,normal,1
+3,树果商店,提供各种具有神奇功效的树果,normal,1
