@@ -759,7 +759,13 @@ class UserPokemonService:
         for move in can_learn_moves:
             if move.get('move_method_id') == 1:
                 can_learn_move_ids.append(move.get('move_id'))
-        can_learn_move_names = [self.move_repo.get_move_by_id(move_id).get('name_zh', '未知招式') for move_id in can_learn_move_ids]
+        can_learn_move_names = []
+        for move_id in can_learn_move_ids:
+            move_data = self.move_repo.get_move_by_id(move_id)
+            if move_data:
+                can_learn_move_names.append(move_data.get('name_zh', '未知招式'))
+            else:
+                can_learn_move_names.append('未知招式')
         stats = pokemon_info.stats
         ivs = pokemon_info.ivs
         evs = pokemon_info.evs

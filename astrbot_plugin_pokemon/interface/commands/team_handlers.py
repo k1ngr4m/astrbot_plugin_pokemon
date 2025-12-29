@@ -109,7 +109,9 @@ class TeamHandlers:
                 "ability": ability_name,
                 "current_hp": p.current_hp,
                 "max_hp": p.stats.hp,
-                "types": raw_types if raw_types else []
+                "types": raw_types if raw_types else [],
+                "ivs": p.ivs,  # 添加IV信息
+                "is_favorite": p.is_favorite  # 添加收藏信息
             })
 
         # 生成图片

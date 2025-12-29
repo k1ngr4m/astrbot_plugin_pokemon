@@ -3,6 +3,8 @@ import os
 from typing import List, Dict, Any, Tuple
 from PIL import Image, ImageDraw, ImageFilter
 
+from .base import BaseDrawer
+from .constants import POKEDEX_CONFIG
 from .styles import (
     COLOR_TITLE, COLOR_TEXT_DARK, COLOR_TEXT_GRAY, COLOR_CARD_BG,
     COLOR_SUCCESS, COLOR_WARNING, COLOR_ERROR, TYPE_COLORS,
@@ -10,45 +12,19 @@ from .styles import (
 )
 from .gradient_utils import create_vertical_gradient
 
-# --- 配置 ---
-POKEDEX_CONFIG = {
-    "width": 800,
-    "padding": 30,
-    "card_h": 100,
-    "cols": 4,
-    "col_gap": 15,
-    "row_gap": 15,
-    "bg_colors": ((240, 248, 255), (255, 255, 255))
-}
 
-class PokedexDrawer:
+class PokedexDrawer(BaseDrawer):
     def __init__(self):
-        self.cfg = POKEDEX_CONFIG
-        self.width = POKEDEX_CONFIG["width"]
-        self.fonts = {
-            "title": load_font(32),
-            "subtitle": load_font(18),
-            "number": load_font(16),
-            "name": load_font(16),
-            "small": load_font(14),
-            "icon": load_font(24),
-        }
-        self.sprite_cache = {}
+        super().__init__(POKEDEX_CONFIG)
 
     def _load_pokemon_sprite(self, pokemon_id: int, size=(60, 60), pokemon_seen: bool = True) -> Image.Image:
-        base_path = os.path.dirname(__file__)
-
         if pokemon_seen:
-            sprite_path = os.path.abspath(os.path.join(
-                base_path, "..", "..", "..", "..", "assets", "sprites", "front", f"{pokemon_id}.png"
-            ))
             cache_key = f"{pokemon_id}_{size}"
             if cache_key in self.sprite_cache:
                 return self.sprite_cache[cache_key]
 
             try:
-                sprite = Image.open(sprite_path).convert("RGBA")
-                sprite = sprite.resize(size, Image.Resampling.LANCZOS)
+                sprite = super()._load_pokemon_sprite(pokemon_id, size)
                 self.sprite_cache[cache_key] = sprite
                 return sprite
             except FileNotFoundError:
@@ -60,7 +36,7 @@ class PokedexDrawer:
 
             # 绘制问号，表示未遇见
             question_mark = "?"
-            font = self.fonts["name"]  # 使用较小的字体
+            font = self.fonts["name"] if "name" in self.fonts else self.fonts["small"]  # 回退到 small 字体
             bbox = font.getbbox(question_mark)
             text_w = bbox[2] - bbox[0]
             text_h = bbox[3] - bbox[1]
