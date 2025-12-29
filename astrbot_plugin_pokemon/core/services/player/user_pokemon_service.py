@@ -816,3 +816,33 @@ class UserPokemonService:
                 "info_str": info_str
             }
         )
+
+    def admin_get_item(self, user_id: str, item_id: int, quantity: int) -> BaseResult:
+        """
+        管理员获取道具
+        Args:
+            user_id: 用户ID
+            item_id: 道具ID
+            quantity: 道具数量
+        Returns:
+            BaseResult
+        """
+        # 1. 检查道具是否存在
+        item_result = self.item_repo.get_item_by_id(item_id)
+        if not item_result.get('id'):
+            return BaseResult(
+                success=False,
+                message=f"道具{item_id}不存在"
+            )
+
+        # 4. 更新用户道具数量
+        self.user_item_repo.add_user_item(user_id, item_id, quantity)
+
+        return BaseResult(
+            success=True,
+            message=f"成功获取道具{item_id} {quantity}个",
+            data={
+                "item_id": item_id,
+                "quantity": quantity
+            }
+        )

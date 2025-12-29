@@ -70,7 +70,7 @@ class ItemHandlers:
             # 临时保存图片
             import os
             import time
-            filename = f"user_items_{user_id}_{int(time.time())}.png"
+            filename = f"user_items_{user_id}.png"
             image_path = os.path.join(self.tmp_dir, filename)
             image.save(image_path)
 

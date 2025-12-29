@@ -362,6 +362,12 @@ class PokemonPlugin(Star):
         async for r in self.common_handlers.stop_admin(event):
             yield r
 
+    @filter.command("获得道具")
+    async def get_item(self, event: AstrMessageEvent):
+        """获得道具"""
+        async for r in self.user_pokemon_handlers.admin_get_item(event):
+            yield r
+
     async def _check_port_active(self):
         """验证端口是否实际已激活"""
         try:

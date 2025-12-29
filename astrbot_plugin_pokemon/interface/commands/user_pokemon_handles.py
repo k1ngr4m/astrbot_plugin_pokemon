@@ -235,6 +235,40 @@ class UserPokemonHandlers:
         img.save(save_path)
         return event.image_result(save_path)
 
+    async def admin_get_item(self, event: AstrMessageEvent):
+        """获得道具"""
+        user_id = userid_to_base32(event.get_sender_id())
+        result = self.user_service.check_user_registered(user_id)
+        if not result.success:
+            yield event.plain_result(result.message)
+            return
+
+        args = event.message_str.split()
+        if len(args) < 2:
+            yield event.plain_result("❌ 请指定道具ID，格式：/获得道具 [道具ID] [数量]")
+            return
+
+        try:
+            item_id = int(args[1])
+            quantity = int(args[2]) if len(args) > 2 else 1
+        except ValueError:
+            yield event.plain_result("❌ 道具ID和数量必须是整数")
+            return
+
+        # 检查道具是否存在
+        item_info = self.plugin.item_repo.get_item_by_id(item_id)
+        if not item_info:
+            yield event.plain_result(f"❌ 道具{item_id}不存在")
+            return
+
+        # 获得道具
+        res = self.user_pokemon_service.admin_get_item(user_id, item_id, quantity)
+        if not res.success:
+            yield event.plain_result(res.message)
+            return
+
+        yield event.plain_result(f"✅ 获得道具{item_id}成功")
+
     def _get_pokemon_basic_info(self, p):
         """辅助方法：统一获取宝可梦的基础显示文本"""
         # 性别图标
