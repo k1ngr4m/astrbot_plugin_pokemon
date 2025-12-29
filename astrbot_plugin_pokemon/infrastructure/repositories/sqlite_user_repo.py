@@ -70,6 +70,8 @@ class SqliteUserRepository(AbstractUserRepository):
             user_data['isdel'] = row["isdel"]
         if "origin_id" in row_keys:
             user_data['origin_id'] = row["origin_id"]
+        if "max_unlocked_location_id" in row_keys:
+            user_data['max_unlocked_location_id'] = row["max_unlocked_location_id"]
 
         return User(**user_data)
 
@@ -263,6 +265,22 @@ class SqliteUserRepository(AbstractUserRepository):
                 SET last_adventure_time = ?
                 WHERE user_id = ?
             """, (last_adventure_time, user_id))
+            conn.commit()
+
+    def update_user_max_location(self, user_id: str, max_location: int) -> None:
+        """
+        更新用户的最大探索地点
+        Args:
+            user_id: 用户ID
+            max_location: 新的最大探索地点
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE users
+                SET max_unlocked_location_id = ?
+                WHERE user_id = ?
+            """, (max_location, user_id))
             conn.commit()
 
     def get_all_users(self) -> List[User]:

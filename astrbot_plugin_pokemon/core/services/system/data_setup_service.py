@@ -202,6 +202,29 @@ class DataSetupService:
                         except Exception as e:
                             logger.error(f"地点数据错误 (ID: {row.get('id')}): {e}")
 
+            # 6.5 填充道馆数据
+            if not self.adventure_repo.get_gym_by_location(1):
+                df = self._read_csv_data("gyms.csv")
+                if not df.empty:
+                    logger.info("正在初始化道馆数据...")
+                    df = df.where(pd.notnull(df), None)
+                    for row in df.to_dict('records'):
+                        try:
+                            # elite_trainer_ids will be handled by add_gym_template
+                            self.adventure_repo.add_gym_template({
+                                "id": int(row['id']),
+                                "location_id": int(row['location_id']),
+                                "name": str(row['name']),
+                                "description": str(row['description']) if row['description'] else "",
+                                "elite_trainer_ids": row['elite_trainer_ids'] if row['elite_trainer_ids'] else "",
+                                "boss_trainer_id": int(row['boss_trainer_id']),
+                                "required_level": int(row['required_level']),
+                                "unlock_location_id": int(row['unlock_location_id']),
+                                "reward_item_id": int(row['reward_item_id']) if pd.notna(row['reward_item_id']) else None
+                            })
+                        except Exception as e:
+                            logger.error(f"道馆数据错误 (ID: {row.get('id')}): {e}")
+
             # 7. 填充地点宝可梦关联
             if not self.adventure_repo.get_location_pokemon_by_location_id(1):
                 df = self._read_csv_data("location_pokemon.csv")

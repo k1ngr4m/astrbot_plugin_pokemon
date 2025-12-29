@@ -110,3 +110,30 @@ class BattleResult:
     user_battle_exp_result: Dict[str, any] = None  # 用户战斗经验奖励结果
     dropped_items: List[Dict[str, any]] = None  # 掉落物品列表
 
+
+@dataclass
+class GymInfo:
+    id: int
+    location_id: int
+    name: str
+    description: str
+    elite_trainer_ids: List[int]
+    boss_trainer_id: int
+    required_level: int
+    unlock_location_id: int
+    reward_item_id: Optional[int] = None
+
+@dataclass
+class UserBadge:
+    user_id: str
+    gym_id: int
+    badge_id: int
+    obtained_at: int
+
+@dataclass
+class UserGymState:
+    user_id: str
+    gym_id: int
+    current_stage: int
+    is_active: bool
+    last_updated: int

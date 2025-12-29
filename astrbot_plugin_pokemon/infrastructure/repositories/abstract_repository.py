@@ -5,7 +5,7 @@ from ...core.models.trainer_models import TrainerEncounter, TrainerLocation, Tra
 from ...core.models.user_models import User, UserTeam, UserItems, UserItemInfo
 from ...core.models.pokemon_models import PokemonSpecies, UserPokemonInfo, \
     WildPokemonInfo, WildPokemonEncounterLog, PokemonMoves, PokemonEvolutionInfo
-from ...core.models.adventure_models import LocationTemplate, LocationPokemon
+from ...core.models.adventure_models import LocationTemplate, LocationPokemon, GymInfo, UserBadge, UserGymState
 from ...core.models.shop_models import Shop
 
 
@@ -46,6 +46,9 @@ class AbstractUserRepository(ABC):
 
     @abstractmethod
     def update_user_last_adventure_time(self, user_id, last_adventure_time): pass
+
+    @abstractmethod
+    def update_user_max_location(self, user_id: str, location_id: int) -> None: pass
 
     @abstractmethod
     def get_all_users(self) -> List[User]: pass
@@ -157,6 +160,34 @@ class AbstractAdventureRepository(ABC):
     # 根据区域ID获取区域内的宝可梦
     @abstractmethod
     def get_location_pokemon_by_location_id(self, location_id: int) -> List[LocationPokemon]: pass
+
+    # 获取区域道馆信息
+    @abstractmethod
+    def get_gym_by_location(self, location_id: int) -> Optional['GymInfo']: pass
+
+    # 添加道馆模板
+    @abstractmethod
+    def add_gym_template(self, gym_data: Dict[str, Any]) -> None: pass
+
+    # ==========徽章管理==========
+    @abstractmethod
+    def add_user_badge(self, user_id: str, gym_id: int, badge_id: int) -> None: pass
+
+    @abstractmethod
+    def get_user_badges(self, user_id: str) -> List[UserBadge]: pass
+
+    @abstractmethod
+    def has_badge(self, user_id: str, badge_id: int) -> bool: pass
+
+    # ==========道馆状态管理==========
+    @abstractmethod
+    def save_gym_state(self, state: UserGymState) -> None: pass
+
+    @abstractmethod
+    def get_gym_state(self, user_id: str) -> Optional[UserGymState]: pass
+
+    @abstractmethod
+    def delete_gym_state(self, user_id: str) -> None: pass
 
 class AbstractShopRepository(ABC):
     """商店数据仓储接口"""

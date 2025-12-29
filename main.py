@@ -298,6 +298,18 @@ class PokemonPlugin(Star):
         async for r in self.adventure_handlers.adventure(event):
             yield r
 
+    @filter.command("挑战道馆", alias={"道馆挑战"})
+    async def challenge_gym(self, event: AstrMessageEvent):
+        """挑战当前区域的道馆。用法：/挑战道馆 [区域ID]"""
+        async for r in self.adventure_handlers.challenge_gym(event):
+            yield r
+
+    @filter.command("放弃道馆", alias={"放弃挑战"})
+    async def give_up_gym(self, event: AstrMessageEvent):
+        """放弃当前的道馆挑战进度"""
+        async for r in self.adventure_handlers.give_up_gym(event):
+            yield r
+
     @filter.command("战斗")
     async def battle(self, event: AstrMessageEvent):
         """与当前遇到的野生宝可梦战斗"""

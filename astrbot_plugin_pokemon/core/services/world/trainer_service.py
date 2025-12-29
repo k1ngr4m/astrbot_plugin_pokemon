@@ -77,7 +77,8 @@ class TrainerService:
                     ivs=pokemon_detail.ivs,
                     evs=pokemon_detail.evs,
                     moves=pokemon_detail.moves,
-                    nature_id=pokemon_detail.nature_id
+                    nature_id=pokemon_detail.nature_id,
+                    current_hp=pokemon_detail.stats.hp  # Initialize Full HP
                 )
                 pokemon_instances.append(user_pokemon_info)
             else:

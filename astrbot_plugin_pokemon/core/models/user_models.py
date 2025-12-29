@@ -14,6 +14,7 @@ class User:
     origin_id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
+    max_unlocked_location_id: int = 1  # 默认只能进入 ID 为 1 的区域
     isdel: Optional[int] = 0
 
 @dataclass

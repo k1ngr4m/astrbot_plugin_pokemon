@@ -20,6 +20,7 @@ class TeamHandlers:
         self.pokemon_service = container.pokemon_service
         self.nature_service = container.nature_service
         self.ability_service = container.ability_service
+        self.adventure_service = container.adventure_service
         self.tmp_dir = container.tmp_dir
 
     async def set_team(self, event: AstrMessageEvent):
@@ -135,6 +136,12 @@ class TeamHandlers:
         if user.coins < cost:
             yield event.plain_result(f"金币不足！恢复队伍需要 {cost} 金币，您当前有 {user.coins} 金币。")
             return
+
+        # 检查是否在道馆挑战中
+        state = self.adventure_service.adventure_repo.get_gym_state(user_id)
+        if state and state.is_active:
+             yield event.plain_result(f"您正在挑战道馆中！\n无法使用宝可梦中心治疗。\n如果不敌，可以使用背包中的药品，或输入 /放弃道馆 退出挑战。")
+             return
 
         # 获取用户队伍
         team_result = self.team_service.get_user_team(user_id)

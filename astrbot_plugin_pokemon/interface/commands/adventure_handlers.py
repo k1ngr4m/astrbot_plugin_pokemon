@@ -42,7 +42,7 @@ class AdventureHandlers:
             yield event.plain_result(check_res.message)
             return
 
-        result = self.adventure_service.get_all_locations()
+        result = self.adventure_service.get_all_locations(user_id)
         if not result.success:
             yield event.plain_result(result.message)
             return
@@ -440,6 +440,68 @@ class AdventureHandlers:
                 yield event.plain_result(f"🏃 您成功从 {wild_pokemon.name} 身边逃跑了！")
             else:
                 yield event.plain_result(f"😅 逃跑失败！{wild_pokemon.name} 还在盯着你...\n请选择 /战斗 或再次 /逃跑。")
+
+    async def challenge_gym(self, event: AstrMessageEvent):
+        """挑战道馆指令"""
+        user_id = userid_to_base32(event.get_sender_id())
+        check_res = await self._check_registered(user_id)
+        if not check_res.success:
+            yield event.plain_result(check_res.message)
+            return
+
+        # 检查是否处于其他战斗状态
+        if self.user_pokemon_service.get_user_encountered_wild_pokemon(user_id) or \
+           self.user_pokemon_service.get_user_current_trainer_encounter(user_id):
+            yield event.plain_result("请先完成当前的野生遭遇或战斗！")
+            return
+
+        args = event.message_str.split()
+        # 如果参数不足，尝试自动获取当前进行中的道馆挑战（如果有）
+        location_id = None
+        if len(args) < 2:
+            state = self.adventure_service.adventure_repo.get_gym_state(user_id)
+            if state and state.is_active:
+                gym = self.adventure_service.adventure_repo.get_gym_by_location(state.gym_id) # Gym ID assumed same as Location ID for simplicity? 
+                # !!! Wait. Earlier I said Gym ID and Location ID are different.
+                # Repo: get_gym_by_location(loc_id). 
+                # GymInfo: id, location_id. 
+                # Repo: get_gym_state -> UserGymState(gym_id=...).
+                # If I want to auto-resume, I need to know location_id from gym_id.
+                # I don't have get_location_by_gym_id.
+                # However, usually Gym ID 1 is at Location 1.
+                # Let's require ID for now to be safe, or just check state.gym_id and assume gym has access to its location.
+                # For now prompt user to input ID if missing.
+                yield event.plain_result("请输入道馆所在区域ID，例如：/挑战道馆 1")
+                return
+        else:
+            try:
+                location_id = int(args[1])
+            except ValueError:
+                yield event.plain_result("无效的区域ID")
+                return
+
+        result = self.adventure_service.challenge_gym(user_id, location_id)
+        
+        # 如果包含战斗结果数据，格式化并显示
+        if result.success and result.data:
+            # result.data 是 BattleResult (来自 start_trainer_battle)
+            battle_msg = self._format_battle_result_message(result.data)
+            # 组合消息：道馆进度/奖励信息 + 战斗总结
+            full_msg = f"{result.message}\n\n{'-'*20}\n{battle_msg}"
+            yield event.plain_result(full_msg)
+        else:
+            yield event.plain_result(result.message)
+
+    async def give_up_gym(self, event: AstrMessageEvent):
+        """放弃道馆挑战"""
+        user_id = userid_to_base32(event.get_sender_id())
+        check_res = await self._check_registered(user_id)
+        if not check_res.success:
+            yield event.plain_result(check_res.message)
+            return
+
+        result = self.adventure_service.give_up_gym(user_id)
+        yield event.plain_result(result.message)
 
     async def learn_move(self, event: AstrMessageEvent):
         """处理学习新技能指令 (入口)"""
