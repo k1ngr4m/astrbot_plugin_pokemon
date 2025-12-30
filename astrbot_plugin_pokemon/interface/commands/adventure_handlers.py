@@ -375,7 +375,7 @@ class AdventureHandlers:
             message_parts = [
                 f"🎉 捕捉成功！\n\n",
                 f"已添加 {wild_pokemon.name} 到收藏 (ID: {new_pokemon.id})。\n\n",
-                f"消耗: [{pokeball.item_id}] {pokeball.name_zh} (剩余: {pokeball.quantity - 1})\n\n"
+                f"消耗: 1个{pokeball.name_zh}[{pokeball.item_id}]  (剩余: {pokeball.quantity - 1})\n\n"
             ]
 
             # 添加特殊球的提示信息
